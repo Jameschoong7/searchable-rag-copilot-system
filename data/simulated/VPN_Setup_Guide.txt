@@ -1,0 +1,128 @@
+CENTIFIC MALAYSIA — IT INFRASTRUCTURE GUIDE
+Document: Azure VPN Client Setup & Troubleshooting Guide
+Version: 1.4 | Effective Date: 15 January 2026
+Department: IT & Engineering
+Classification: Internal Use Only
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. PURPOSE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+This guide explains how to install, configure, and troubleshoot the
+Azure VPN Client on your Centific Malaysia company workstation. You
+must be connected to the VPN whenever you are working remotely and
+need to access internal company systems.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. SYSTEMS THAT REQUIRE VPN ACCESS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The following systems are only accessible when connected to the
+Centific-Corp VPN:
+
+  - Internal SharePoint sites (intranet.centific.com)
+  - IT Helpdesk ticketing portal (helpdesk.centific.com)
+  - Azure DevOps (internal project repositories)
+  - GitHub Enterprise (company private repositories)
+  - Internal databases and data pipelines
+  - HR and payroll portal
+
+Note: Microsoft Teams, Outlook, and public-facing SharePoint sites
+do NOT require VPN and can be accessed from any network.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. INSTALLATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Step 1: Download the Azure VPN Client
+  - Open Microsoft Store on your Windows workstation
+  - Search for "Azure VPN Client"
+  - Click Install (it is free)
+  - For macOS users: download from
+    https://apps.apple.com — search "Azure VPN Client"
+
+Step 2: Download the VPN configuration profile
+  - Go to: https://vpn.centific.com/profile
+  - Log in with your corporate Microsoft 365 account
+  - Click "Download VPN Profile"
+  - Save the file — it will be named Centific-Corp.xml
+
+Step 3: Import the VPN profile
+  - Open the Azure VPN Client
+  - Click the "+" icon (bottom left) → Import
+  - Select the Centific-Corp.xml file you just downloaded
+  - The profile "Centific-Corp" will appear in the profile list
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. CONNECTING TO THE VPN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Once the profile is installed:
+
+  1. Open the Azure VPN Client
+  2. Select the "Centific-Corp" profile
+  3. Click the "Connect" button
+  4. A Microsoft login window will appear — enter your corporate
+     email (yourname@centific.com) and password
+  5. Approve the MFA notification in your Microsoft Authenticator app
+  6. Wait 5–10 seconds for the status bar to show "Connected"
+  7. You are now on the Centific internal network
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. DISCONNECTING FROM THE VPN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  1. Open the Azure VPN Client
+  2. Click the "Disconnect" button next to the Centific-Corp profile
+  3. Wait for the status to change to "Disconnected"
+
+Always disconnect from the VPN when you are finished working to
+avoid consuming VPN bandwidth and to reduce security exposure.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. TROUBLESHOOTING COMMON ISSUES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Issue: "Connection timed out" or VPN does not connect
+  - Check that your internet connection is working
+  - Try disconnecting and reconnecting once
+  - Restart the Azure VPN Client application
+  - If the issue persists for more than 5 minutes, contact IT
+    Helpdesk at ext. 1800
+
+Issue: "Authentication failed"
+  - Ensure you are using your CORPORATE email, not a personal one
+  - Check that your Microsoft Authenticator app is set up correctly
+  - If your password has expired, reset it first via
+    https://aka.ms/sspr before connecting
+
+Issue: VPN connects but cannot access internal sites
+  - Confirm the status bar shows "Connected" not just "Connecting"
+  - Try clearing your browser DNS cache:
+    Open Chrome → Settings → Privacy → Clear browsing data
+    → check "Cached images and files" → Clear data
+  - Try using a different browser
+  - If the problem persists, contact IT Helpdesk
+
+Issue: Lost or cannot find the Centific-Corp.xml profile file
+  - Re-download from https://vpn.centific.com/profile
+  - If access is blocked, contact IT Helpdesk who can email the
+    profile file to your personal email as a one-time exception
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. IMPORTANT SECURITY RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  - Never share your VPN profile file with anyone, including
+    colleagues. Each employee must download their own profile.
+  - Do not connect to the corporate VPN from a public or shared
+    computer (e.g. a hotel lobby PC, a friend's machine).
+  - Do not use personal VPN software alongside the Azure VPN Client.
+    This will cause connection conflicts and is a policy violation.
+  - VPN usage logs are retained and monitored for security purposes.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+8. CONTACT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+For all VPN issues not resolved by this guide:
+
+  IT Helpdesk
+  Phone: Ext. 1800
+  Email: ithelpdesk@centific.com
+  Hours: Monday to Friday, 9AM to 6PM
+
+Document Owner: IT Infrastructure Team, Centific Malaysia
+Next Review Date: 15 January 2027

@@ -1,0 +1,87 @@
+CENTIFIC MALAYSIA — IT POLICY
+Document: Approved Software List for Engineering Staff
+Version: 3.0 | Effective Date: 01 February 2026
+Department: IT & Engineering
+Classification: Internal Use Only
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. PURPOSE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+This document lists all software pre-approved for installation on
+Centific Malaysia company-issued workstations. Only software on this
+list may be installed without a formal IT request. Installing
+unapproved software is a violation of the IT Security Policy and may
+result in disciplinary action.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. PRE-APPROVED SOFTWARE (NO REQUEST NEEDED)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The following software is pre-approved for all Engineering staff and
+may be installed directly from the IT Software Portal or official
+vendor websites.
+
+DEVELOPMENT TOOLS
+  - Visual Studio Code (VS Code) — latest stable release
+  - Cursor IDE — latest stable release
+  - Git — latest stable release
+  - GitHub Desktop — latest stable release
+  - Python 3.10 or higher (official python.org release)
+  - Node.js LTS version (official nodejs.org release)
+  - Docker Desktop — for containerised development workflows
+  - Windows Subsystem for Linux (WSL2) — Ubuntu 22.04 LTS only
+
+COLLABORATION & PRODUCTIVITY
+  - Microsoft 365 Suite (Teams, Outlook, Word, Excel, OneNote,
+    SharePoint access) — installed via company M365 licence
+  - Slack — company workspace only
+  - Zoom — for external client calls only
+
+CLOUD & INFRASTRUCTURE
+  - Azure CLI — latest stable release
+  - Azure VPN Client — required for remote access to internal systems
+  - GitHub CLI (gh)
+
+BROWSERS
+  - Microsoft Edge — pre-installed, keep updated
+  - Google Chrome — allowed
+  - Mozilla Firefox — allowed
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. SOFTWARE REQUIRING AN IT REQUEST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+If you require software not listed in Section 2, you must submit a
+Software Installation Request via the IT ticketing portal at:
+  https://helpdesk.centific.com/software-request
+
+Your request must include:
+  - Software name and version
+  - Business justification (why is this needed for your work?)
+  - Link to the official vendor website
+  - Your line manager's name (approval will be sought from them)
+
+Requests are typically processed within 3 business days. The IT team
+will assess the software for security risks and licensing compliance
+before approving.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. STRICTLY PROHIBITED SOFTWARE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The following categories of software are NEVER permitted on company
+workstations, regardless of business justification:
+
+  - Peer-to-peer file sharing applications (e.g. BitTorrent)
+  - Unlicensed or cracked software of any kind
+  - Personal VPN clients (other than Azure VPN Client)
+  - Remote desktop tools not approved by IT
+    (e.g. AnyDesk, personal TeamViewer accounts)
+  - Cryptocurrency mining software
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. SOFTWARE UPDATES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+All approved software must be kept up-to-date. Security patches must
+be applied within 7 days of release. Workstations that are more than
+30 days behind on OS updates will be flagged by the security team.
+
+Document Owner: IT Engineering Team, Centific Malaysia
+Next Review Date: 01 February 2027

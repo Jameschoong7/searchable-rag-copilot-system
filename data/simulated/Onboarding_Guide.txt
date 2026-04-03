@@ -1,0 +1,109 @@
+CENTIFIC MALAYSIA — EMPLOYEE ONBOARDING GUIDE
+Document: New Employee Onboarding Runbook
+Version: 4.2 | Effective Date: 01 January 2026
+Department: Human Resources & IT
+Classification: Internal Use Only — New Hires
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WELCOME TO CENTIFIC MALAYSIA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Welcome to the team! This guide will walk you through everything you
+need to get set up and productive in your first week. Please read
+this document fully before your first day.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. BEFORE YOUR FIRST DAY (ACTION REQUIRED)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+You will receive a Welcome Email from HR containing:
+  - Your corporate email address (yourname@centific.com)
+  - A temporary password — valid for 24 hours only
+  - Instructions to set up Microsoft Authenticator (MFA)
+
+Action Required: Set up your MFA device before Day 1. If you do not
+complete this step, you will not be able to log in to any system on
+your first day.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. DAY 1 CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Complete all of the following on your first day:
+
+  [ ] Collect your company laptop from the IT Support Counter
+      (Level 3, Building A) — bring your Employee ID letter
+  [ ] Log in to your Microsoft 365 account and change your temporary
+      password immediately
+  [ ] Install the Microsoft Authenticator app on your phone and link
+      it to your corporate account
+  [ ] Install the Azure VPN Client (see Section 4 for remote work)
+  [ ] Join the #general and #engineering Slack channels
+  [ ] Book a 30-minute onboarding call with your assigned buddy
+      (your buddy's name is in your Welcome Email)
+  [ ] Read and sign the IT Acceptable Use Policy (emailed separately)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. SETTING UP YOUR DEVELOPMENT ENVIRONMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+For Engineering hires, your workstation comes pre-installed with:
+  - Windows 11 Pro with WSL2 (Ubuntu 22.04 LTS)
+  - Visual Studio Code with recommended extensions
+  - Git configured with the company's GitHub organisation
+  - Microsoft 365 Suite
+
+Additional software you should install on Day 1 (all pre-approved —
+no IT request needed):
+  - Docker Desktop
+  - Azure VPN Client
+  - GitHub Desktop or GitHub CLI
+  - Python 3.11 (from python.org — do not use the Microsoft Store
+    version)
+  - Node.js LTS
+
+For the full approved software list, see the IT Policy: Approved
+Software List document.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. REMOTE WORK AND VPN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Centific Malaysia supports hybrid work. To access internal systems
+from outside the office, you must connect to the company VPN first.
+
+VPN Client: Azure VPN Client
+VPN Profile Name: Centific-Corp
+
+To connect:
+  1. Open the Azure VPN Client application
+  2. Select the "Centific-Corp" profile
+  3. Click Connect
+  4. Authenticate using your Microsoft 365 account + MFA approval
+  5. Wait for the status to show "Connected"
+
+You must be on the VPN to access: internal SharePoint sites, the IT
+ticketing portal, GitHub Enterprise repositories, and Azure DevOps.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. IMPORTANT CONTACTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IT Helpdesk
+  Phone: Ext. 1800
+  Email: ithelpdesk@centific.com
+  Hours: Monday to Friday, 9AM to 6PM
+
+HR Department
+  Email: hr@centific.com
+  Location: Level 5, Building A
+
+Payroll Enquiries
+  Email: payroll@centific.com
+  Note: Payroll is processed on the 25th of each month.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. PROBATION PERIOD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+All new employees serve a 3-month probation period. During this
+period, your line manager will conduct monthly check-in reviews.
+Performance expectations for your role will be shared in your first
+week by your line manager. Probation confirmation or extension
+decisions are made by HR in consultation with your department head.
+
+Document Owner: Human Resources, Centific Malaysia
+Next Review Date: 01 January 2027
