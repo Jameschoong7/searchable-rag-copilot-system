@@ -45,6 +45,7 @@ langchain==1.2.14
 langchain-classic==1.0.3
 langchain-community==0.4.1
 langchain-core==1.2.25
+langchain-huggingface==1.2.1
 langchain-text-splitters==1.1.1
 langgraph==1.1.5
 langgraph-checkpoint==4.0.1
