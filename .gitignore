@@ -6,6 +6,6 @@ __pycache__/
 *.pyc
 *.pyo
 .DS_Store
-CLAUDE.md
-
-
+.codex
+PROJECT_MEMORY.md
+ui_prototype
