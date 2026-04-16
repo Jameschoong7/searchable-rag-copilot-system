@@ -66,10 +66,10 @@ def chunk_documents(documents: list) -> list:
     
     splitter = RecursiveCharacterTextSplitter(
         #max characters per chunk
-        chunk_size=500,
+        chunk_size=900,
 
         #overlap between consecutive chunks to preserve context
-        chunk_overlap=50,
+        chunk_overlap=100,
 
         #tries to split at paragraph first, then lines, then words
         separators=["\n\n","\n"," ",""]
