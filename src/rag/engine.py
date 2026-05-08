@@ -61,11 +61,15 @@ def build_context_and_sources(chunks:list) ->tuple[str,list]:
     #store source filenames for citation display
     sources = []
 
-    for chunk in chunks:
-        context_parts.append(chunk.page_content)
-
+    for index, chunk in enumerate(chunks, start=1):
         source_name = chunk.metadata.get("source","Unknown source")
         sources.append(source_name)
+
+        labelled_chunk = (
+            f"[Source {index}: {source_name}]\n"
+            f"{chunk.page_content}"
+        )
+        context_parts.append(labelled_chunk)
 
     #merge chunks into one prompt context block
     context_text = "\n\n".join(context_parts)
@@ -87,11 +91,14 @@ def generate_answer(question:str) -> dict:
     #system prompt (grounded rules for anti hallucination)
     prompt = f"""
     You are an internal knowledge assistant for Centific Malaysia.
-    Answer the user's question using only the context provided below.
-    If the answer is not clearly supported by the context, say that the information was not found in the available documents.
-    Keep the answer clear and professional.
 
-    Context:
+    Answer the user's question using only the provided source excerpts.
+    Use all relevant excerpts before deciding that information is missing.
+    If specific requirements, steps, or rules are present, list them clearly.
+    If the answer is not supported by the excerpts, say that the information was not found in the available documents.
+    Do not invent information.
+
+    Source excerpts:
     {context_text}
 
     Question:
