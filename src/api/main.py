@@ -2,7 +2,7 @@
 # REQ_F003: Provides the backend route that a future Teams chatbot can call
 # REQ_F005: Provides the backend route that the Streamlit web app can call
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 
@@ -40,9 +40,17 @@ class QueryResponse(BaseModel):
 @app.post("/query", response_model=QueryResponse)
 def query_knowledge_base(request: QueryRequest) -> QueryResponse:
     """Answer a user question by calling the shared RAG engine."""
+    question = request.question.strip()
+
+    if not question:
+        raise HTTPException(
+            status_code=400,
+            detail="Question cannot be empty.",
+        )
+
     from src.rag.engine import generate_answer
-    
-    result = generate_answer(request.question)
+
+    result = generate_answer(question)
 
     return QueryResponse(
         question=result["question"],
