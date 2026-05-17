@@ -48,9 +48,15 @@ def query_knowledge_base(request: QueryRequest) -> QueryResponse:
             detail="Question cannot be empty.",
         )
 
-    from src.rag.engine import generate_answer
+    try:
+        from src.rag.engine import generate_answer
 
-    result = generate_answer(question)
+        result = generate_answer(question)
+    except Exception as error:
+        raise HTTPException(
+            status_code=503,
+            detail=f"RAG backend is unavailable: {error}",
+        ) from error
 
     return QueryResponse(
         question=result["question"],
