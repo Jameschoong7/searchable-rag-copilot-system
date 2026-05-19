@@ -7,6 +7,23 @@ import streamlit as st
 
 API_URL = "http://127.0.0.1:8000/query"
 
+DEMO_ACCOUNTS = {
+    "admin_jc": {
+        "password": "password123",
+        "role": "System Admin",
+        "department": "IT",
+    },
+    "pm_engineering": {
+        "password": "password123",
+        "role": "Project Manager",
+        "department": "Engineering",
+    },
+    "employee_hr": {
+        "password": "password123",
+        "role": "General Employee",
+        "department": "HR",
+    },
+}
 
 def ask_backend(question: str) -> dict:
     """Send one user question to the shared FastAPI RAG backend."""
@@ -20,14 +37,61 @@ def ask_backend(question: str) -> dict:
     return response.json()
 
 
+def is_logged_in() -> bool:
+    """Check whether the current Streamlit session has an authenticated demo user."""
+    return "user" in st.session_state
+
+
+def login_user(username: str, password: str) -> bool:
+    """Validate a demo account and store role/department in the session."""
+    account = DEMO_ACCOUNTS.get(username)
+
+    if account is None or account["password"] != password:
+        return False
+
+    st.session_state["user"] = username
+    st.session_state["role"] = account["role"]
+    st.session_state["department"] = account["department"]
+    return True
+
+
+def logout_user() -> None:
+    """Clear demo authentication state from the current Streamlit session."""
+    st.session_state.clear()
+
+
 st.set_page_config(
     page_title="Searchable RAG Copilot",
     page_icon="R",
     layout="wide",
 )
 
+
+if not is_logged_in():
+    st.title("Searchable RAG Copilot")
+    st.caption("Demo sign-in for the standalone Admin Web Portal.")
+
+    username = st.text_input("Username", value="admin_jc")
+    password = st.text_input("Password", value="password123", type="password")
+
+    if st.button("Sign In"):
+        if login_user(username.strip(), password):
+            st.rerun()
+        else:
+            st.error("Invalid demo username or password.")
+
+    st.stop()
+
 st.title("Searchable RAG Copilot")
 st.caption("Admin Web Portal proof of connection to the shared FastAPI RAG backend.")
+st.sidebar.subheader("Current Session")
+st.sidebar.write(f"User: {st.session_state['user']}")
+st.sidebar.write(f"Role: {st.session_state['role']}")
+st.sidebar.write(f"Department: {st.session_state['department']}")
+
+if st.sidebar.button("Logout"):
+    logout_user()
+    st.rerun()
 
 question = st.text_input(
     "Ask a question",
