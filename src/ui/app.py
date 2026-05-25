@@ -1,11 +1,14 @@
 # REQ_F005: Streamlit Admin Web Portal for manager/admin workflows
 # REQ_F004: Displays cited answers returned by the shared FastAPI RAG backend
 
+import json
+from pathlib import Path
 import requests
 import streamlit as st
 
 
 API_URL = "http://127.0.0.1:8000/query"
+METADATA_PATH = Path("data/simulated/document_metadata.json")
 
 DEMO_ACCOUNTS = {
     "admin_jc": {
@@ -69,13 +72,33 @@ def get_kb_page_label() -> str:
     """Return the KB page label based on the current user's role."""
     if st.session_state["role"] in ["System Admin", "Project Manager"]:
         return "KB Management"
-    
+
     return "KB Status"
 
 
 def can_access_settings() -> bool:
     """Check whether the current user can access admin-only settings."""
     return st.session_state["role"] == "System Admin"
+
+
+def load_document_metadata() -> list[dict]:
+    """Load simulated document metadata for the KB Management/Status page."""
+    with METADATA_PATH.open("r", encoding="utf-8") as metadata_file:
+        return json.load(metadata_file)
+
+
+def can_view_document(document: dict) -> bool:
+    """Check whether the current user can see a document metadata row."""
+    role = st.session_state["role"]
+    department = st.session_state["department"]
+
+    if role == "System Admin":
+        return True
+
+    return (
+        role in document["allowed_roles"]
+        and department in document["allowed_departments"]
+    )
 
 
 st.set_page_config(
@@ -154,6 +177,24 @@ elif selected_page in ["KB Management", "KB Status"]:
             "Later this page will show view-only document status for the current user's "
             "allowed department and role."
         )
+
+    documents = load_document_metadata()
+    visible_documents = [
+        document for document in documents
+        if can_view_document(document)
+    ]
+
+    st.subheader("Visible Knowledge Base Documents")
+
+    if not visible_documents:
+        st.warning("No documents are visible for the current role and department.")
+    else:
+        st.dataframe(
+            visible_documents,
+            use_container_width=True,
+            hide_index=True,
+        )
+
 
 elif selected_page == "Chat":
     st.title("Chat")
