@@ -25,11 +25,16 @@ DEMO_ACCOUNTS = {
     },
 }
 
+
 def ask_backend(question: str) -> dict:
-    """Send one user question to the shared FastAPI RAG backend."""
+    """Send one user question and session context to the shared FastAPI RAG backend."""
     response = requests.post(
         API_URL,
-        json={"question": question},
+        json={
+            "question": question,
+            "role": st.session_state["role"],
+            "department": st.session_state["department"],
+        },
         timeout=120,
     )
 
@@ -146,7 +151,7 @@ elif selected_page in ["KB Management", "KB Status"]:
     else:
         st.caption("Department-scoped knowledge base status.")
         st.info(
-            "Later this page will show view-only document status for the current user's"
+            "Later this page will show view-only document status for the current user's "
             "allowed department and role."
         )
 
@@ -173,6 +178,10 @@ elif selected_page == "Chat":
                 else:
                     st.subheader("Answer")
                     st.write(result["answer"])
+                    st.caption(
+                        f"Query context: {result['role']} / {result['department']} "
+                        "(ACL filtering will be enforced in a later backend slice.)"
+                    )
 
                     st.subheader("Sources")
                     for source in result["sources"]:

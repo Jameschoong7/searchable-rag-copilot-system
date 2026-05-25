@@ -27,6 +27,8 @@ class QueryRequest(BaseModel):
     """Represent one user question sent from a frontend client."""
 
     question: str
+    role: str = "General Employee"
+    department: str = "General"
 
 
 class QueryResponse(BaseModel):
@@ -35,6 +37,8 @@ class QueryResponse(BaseModel):
     question: str
     answer: str
     sources: list[str]
+    role: str
+    department: str
 
 
 @app.post("/query", response_model=QueryResponse)
@@ -62,4 +66,6 @@ def query_knowledge_base(request: QueryRequest) -> QueryResponse:
         question=result["question"],
         answer=result["answer"],
         sources=result["sources"],
+        role=request.role,
+        department=request.department,
     )
