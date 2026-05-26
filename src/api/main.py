@@ -55,7 +55,11 @@ def query_knowledge_base(request: QueryRequest) -> QueryResponse:
     try:
         from src.rag.engine import generate_answer
 
-        result = generate_answer(question)
+        result = generate_answer(
+            question=question,
+            role=request.role,
+            department=request.department,
+        )
     except Exception as error:
         raise HTTPException(
             status_code=503,

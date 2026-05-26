@@ -1,5 +1,7 @@
 #REQ_F004: Retrieve relevant documents chunks and generate cited answers
 
+import json
+from pathlib import Path
 import os
 from dotenv import load_dotenv
 
@@ -19,6 +21,8 @@ from langchain_community.llms import Ollama
 
 #load .env file values
 load_dotenv()
+
+METADATA_PATH = Path("data/simulated/document_metadata.json")
 
 #function to load ChromaDB knowledge base data
 def load_vector_store() -> Chroma:
@@ -46,15 +50,98 @@ def load_vector_store() -> Chroma:
     return vector_store
 
 
-#function to find most relevant document chunks for a user question before answer generation
-def retrieve_relevant_chunks(question:str, top_k:int = 5) -> list:
+def load_document_metadata() -> list[dict]:
+    """Load simulated document metadata used for ACL filtering before retrieval."""
+    with METADATA_PATH.open("r", encoding="utf-8") as metadata_file:
+        return json.load(metadata_file)
+
+
+def can_access_document(document: dict, role: str, department: str) -> bool:
+    """Check whether a role and department can retrieve a document."""
+    if role == "System Admin":
+        return True
+
+    return (
+        role in document["allowed_roles"]
+        and department in document["allowed_departments"]
+    )
+
+
+def query_matches_document(question: str, document: dict) -> bool:
+    """Check whether a user question appears to target a document's metadata."""
+    query_text = question.lower()
+
+    searchable_metadata = " ".join(
+        [
+            document["title"],
+            document["category"],
+            " ".join(document["tags"]),
+        ]
+    ).lower()
+
+    return any(
+        word in searchable_metadata
+        for word in query_text.split()
+        if len(word) >= 4
+    )
+
+
+def get_allowed_source_path(role: str, department: str) -> list[dict]:
+    """Return Chroma source paths that the current user is allowed to retrieve."""
+    documents = load_document_metadata()
+
+    allowed_filenames = [
+        document["filename"]
+        for document in documents
+        if can_access_document(document, role, department)
+    ]
+
+    return [
+        f"data/simulated/{filename}"
+        for filename in allowed_filenames
+    ]
+
+
+def retrieve_relevant_chunks(
+    question:str,
+    role: str,
+    department: str,
+    top_k:int = 5,
+) -> list:
+    """Retrieve only chunks from documents allowed for the user's role and department."""
     vector_store = load_vector_store()
-    results = vector_store.similarity_search(question,k=top_k)
+    allowed_sources = get_allowed_source_path(role, department)
+
+    if not allowed_sources:
+        return []
+    
+    results = vector_store.similarity_search(
+        question,
+        k=top_k,
+        filter={"source": {"$in": allowed_sources}},
+    )
 
     return results
 
-#function to convert retrieved LangChain Document chunks into plain text context for LLM and extract source filenames for citation.
+
+def find_restricted_matching_documents(
+    question: str,
+    role: str,
+    department: str,
+) -> list[dict]:
+    """Find documents that match the question but are not accessible to the user."""
+    documents = load_document_metadata()
+
+    return [
+        document
+        for document in documents
+        if query_matches_document(question, document)
+        and not can_access_document(document, role, department)
+    ]
+
+
 def build_context_and_sources(chunks:list) ->tuple[str,list]:
+    """Convert retrieved LangChain Document chunks into plain text context for LLM and extract source filenames for citation."""
     #store text content for each retrieved chunk
     context_parts = []
 
@@ -80,10 +167,41 @@ def build_context_and_sources(chunks:list) ->tuple[str,list]:
     #return in tuple
     return context_text,unique_sources
 
-#function to retrieving relevant evidence, building a grounded prompt, calling LLM, and returning both answer and sources
-def generate_answer(question:str) -> dict:
+
+def generate_answer(
+    question: str,
+    role: str = "General Employee",
+    department: str = "General",
+) -> dict:
+    """Generate a cited answer using only documents allowed for the user."""
+    restricted_documents = find_restricted_matching_documents(
+        question,
+        role,
+        department,
+    )
+
+    if restricted_documents:
+        return {
+            "question": question,
+            "answer": (
+                "Insufficient Permission. A relevant document exists, but your "
+                "current role and department are not allowed to access that source."
+            ),
+            "sources": [],
+        }
+
     #retrieve most relevant document chunks
-    chunks = retrieve_relevant_chunks(question)
+    chunks = retrieve_relevant_chunks(question, role, department)
+
+    if not chunks:
+        return {
+            "question": question,
+            "answer": (
+                "I could not find relevant information in the documents available "
+                "to your current role and department."
+            ),
+            "sources": [],
+        }
 
     #prepare context and citation
     context_text, sources = build_context_and_sources(chunks)
@@ -95,8 +213,9 @@ def generate_answer(question:str) -> dict:
     Answer the user's question using only the provided source excerpts.
     Use all relevant excerpts before deciding that information is missing.
     If specific requirements, steps, or rules are present, list them clearly.
-    If the answer is not supported by the excerpts, say that the information was not found in the available documents.
-    Do not invent information.
+    If the exact answer is not explicitly supported by the excerpts, say that the information was not found in the available documents.
+    Do not infer policies, requirements, numbers, or rules from related but incomplete text.
+    Temporary password setup instructions are not the same as password policy requirements.
 
     Source excerpts:
     {context_text}
