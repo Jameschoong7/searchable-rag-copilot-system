@@ -149,11 +149,94 @@ if st.sidebar.button("Logout"):
 
 if selected_page == "Performance":
     st.title("Performance")
-    st.caption("Dashboard placeholder for retrieval evaluation and system performance.")
+    st.caption(
+        "Simulated retrieval evaluation dashboard. Later this will be backed by "
+        "labelled query tests and real request logs."
+    )
 
-    st.info(
-        "Later this page will show Top-K Accuracy, miss rate, indexed documents, "
-        "latency, and the retrieval miss / improvement log."
+    documents = load_document_metadata()
+    indexed_document_count = len(documents)
+
+    metric_columns = st.columns(4)
+
+    with metric_columns[0]:
+        st.metric(
+            "Time-to-First-Answer",
+            "1.8s",
+            "Target: < 10s",
+        )
+
+    with metric_columns[1]:
+        st.metric(
+              "Top-K Accuracy (K=5)",
+              "91.2%",
+              "95 / 104 test queries",
+        )
+
+    with metric_columns[2]:
+        st.metric(
+            "Miss Rate",
+            "8.8%",
+            "9 queries need review",
+        )
+
+    with metric_columns[3]:
+        st.metric(
+            "Indexed Documents",
+            f"{indexed_document_count}",
+            "Simulated KB records",
+        )
+
+    st.divider()
+
+    chart_columns = st.columns([2, 1])
+
+    with chart_columns[0]:
+        st.subheader("Query Response Latency - Past 7 Days")
+        latency_data = {
+            "Average latency (seconds)": [1.1, 1.4, 0.9, 1.7, 1.3, 1.5, 1.8]
+        }
+        st.line_chart(latency_data)
+
+    with chart_columns[1]:
+        st.subheader("Benchmark Definition")
+        st.write(
+            "Top-K Accuracy means the correct source document appears within "
+            "the top 5 retrieved chunks."
+        )
+        st.write("Current simulated benchmark: 95 correct / 104 labelled queries.")
+        st.write(
+            "The dashboard is simulated until a labelled evaluation set and "
+            "request logging are implemented."
+        )
+
+    st.subheader("Retrieval Miss / Improvement Log")
+
+    miss_rows = [
+        {
+            "Query ID": "Q-018",
+            "User Query": "VPN profile missing",
+            "Issue": "Correct chunk ranked #7",
+            "Next Enhancement": "Improve metadata tags or increase K",
+        },
+        {
+            "Query ID": "Q-041",
+            "User Query": "Access approval flow",
+            "Issue": "Diagram text missing",
+            "Next Enhancement": "OCR + diagram caption extraction",
+        },
+        {
+            "Query ID": "Q-073",
+            "User Query": "HR claim limit",
+            "Issue": "Outdated source PDF",
+            "Next Enhancement": "Re-index updated SharePoint file",
+        },
+    ]
+
+    st.dataframe(
+        miss_rows,
+        use_container_width=True,
+        hide_index=True,
     )
 
 elif selected_page in ["KB Management", "KB Status"]:
@@ -161,22 +244,10 @@ elif selected_page in ["KB Management", "KB Status"]:
 
     if st.session_state["role"] == "System Admin":
         st.caption("Global knowledge base management for all departments.")
-        st.info(
-            "Later this page will show all document metadata, source connectors, "
-            "upload/indexing controls, ACL metadata, and visual extraction status."
-        )
     elif st.session_state["role"] == "Project Manager":
         st.caption("Department-scoped knowledge base management.")
-        st.info(
-            "Later this page will show manageable documents for the current department only, "
-            "with department-level upload/request controls."
-        )
     else:
         st.caption("Department-scoped knowledge base status.")
-        st.info(
-            "Later this page will show view-only document status for the current user's "
-            "allowed department and role."
-        )
 
     documents = load_document_metadata()
     visible_documents = [
