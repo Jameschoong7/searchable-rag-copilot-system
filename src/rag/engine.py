@@ -86,7 +86,7 @@ def query_matches_document(question: str, document: dict) -> bool:
     )
 
 
-def get_allowed_source_path(role: str, department: str) -> list[dict]:
+def get_allowed_source_path(role: str, department: str) -> list[str]:
     """Return Chroma source paths that the current user is allowed to retrieve."""
     documents = load_document_metadata()
 
