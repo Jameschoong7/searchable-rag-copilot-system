@@ -29,7 +29,11 @@ DEMO_ACCOUNTS = {
 }
 
 
-def ask_backend(question: str) -> dict:
+def ask_backend(
+    question: str,
+    department_filter: str | None,
+    file_type_filter: str | None,
+) -> dict:
     """Send one user question and session context to the shared FastAPI RAG backend."""
     response = requests.post(
         API_URL,
@@ -37,6 +41,8 @@ def ask_backend(question: str) -> dict:
             "question": question,
             "role": st.session_state["role"],
             "department": st.session_state["department"],
+            "department_filter": department_filter,
+            "file_type_filter": file_type_filter,
         },
         timeout=120,
     )
@@ -470,35 +476,186 @@ elif selected_page in ["KB Management", "KB Status"]:
 
 elif selected_page == "Chat":
     st.title("Chat")
-    st.caption("Ask a question through the shared FastAPI RAG backend.")
+    if "chat_messages" not in st.session_state:
+        st.session_state["chat_messages"] = []
 
-    question = st.text_input(
-        "Ask a question",
-        placeholder="Example: What are the password policy requirements?",
+    documents = load_document_metadata()
+    visible_documents = [
+        document for document in documents
+        if can_view_document(document)
+    ]
+
+    available_departments = sorted(
+        {document["department"] for document in visible_documents}
+    )
+    available_file_types = sorted(
+        {document["file_type"] for document in visible_documents}
     )
 
-    if st.button("Search Knowledge Base"):
-        if not question.strip():
+    st.caption("Ask questions through the shared FastAPI RAG backend.")
+
+    with st.container(border=True):
+        filter_columns = st.columns([1, 1, 2])
+        if st.session_state["role"] == "System Admin":
+            with filter_columns[0]:
+                department_filter = st.selectbox(
+                    "Department",
+                    ["All"] + available_departments,
+                )
+
+            with filter_columns[1]:
+                file_type_filter = st.selectbox(
+                    "File Type",
+                    ["All"] + available_file_types,
+                )
+
+            filter_status = (
+                f"Selected filter: Department = {department_filter}, "
+                f"File Type = {file_type_filter}"
+            )
+
+        elif st.session_state["role"] == "Project Manager":
+            department_filter = st.session_state["department"]
+
+            with filter_columns[0]:
+                st.text_input(
+                    "Department",
+                    value=department_filter,
+                    disabled=True,
+                )
+
+            with filter_columns[1]:
+                file_type_filter = st.selectbox(
+                    "File Type",
+                    ["All"] + available_file_types,
+                )
+
+            filter_status = (
+                f"Selected filter: Department = {department_filter}, "
+                f"File Type = {file_type_filter}"
+            )
+
+        else:
+            department_filter = st.session_state["department"]
+            file_type_filter = "All"
+
+            with filter_columns[0]:
+                st.text_input(
+                    "Department",
+                    value=department_filter,
+                    disabled=True,
+                )
+
+            with filter_columns[1]:
+                st.text_input(
+                    "File Type",
+                    value="Not available",
+                    disabled=True,
+                )
+
+            filter_status = (
+                "Scope: simple employee chat. Advanced filters are not available "
+                "for General Employee role."
+            )
+
+        with filter_columns[2]:
+            st.text_input(
+                "Selected Search Scope",
+                value=filter_status,
+                disabled=True,
+            )
+
+    st.divider()
+
+    if st.button("Clear Chat"):
+        st.session_state["chat_messages"] = []
+        st.rerun()
+
+    chat_container = st.container(height=420, border=True)
+
+    with chat_container:
+        for message in st.session_state["chat_messages"]:
+            with st.chat_message(message["role"]):
+                st.write(message["content"])
+
+                if message.get("sources"):
+                    st.caption("Sources")
+                    for source in message["sources"]:
+                        st.code(source)
+
+                if message.get("context"):
+                    st.caption(message["context"])
+
+    question = st.chat_input("Ask a question about the knowledge base...")
+
+    if question:
+        clean_question = question.strip()
+
+        if not clean_question:
             st.warning("Please enter a question before searching.")
         else:
-            with st.spinner("Retrieving authorised knowledge chunks and generating answer..."):
-                try:
-                    result = ask_backend(question.strip())
-                except requests.exceptions.HTTPError as error:
-                    st.error(f"API returned an error: {error.response.text}")
-                except requests.exceptions.RequestException as error:
-                    st.error(f"Could not connect to the FastAPI backend: {error}")
-                else:
-                    st.subheader("Answer")
-                    st.write(result["answer"])
-                    st.caption(
-                        f"Query context: {result['role']} / {result['department']} "
-                        "(ACL filtering will be enforced in a later backend slice.)"
-                    )
+            user_message = {
+                "role": "user",
+                "content": clean_question,
+            }
 
-                    st.subheader("Sources")
-                    for source in result["sources"]:
-                        st.code(source)
+            st.session_state["chat_messages"].append(user_message)
+
+            with chat_container:
+                with st.chat_message("user"):
+                    st.write(clean_question)
+
+                with st.chat_message("assistant"):
+                    with st.spinner(
+                        "Retrieving authorised knowledge chunks and generating answer..."
+                    ):
+                        try:
+                            result = ask_backend(
+                                clean_question,
+                                department_filter,
+                                file_type_filter,
+                            )
+                        except requests.exceptions.HTTPError as error:
+                            assistant_message = {
+                                "role": "assistant",
+                                "content": f"API returned an error: {error.response.text}",
+                                "sources": [],
+                                "context": "",
+                            }
+                        except requests.exceptions.RequestException as error:
+                            assistant_message = {
+                                "role": "assistant",
+                                "content": f"Could not connect to the FastAPI backend: {error}",
+                                "sources": [],
+                                "context": "",
+                            }
+                        else:
+                            context_text = (
+                                f"Query context: {result['role']} / {result['department']} | "
+                                f"Department filter: {department_filter} | "
+                                f"File type filter: {file_type_filter}"
+                            )
+
+                            assistant_message = {
+                                "role": "assistant",
+                                "content": result["answer"],
+                                "sources": result["sources"],
+                                "context": context_text,
+                            }
+
+                    st.write(assistant_message["content"])
+
+                    if assistant_message.get("sources"):
+                        st.caption("Sources")
+                        for source in assistant_message["sources"]:
+                            st.code(source)
+
+                    if assistant_message.get("context"):
+                        st.caption(assistant_message["context"])
+
+            st.session_state["chat_messages"].append(assistant_message)
+            st.rerun()
+
 
 elif selected_page == "Settings":
     st.title("Settings")

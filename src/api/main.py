@@ -29,6 +29,8 @@ class QueryRequest(BaseModel):
     question: str
     role: str = "General Employee"
     department: str = "General"
+    department_filter: str | None = None
+    file_type_filter: str | None = None
 
 
 class QueryResponse(BaseModel):
@@ -59,6 +61,8 @@ def query_knowledge_base(request: QueryRequest) -> QueryResponse:
             question=question,
             role=request.role,
             department=request.department,
+            department_filter=request.department_filter,
+            file_type_filter=request.file_type_filter,
         )
     except Exception as error:
         raise HTTPException(

@@ -67,9 +67,49 @@ def can_access_document(document: dict, role: str, department: str) -> bool:
     )
 
 
+def document_matches_filters(
+    document: dict,
+    department_filter: str | None,
+    file_type_filter: str | None,
+) -> bool:
+    """Check whether a document matches optional user-selected search filters."""
+    if department_filter and department_filter != "All":
+        if document["department"] != department_filter:
+            return False
+
+    if file_type_filter and file_type_filter != "All":
+        if document["file_type"] != file_type_filter:
+            return False
+
+    return True
+
+
 def query_matches_document(question: str, document: dict) -> bool:
     """Check whether a user question appears to target a document's metadata."""
-    query_text = question.lower()
+    ignored_words = {
+        "what",
+        "when",
+        "where",
+        "which",
+        "with",
+        "from",
+        "that",
+        "this",
+        "does",
+        "have",
+        "policy",
+        "policies",
+        "requirement",
+        "requirements",
+        "procedure",
+        "process",
+    }
+    
+    query_keywords = [
+        word
+        for word in question.lower().split()
+        if len(word) >= 4 and word not in ignored_words
+    ]
 
     searchable_metadata = " ".join(
         [
@@ -79,22 +119,32 @@ def query_matches_document(question: str, document: dict) -> bool:
         ]
     ).lower()
 
-    return any(
-        word in searchable_metadata
-        for word in query_text.split()
-        if len(word) >= 4
-    )
+    return any(keyword in searchable_metadata for keyword in query_keywords)
 
 
-def get_allowed_source_path(role: str, department: str) -> list[str]:
+def get_allowed_source_path(
+    role: str,
+    department: str,
+    department_filter: str | None = None,
+    file_type_filter: str | None = None,
+) -> list[str]:
     """Return Chroma source paths that the current user is allowed to retrieve."""
     documents = load_document_metadata()
 
-    allowed_filenames = [
-        document["filename"]
-        for document in documents
-        if can_access_document(document, role, department)
-    ]
+    allowed_filenames = []
+
+    for document in documents:
+        if not can_access_document(document, role, department):
+            continue
+
+        if not document_matches_filters(
+            document,
+            department_filter,
+            file_type_filter,
+        ):
+            continue
+
+        allowed_filenames.append(document["filename"])
 
     return [
         f"data/simulated/{filename}"
@@ -106,11 +156,18 @@ def retrieve_relevant_chunks(
     question:str,
     role: str,
     department: str,
+    department_filter: str | None = None,
+    file_type_filter: str | None = None,
     top_k:int = 5,
 ) -> list:
     """Retrieve only chunks from documents allowed for the user's role and department."""
     vector_store = load_vector_store()
-    allowed_sources = get_allowed_source_path(role, department)
+    allowed_sources = get_allowed_source_path(
+        role,
+        department,
+        department_filter,
+        file_type_filter
+    )
 
     if not allowed_sources:
         return []
@@ -137,6 +194,29 @@ def find_restricted_matching_documents(
         for document in documents
         if query_matches_document(question, document)
         and not can_access_document(document, role, department)
+    ]
+
+
+def find_accessible_matching_documents(
+    question: str,
+    role: str,
+    department: str,
+    department_filter: str | None,
+    file_type_filter: str | None,
+) -> list[dict]:
+    """Find accessible documents that match the question and selected filters."""
+    documents = load_document_metadata()
+
+    return [
+        document
+        for document in documents
+        if query_matches_document(question, document)
+        and can_access_document(document, role, department)
+        and document_matches_filters(
+            document,
+            department_filter,
+            file_type_filter,
+        )
     ]
 
 
@@ -172,6 +252,8 @@ def generate_answer(
     question: str,
     role: str = "General Employee",
     department: str = "General",
+    department_filter: str | None = None,
+    file_type_filter: str | None = None,
 ) -> dict:
     """Generate a cited answer using only documents allowed for the user."""
     restricted_documents = find_restricted_matching_documents(
@@ -189,9 +271,39 @@ def generate_answer(
             ),
             "sources": [],
         }
+    
+    matching_documents = [
+        document
+        for document in load_document_metadata()
+        if query_matches_document(question, document)
+    ]
+
+    accessible_matching_documents = find_accessible_matching_documents(
+        question,
+        role,
+        department,
+        department_filter,
+        file_type_filter,
+    )
+
+    if matching_documents and not accessible_matching_documents:
+        return {
+            "question": question,
+            "answer": (
+                "I could not find that information within the documents available "
+                "for your current role, department, and selected filters."
+            ),
+            "sources": [],
+        }
 
     #retrieve most relevant document chunks
-    chunks = retrieve_relevant_chunks(question, role, department)
+    chunks = retrieve_relevant_chunks(
+        question,
+        role,
+        department,
+        department_filter,
+        file_type_filter,
+    )
 
     if not chunks:
         return {
