@@ -1,6 +1,7 @@
 # REQ_F005: Streamlit Admin Web Portal for manager/admin workflows
 # REQ_F004: Displays cited answers returned by the shared FastAPI RAG backend
 
+from html import escape
 from datetime import datetime
 import json
 from pathlib import Path
@@ -11,6 +12,7 @@ import streamlit as st
 
 
 API_URL = "http://127.0.0.1:8000/query"
+API_HEALTH_URL = "http://127.0.0.1:8000/health"
 METADATA_PATH = Path("data/simulated/document_metadata.json")
 QUERY_LOG_DB_PATH = Path("data/logs/query_logs.db")
 
@@ -54,6 +56,16 @@ def ask_backend(
     response.raise_for_status()
     return response.json()
 
+
+def is_api_online() -> bool:
+    """Check whether the lightweight FastAPI health endpoint is reachable."""
+    try:
+        response = requests.get(API_HEALTH_URL, timeout=3)
+        response.raise_for_status()
+    except requests.exceptions.RequestException:
+        return False
+
+    return True
 
 def is_logged_in() -> bool:
     """Check whether the current Streamlit session has an authenticated demo user."""
@@ -297,7 +309,45 @@ if not is_logged_in():
 
     st.stop()
 
-st.title("Searchable RAG Copilot")
+
+api_online = is_api_online()
+api_status_label = "API Online" if api_online else "API Offline"
+api_status_color = "#166534" if api_online else "#991b1b"
+api_status_background = "#dcfce7" if api_online else "#fee2e2"
+
+st.markdown(
+    f"""
+    <div style="
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.35rem 0 0.65rem 0;
+        border-bottom: 1px solid #e5e7eb;
+        margin-bottom: 1rem;
+    ">
+        <div>
+            <div style="font-size: 1.1rem; font-weight: 700;">
+                Searchable RAG Copilot
+            </div>
+            <div style="font-size: 0.78rem; color: #64748b;">
+                Enterprise Knowledge Portal
+            </div>
+        </div>
+        <div style="
+            color: {api_status_color};
+            background: {api_status_background};
+            border-radius: 0.3rem;
+            padding: 0.28rem 0.55rem;
+            font-size: 0.76rem;
+            font-weight: 600;
+        ">
+            {escape(api_status_label)}
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.sidebar.subheader("Current Session")
 st.sidebar.write(f"User: {st.session_state['user']}")
 st.sidebar.write(f"Role: {st.session_state['role']}")
