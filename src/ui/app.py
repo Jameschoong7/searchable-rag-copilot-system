@@ -1,14 +1,18 @@
 # REQ_F005: Streamlit Admin Web Portal for manager/admin workflows
 # REQ_F004: Displays cited answers returned by the shared FastAPI RAG backend
 
+from datetime import datetime
 import json
 from pathlib import Path
+import sqlite3
+import time
 import requests
 import streamlit as st
 
 
 API_URL = "http://127.0.0.1:8000/query"
 METADATA_PATH = Path("data/simulated/document_metadata.json")
+QUERY_LOG_DB_PATH = Path("data/logs/query_logs.db")
 
 DEMO_ACCOUNTS = {
     "admin_jc": {
@@ -91,6 +95,86 @@ def load_document_metadata() -> list[dict]:
     """Load simulated document metadata for the KB Management/Status page."""
     with METADATA_PATH.open("r", encoding="utf-8") as metadata_file:
         return json.load(metadata_file)
+    
+
+def initialise_query_log_database() -> None:
+    """Create the local SQLite query log table if it does not exist."""
+    QUERY_LOG_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    with sqlite3.connect(QUERY_LOG_DB_PATH) as connection:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS query_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                user TEXT NOT NULL,
+                role TEXT NOT NULL,
+                department TEXT NOT NULL,
+                question TEXT NOT NULL,
+                department_filter TEXT,
+                file_type_filter TEXT,
+                status TEXT NOT NULL,
+                sources_json TEXT NOT NULL,
+                latency_seconds REAL NOT NULL
+            )
+            """
+        )
+
+
+def classify_answer_status(answer: str, sources: list[str]) -> str:
+    """Classify the result so dashboard metrics can group query outcomes."""
+    lowered_answer = answer.lower()
+
+    if "insufficient permission" in lowered_answer:
+        return "permission_block"
+    
+    if not sources:
+        return "not_found"
+    
+    return "success"
+
+
+def write_query_log(
+        question: str,
+        department_filter: str | None,
+        file_type_filter: str | None,
+        status: str,
+        sources: list[str],
+        latency_seconds: float,
+) -> None:
+    """Insert one structured chat query event into the local SQLite log."""
+    initialise_query_log_database()
+
+    with sqlite3.connect(QUERY_LOG_DB_PATH) as connection:
+        connection.execute(
+            """
+            INSERT INTO query_logs (
+                timestamp,
+                user,
+                role,
+                department,
+                question,
+                department_filter,
+                file_type_filter,
+                status,
+                sources_json,
+                latency_seconds
+            )
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                datetime.now().isoformat(timespec="seconds"),
+                st.session_state["user"],
+                st.session_state["role"],
+                st.session_state["department"],
+                question,
+                department_filter,
+                file_type_filter,
+                status,
+                json.dumps(sources),
+                round(latency_seconds, 3),
+            )
+        )
 
 
 def can_view_document(document: dict) -> bool:
@@ -610,12 +694,22 @@ elif selected_page == "Chat":
                         "Retrieving authorised knowledge chunks and generating answer..."
                     ):
                         try:
+                            start_time = time.perf_counter()
                             result = ask_backend(
                                 clean_question,
                                 department_filter,
                                 file_type_filter,
                             )
                         except requests.exceptions.HTTPError as error:
+                            latency_seconds = time.perf_counter() - start_time
+                            write_query_log(
+                                question=clean_question,
+                                department_filter=department_filter,
+                                file_type_filter=file_type_filter,
+                                status="api_error",
+                                sources=[],
+                                latency_seconds=latency_seconds,
+                            )
                             assistant_message = {
                                 "role": "assistant",
                                 "content": f"API returned an error: {error.response.text}",
@@ -623,6 +717,15 @@ elif selected_page == "Chat":
                                 "context": "",
                             }
                         except requests.exceptions.RequestException as error:
+                            latency_seconds = time.perf_counter() - start_time
+                            write_query_log(
+                                question=clean_question,
+                                department_filter=department_filter,
+                                file_type_filter=file_type_filter,
+                                status="connection_error",
+                                sources=[],
+                                latency_seconds=latency_seconds,
+                            )
                             assistant_message = {
                                 "role": "assistant",
                                 "content": f"Could not connect to the FastAPI backend: {error}",
@@ -630,6 +733,19 @@ elif selected_page == "Chat":
                                 "context": "",
                             }
                         else:
+                            latency_seconds = time.perf_counter() - start_time
+                            answer_status = classify_answer_status(
+                                result["answer"],
+                                result["sources"]
+                            )
+                            write_query_log(
+                                question=clean_question,
+                                department_filter=department_filter,
+                                file_type_filter=file_type_filter,
+                                status=answer_status,
+                                sources=result["sources"],
+                                latency_seconds=latency_seconds
+                            )
                             context_text = (
                                 f"Query context: {result['role']} / {result['department']} | "
                                 f"Department filter: {department_filter} | "
