@@ -177,6 +177,52 @@ def write_query_log(
         )
 
 
+def read_query_log_summary() -> dict:
+    """Read real local query-log signals for the Performance dashboard."""
+    initialise_query_log_database()
+
+    with sqlite3.connect(QUERY_LOG_DB_PATH) as connection:
+        summary_row = connection.execute(
+            """
+            SELECT
+                COUNT(*) AS total_queries,
+                COALESCE(AVG(latency_seconds), 0) AS average_latency,
+                SUM(CASE WHEN status = 'permission_block' THEN 1 ELSE 0 END)
+                    AS permission_blocks,
+                SUM(CASE WHEN status IN ('not_found', 'error') THEN 1 ELSE 0 END)
+                    AS unresolved_queries
+            FROM query_logs
+            """
+        ).fetchone()
+
+        recent_rows = connection.execute(
+            """
+            SELECT
+                timestamp,
+                user,
+                role,
+                department,
+                question,
+                department_filter,
+                file_type_filter,
+                status,
+                latency_seconds
+            FROM query_logs
+            ORDER BY id DESC
+            LIMIT 10
+            """
+        ).fetchall()
+
+        return {
+            "total_queries": summary_row[0],
+            "average_latency": summary_row[1],
+            "permission_blocks": summary_row[2] or 0,
+            "unresolved_queries": summary_row[3] or 0,
+            "recent_queries": recent_rows,
+        }
+    
+
+
 def can_view_document(document: dict) -> bool:
     """Check whether the current user can see a document metadata row."""
     role = st.session_state["role"]
@@ -246,6 +292,7 @@ if selected_page == "Performance":
 
     documents = load_document_metadata()
     indexed_document_count = len(documents)
+    query_log_summary = read_query_log_summary()
 
     metric_columns = st.columns(4)
 
@@ -275,6 +322,39 @@ if selected_page == "Performance":
             "Indexed Documents",
             f"{indexed_document_count}",
             "Simulated KB records",
+        )
+
+    st.caption(
+        "Benchmark cards above are simulated presentation placeholders until a "
+        "labelled evaluation dataset exists."
+    )
+
+    st.subheader("Live Query Signals")
+
+    live_metric_columns = st.columns(4)
+
+    with live_metric_columns[0]:
+        st.metric(
+            "Logged Queries",
+            query_log_summary["total_queries"]
+        )
+
+    with live_metric_columns[1]:
+        st.metric(
+            "Average Local Latency",
+            f"{query_log_summary['average_latency']:.2f}s",
+        )
+
+    with live_metric_columns[2]:
+        st.metric(
+            "Permission Blocks",
+            query_log_summary["permission_blocks"],
+        )
+
+    with live_metric_columns[3]:
+        st.metric(
+            "Not Found / Errors",
+            query_log_summary["unresolved_queries"],
         )
 
     st.divider()
@@ -328,6 +408,33 @@ if selected_page == "Performance":
         use_container_width=True,
         hide_index=True,
     )
+
+    st.subheader("Recent Logged Queries")
+
+    recent_query_rows = [
+        {
+            "Timestamp": row[0],
+            "User": row[1],
+            "Role": row[2],
+            "Department": row[3],
+            "Question": row[4],
+            "Department Filter": row[5],
+            "File Type Filter": row[6],
+            "Status": row[7],
+            "Latency (s)": row[8],
+        }
+        for row in query_log_summary["recent_queries"]
+    ]
+
+    if recent_query_rows:
+        st.dataframe(
+            recent_query_rows,
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("No logged chat queries yet. Submit a Chat query to create a log.")
+
 
 elif selected_page in ["KB Management", "KB Status"]:
     st.title(selected_page)
