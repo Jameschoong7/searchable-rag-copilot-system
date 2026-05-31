@@ -1,0 +1,28 @@
+CENTIFIC MALAYSIA - ENGINEERING STANDARD
+Document: Python Coding Standards
+Version: 1.3 | Effective Date: 12 March 2026
+Department: Engineering
+Classification: Internal - Engineering Team
+
+1. PURPOSE
+This standard keeps Python services readable, reviewable, and maintainable.
+
+2. STYLE
+- Use descriptive function and variable names.
+- Keep functions focused on one responsibility.
+- Add docstrings for public functions and non-obvious helpers.
+- Use type hints for inputs and return values where practical.
+- Avoid unrelated refactoring inside feature changes.
+
+3. ERROR HANDLING
+Validate user input near the boundary of the system. Return clear error
+responses from APIs. Log enough context to diagnose failures without storing
+passwords, access tokens, or confidential document content.
+
+4. TESTING
+Add focused tests for new behavior and bug fixes. For retrieval systems,
+verify both successful answers and grounded refusal or permission-block paths.
+
+5. REVIEW CHECKLIST
+Reviewers should confirm correctness, security impact, readability, and test
+coverage before approving a pull request.

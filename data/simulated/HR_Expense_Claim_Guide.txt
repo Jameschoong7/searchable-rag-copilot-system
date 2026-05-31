@@ -1,0 +1,34 @@
+CENTIFIC MALAYSIA - HUMAN RESOURCES GUIDE
+Document: Employee Expense Claim Submission Guide
+Version: 2.2 | Effective Date: 10 February 2026
+Department: Human Resources
+Classification: Internal - All Employees
+
+1. PURPOSE
+This guide explains how employees submit reimbursement claims for approved
+business expenses such as local travel, meals during client visits, and
+approved office supplies.
+
+2. REQUIRED INFORMATION
+Each claim must include:
+- claim category
+- business purpose
+- transaction date
+- amount in Malaysian Ringgit
+- receipt or invoice image
+- approving manager
+
+3. SUBMISSION DEADLINE
+Claims must be submitted through the HR portal within 30 calendar days from
+the transaction date. Claims submitted after the deadline require HR review
+and may be rejected.
+
+4. APPROVAL FLOW
+1. Employee uploads receipt and claim details.
+2. Direct manager validates the business purpose.
+3. Finance reviews the amount and supporting document.
+4. Approved reimbursement is included in the next available payroll cycle.
+
+5. RESTRICTIONS
+Personal expenses, unapproved subscriptions, and incomplete claims are not
+reimbursable. Contact hr-helpdesk@centific.com for submission issues.

@@ -1,0 +1,27 @@
+CENTIFIC MALAYSIA - SECURITY POLICY
+Document: Access Control And Role Assignment Policy
+Version: 3.1 | Effective Date: 20 January 2026
+Department: Security
+Classification: Restricted - Security And IT Administrators
+
+1. PURPOSE
+This policy defines how employees receive access to internal systems and how
+role assignments are reviewed.
+
+2. PRINCIPLE OF LEAST PRIVILEGE
+Employees receive only the permissions required for their current job
+responsibilities. Access must not be granted solely for convenience.
+
+3. ACCESS REQUEST FLOW
+1. Employee submits an access request with business justification.
+2. Direct manager validates the business need.
+3. System administrator assigns the approved role.
+4. Security team reviews the audit log.
+
+4. REVIEW FREQUENCY
+Privileged access must be reviewed every 90 days. Access that is no longer
+required must be removed promptly.
+
+5. RESTRICTIONS
+Employees must not share credentials or approve their own privileged-access
+requests. Contact security-operations@centific.com for urgent access issues.

@@ -1,0 +1,31 @@
+CENTIFIC MALAYSIA - SECURITY RUNBOOK
+Document: Security Incident Reporting And Response Guide
+Version: 2.5 | Effective Date: 01 February 2026
+Department: Security
+Classification: Internal - All Employees
+
+1. PURPOSE
+This guide explains how employees report suspected security incidents and
+what information should be included.
+
+2. REPORT IMMEDIATELY
+Employees should immediately report:
+- suspicious login notifications
+- lost or stolen company devices
+- suspected phishing emails
+- accidental sharing of confidential files
+- malware or ransomware warnings
+
+3. REPORTING CHANNEL
+Email security-operations@centific.com or call extension 1900. Include your
+name, department, the affected system, the time observed, and a short
+description. Do not forward suspicious attachments.
+
+4. FIRST RESPONSE
+Disconnect an affected device from the network if malware is suspected.
+Do not delete files, reset the device, or attempt your own investigation.
+Security staff will preserve evidence and provide next steps.
+
+5. ESCALATION
+Security Operations coordinates with IT, department leadership, and legal or
+privacy stakeholders when required.

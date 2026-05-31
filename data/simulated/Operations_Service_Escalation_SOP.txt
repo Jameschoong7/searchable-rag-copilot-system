@@ -1,0 +1,28 @@
+CENTIFIC MALAYSIA - OPERATIONS SOP
+Document: Internal Service Escalation Procedure
+Version: 1.6 | Effective Date: 15 February 2026
+Department: Operations
+Classification: Internal - Operations And Project Managers
+
+1. PURPOSE
+This SOP defines how operational issues are escalated when an internal
+service affects delivery, customer support, or employee productivity.
+
+2. SEVERITY LEVELS
+- Severity 1: service unavailable with major business impact
+- Severity 2: degraded service affecting multiple users
+- Severity 3: limited issue with workaround available
+
+3. ESCALATION FLOW
+1. Log the incident in the service desk portal.
+2. Record affected users, service, time detected, and business impact.
+3. Notify the service owner.
+4. Escalate Severity 1 issues to the Operations Duty Manager immediately.
+5. Provide status updates until service recovery is confirmed.
+
+4. COMMUNICATION FREQUENCY
+Severity 1 incidents require an update every 30 minutes. Severity 2 incidents
+require an update every 2 hours until a workaround or resolution is available.
+
+5. POST-INCIDENT REVIEW
+A review should document root cause, corrective actions, and follow-up owners.

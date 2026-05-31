@@ -294,25 +294,27 @@ if selected_page == "Performance":
     indexed_document_count = len(documents)
     query_log_summary = read_query_log_summary()
 
+    st.subheader("Planned Benchmark Metrics")
+
     metric_columns = st.columns(4)
 
     with metric_columns[0]:
         st.metric(
-            "Time-to-First-Answer",
+            "Target Time-to-First-Answer",
             "1.8s",
             "Target: < 10s",
         )
 
     with metric_columns[1]:
         st.metric(
-              "Top-K Accuracy (K=5)",
+              "Simulated Top-K Accuracy (K=5)",
               "91.2%",
               "95 / 104 test queries",
         )
 
     with metric_columns[2]:
         st.metric(
-            "Miss Rate",
+            "Simulated Miss Rate",
             "8.8%",
             "9 queries need review",
         )
@@ -727,13 +729,13 @@ elif selected_page == "Chat":
             )
 
         else:
-            department_filter = st.session_state["department"]
+            department_filter = None
             file_type_filter = "All"
 
             with filter_columns[0]:
                 st.text_input(
                     "Department",
-                    value=department_filter,
+                    value=st.session_state["department"],
                     disabled=True,
                 )
 
@@ -745,8 +747,8 @@ elif selected_page == "Chat":
                 )
 
             filter_status = (
-                "Scope: simple employee chat. Advanced filters are not available "
-                "for General Employee role."
+                "Scope: own department plus shared documents allowed by ACL. "
+                "Advanced filters are not available for General Employee role."
             )
 
         with filter_columns[2]:

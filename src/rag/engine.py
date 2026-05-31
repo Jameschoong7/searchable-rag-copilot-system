@@ -1,5 +1,6 @@
 #REQ_F004: Retrieve relevant documents chunks and generate cited answers
 
+import re
 import json
 from pathlib import Path
 import os
@@ -103,13 +104,13 @@ def query_matches_document(question: str, document: dict) -> bool:
         "requirements",
         "procedure",
         "process",
-    }
+}
     
-    query_keywords = [
+    query_keywords = {
         word
-        for word in question.lower().split()
+        for word in re.findall(r"[a-z0-9]+", question.lower())
         if len(word) >= 4 and word not in ignored_words
-    ]
+    }
 
     searchable_metadata = " ".join(
         [
@@ -119,7 +120,9 @@ def query_matches_document(question: str, document: dict) -> bool:
         ]
     ).lower()
 
-    return any(keyword in searchable_metadata for keyword in query_keywords)
+    metadata_words = set(re.findall(r"[a-z0-9]+", searchable_metadata))
+
+    return bool(query_keywords & metadata_words)
 
 
 def get_allowed_source_path(
@@ -172,13 +175,19 @@ def retrieve_relevant_chunks(
     if not allowed_sources:
         return []
     
-    results = vector_store.similarity_search(
+    scored_results = vector_store.similarity_search_with_relevance_scores(
         question,
         k=top_k,
         filter={"source": {"$in": allowed_sources}},
     )
 
-    return results
+    minimum_relevance_score = 0.35
+
+    return [
+        document
+        for document, score in scored_results
+        if score >= minimum_relevance_score
+    ]
 
 
 def find_restricted_matching_documents(
@@ -262,7 +271,15 @@ def generate_answer(
         department,
     )
 
-    if restricted_documents:
+    accessible_documents = find_accessible_matching_documents(
+        question,
+        role,
+        department,
+        department_filter,
+        file_type_filter,
+    )
+
+    if restricted_documents and not accessible_documents:
         return {
             "question": question,
             "answer": (
@@ -278,15 +295,7 @@ def generate_answer(
         if query_matches_document(question, document)
     ]
 
-    accessible_matching_documents = find_accessible_matching_documents(
-        question,
-        role,
-        department,
-        department_filter,
-        file_type_filter,
-    )
-
-    if matching_documents and not accessible_matching_documents:
+    if matching_documents and not accessible_documents:
         return {
             "question": question,
             "answer": (

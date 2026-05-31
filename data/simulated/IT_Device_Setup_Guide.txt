@@ -1,0 +1,30 @@
+CENTIFIC MALAYSIA - IT SUPPORT GUIDE
+Document: Company Laptop First-Day Setup Guide
+Version: 2.0 | Effective Date: 01 March 2026
+Department: IT
+Classification: Internal - IT And Engineering
+
+1. PURPOSE
+This guide explains the required first-day setup for a company-managed laptop.
+
+2. INITIAL SIGN-IN
+Sign in using the temporary password from the onboarding email. Change the
+temporary password when prompted and complete Microsoft Authenticator setup.
+
+3. REQUIRED SOFTWARE
+Confirm that the following tools are installed:
+- Microsoft 365 applications
+- Microsoft Teams
+- approved endpoint protection agent
+- Azure VPN Client
+- approved browser
+
+Engineering users may also request approved development tools through the IT
+service desk.
+
+4. DEVICE CHECKS
+Run system updates, restart the laptop, and confirm endpoint protection status
+shows active. Do not install unapproved software using a personal account.
+
+5. SUPPORT
+For setup issues, open an IT Helpdesk ticket or call extension 1800.

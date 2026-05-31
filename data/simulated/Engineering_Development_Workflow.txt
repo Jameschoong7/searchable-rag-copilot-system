@@ -1,0 +1,33 @@
+CENTIFIC MALAYSIA - ENGINEERING HANDBOOK
+Document: Software Development Workflow
+Version: 1.8 | Effective Date: 05 March 2026
+Department: Engineering
+Classification: Internal - Engineering Team
+
+1. PURPOSE
+This workflow describes how engineering work moves from task selection to
+production readiness.
+
+2. BRANCHING WORKFLOW
+Engineers create a short-lived feature branch from the current development
+branch. Branch names should follow:
+
+feature/TICKET-short-description
+fix/TICKET-short-description
+
+Direct commits to protected branches are not allowed.
+
+3. PULL REQUEST REVIEW
+Every pull request must:
+- link the related work item
+- describe the change and test evidence
+- receive at least one engineering reviewer approval
+- pass automated checks where configured
+
+4. TESTING
+The author should run relevant local tests before requesting review. Changes
+that affect shared APIs require an integration test or documented manual test.
+
+5. RELEASE HANDOFF
+Approved changes are merged according to the project release schedule.
+Rollback notes should be included for changes with operational impact.
