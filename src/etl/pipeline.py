@@ -69,7 +69,7 @@ def chunk_documents(documents: list) -> list:
         chunk_size=900,
 
         #overlap between consecutive chunks to preserve context
-        chunk_overlap=100,
+        chunk_overlap=250,
 
         #tries to split at paragraph first, then lines, then words
         separators=["\n\n","\n"," ",""]

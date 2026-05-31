@@ -128,10 +128,48 @@ def classify_answer_status(answer: str, sources: list[str]) -> str:
     if "insufficient permission" in lowered_answer:
         return "permission_block"
     
+    not_found_phrases = [
+        "not explicitly stated",
+        "unable to find",
+        "information missing",
+        "could not find",
+        "not found",
+    ]
+
+    if any(phrase in lowered_answer for phrase in not_found_phrases):
+        return "not_found"
+
     if not sources:
         return "not_found"
     
     return "success"
+
+
+def get_status_label(status: str) -> str:
+    """Return a user-facing label for one chat answer status"""
+    labels = {
+          "success": "Grounded Answer",
+          "permission_block": "Permission Block",
+          "not_found": "Not Found",
+          "api_error": "API Error",
+          "connection_error": "Connection Error",
+    }
+
+    return labels.get(status, "System Response")
+
+
+def show_status_message(status: str) -> None:
+    """Render a visible chat result state for the current assistant answer."""
+    label = get_status_label(status)
+
+    if status == "success":
+        st.success(label)
+    elif status == "permission_block":
+        st.warning(label)
+    elif status == "not_found":
+        st.info(label)
+    else:
+        st.error(label)
 
 
 def write_query_log(
@@ -769,6 +807,9 @@ elif selected_page == "Chat":
     with chat_container:
         for message in st.session_state["chat_messages"]:
             with st.chat_message(message["role"]):
+                if message["role"] == "assistant" and message.get("status"):
+                    show_status_message(message["status"])
+
                 st.write(message["content"])
 
                 if message.get("sources"):
@@ -778,6 +819,11 @@ elif selected_page == "Chat":
 
                 if message.get("context"):
                     st.caption(message["context"])
+
+    st.caption(
+        "Try: password policy requirements | security incident reporting procedure | "
+        "annual leave approval process | VPN setup"
+    )
 
     question = st.chat_input("Ask a question about the knowledge base...")
 
@@ -824,6 +870,7 @@ elif selected_page == "Chat":
                                 "content": f"API returned an error: {error.response.text}",
                                 "sources": [],
                                 "context": "",
+                                "status": "api_error",
                             }
                         except requests.exceptions.RequestException as error:
                             latency_seconds = time.perf_counter() - start_time
@@ -840,6 +887,7 @@ elif selected_page == "Chat":
                                 "content": f"Could not connect to the FastAPI backend: {error}",
                                 "sources": [],
                                 "context": "",
+                                "status": "connection_error",
                             }
                         else:
                             latency_seconds = time.perf_counter() - start_time
@@ -856,9 +904,9 @@ elif selected_page == "Chat":
                                 latency_seconds=latency_seconds
                             )
                             context_text = (
-                                f"Query context: {result['role']} / {result['department']} | "
-                                f"Department filter: {department_filter} | "
-                                f"File type filter: {file_type_filter}"
+                                f"Access context: {result['role']} / {result['department']} | "
+                                f"Search department: {department_filter or 'ACL-permitted shared scope'} | "
+                                f"File type: {file_type_filter}"
                             )
 
                             assistant_message = {
@@ -866,8 +914,10 @@ elif selected_page == "Chat":
                                 "content": result["answer"],
                                 "sources": result["sources"],
                                 "context": context_text,
+                                "status": answer_status,
                             }
 
+                    show_status_message(assistant_message["status"])
                     st.write(assistant_message["content"])
 
                     if assistant_message.get("sources"):

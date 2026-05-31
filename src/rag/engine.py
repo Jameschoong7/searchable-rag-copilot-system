@@ -229,6 +229,17 @@ def find_accessible_matching_documents(
     ]
 
 
+def calculate_chunk_evidence_score(chunk) -> int:
+    """Rank chunks with concrete lists and steps ahead of introductory text."""
+    content = chunk.page_content.lower()
+
+    return (
+        content.count("\n-")
+        + content.count("step ")
+        + content.count("must ")
+    )
+
+
 def build_context_and_sources(chunks:list) ->tuple[str,list]:
     """Convert retrieved LangChain Document chunks into plain text context for LLM and extract source filenames for citation."""
     #store text content for each retrieved chunk
@@ -237,7 +248,13 @@ def build_context_and_sources(chunks:list) ->tuple[str,list]:
     #store source filenames for citation display
     sources = []
 
-    for index, chunk in enumerate(chunks, start=1):
+    ordered_chunks = sorted(
+        chunks,
+        key=calculate_chunk_evidence_score,
+        reverse=True,
+    )
+
+    for index, chunk in enumerate(ordered_chunks, start=1):
         source_name = chunk.metadata.get("source","Unknown source")
         sources.append(source_name)
 
@@ -333,10 +350,19 @@ def generate_answer(
 
     Answer the user's question using only the provided source excerpts.
     Use all relevant excerpts before deciding that information is missing.
-    If specific requirements, steps, or rules are present, list them clearly.
-    If the exact answer is not explicitly supported by the excerpts, say that the information was not found in the available documents.
+    If any excerpt contains an explicit list of requirements, steps, or rules,
+    copy the concrete items into the answer clearly and completely.
+    Read every excerpt before deciding information is missing.
+    Do not say details are missing when a later excerpt contains them.
+    If the exact answer is genuinely not supported by any excerpt, say that
+    the information was not found in the available documents.
     Do not infer policies, requirements, numbers, or rules from related but incomplete text.
     Temporary password setup instructions are not the same as password policy requirements.
+    Extract facts exactly as written in the excerpts.
+    Preserve every number exactly. Never replace a number with a different value.
+    Do not merge, reinterpret, or add requirements from general knowledge.
+    When an excerpt contains a bullet list, reproduce only those bullet items.
+    Before answering, verify that every stated rule appears explicitly in the excerpts.
 
     Source excerpts:
     {context_text}
@@ -347,7 +373,8 @@ def generate_answer(
 
     llm = Ollama(
         base_url= os.getenv("OLLAMA_BASE_URL"),
-        model = os.getenv("OLLAMA_MODEL")
+        model = os.getenv("OLLAMA_MODEL"),
+        temperature=0,
     )
     # ── AZURE SWAP ──
     # Replace Ollama(...) above with:
