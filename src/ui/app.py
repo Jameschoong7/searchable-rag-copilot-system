@@ -348,10 +348,72 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.sidebar.subheader("Current Session")
-st.sidebar.write(f"User: {st.session_state['user']}")
-st.sidebar.write(f"Role: {st.session_state['role']}")
-st.sidebar.write(f"Department: {st.session_state['department']}")
+
+st.markdown(
+    """
+    <style>
+    [data-testid="stSidebar"] {
+        background-color: #f8fafc;
+        border-right: 1px solid #e2e8f0;
+    }
+
+    [data-testid="stSidebar"] [role="radiogroup"] {
+        gap: 0.2rem;
+    }
+
+    [data-testid="stSidebar"] [role="radiogroup"] label {
+        width: 100%;
+        padding: 0.58rem 0.7rem;
+        border-radius: 0.3rem;
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+    }
+
+    [data-testid="stSidebar"] [role="radiogroup"] label:hover {
+        background-color: #eef2f7;
+    }
+
+    [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
+        background-color: #e2e8f0;
+        font-weight: 600;
+    }
+
+    [data-testid="stSidebar"] [role="radiogroup"] > label
+    [data-testid="stMarkdownContainer"] {
+        width: 100%;
+    }
+
+    [data-testid="stSidebar"] [role="radiogroup"] > label > div:first-child {
+        display: none;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.sidebar.markdown("### Account")
+st.sidebar.caption(escape(st.session_state["user"]))
+st.sidebar.markdown(
+    f"""
+    <div style="
+        padding: 0.55rem 0.65rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.35rem;
+        background: #ffffff;
+        font-size: 0.78rem;
+        line-height: 1.65;
+        margin-bottom: 0.8rem;
+    ">
+        <strong>Role</strong><br>
+        {escape(st.session_state["role"])}<br>
+        <strong>Department</strong><br>
+        {escape(st.session_state["department"])}
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.sidebar.divider()
 
 kb_page_label = get_kb_page_label()
 
@@ -366,7 +428,9 @@ if can_access_settings():
 
 selected_page = st.sidebar.radio("Navigation", page_options)
 
-if st.sidebar.button("Logout"):
+st.sidebar.divider()
+
+if st.sidebar.button("Logout", use_container_width=True):
     logout_user()
     st.rerun()
 
