@@ -16,6 +16,27 @@ API_HEALTH_URL = "http://127.0.0.1:8000/health"
 METADATA_PATH = Path("data/simulated/document_metadata.json")
 QUERY_LOG_DB_PATH = Path("data/logs/query_logs.db")
 
+ROLE_AWARE_CHAT_PROMPTS = {
+    "System Admin": {
+        "Password Policy": "What are the password policy requirements?",
+        "Security Incident": "What is the security incident reporting procedure?",
+        "Annual Leave": "What is the annual leave approval process?",
+        "VPN Setup": "How do I set up the company VPN?",
+    },
+    "Project Manager": {
+        "Development Workflow": "What is the software development workflow?",
+        "Coding Standards": "What are the Python coding standards?",
+        "VPN Setup": "How do I set up the company VPN?",
+        "Security Incident": "What is the security incident reporting procedure?",
+    },
+    "General Employee": {
+        "Annual Leave": "What is the annual leave approval process?",
+        "Expense Claims": "How do I submit an expense claim?",
+        "Security Incident": "What is the security incident reporting procedure?",
+        "Onboarding": "What is the employee onboarding process?",
+    },
+}
+
 DEMO_ACCOUNTS = {
     "admin_jc": {
         "password": "password123",
@@ -66,6 +87,12 @@ def is_api_online() -> bool:
         return False
 
     return True
+
+
+def select_example_chat_prompt(prompt: str) -> None:
+    """Place an example prompt into the chat box so the user can review it."""
+    st.session_state["chat_question"] = prompt
+
 
 def is_logged_in() -> bool:
     """Check whether the current Streamlit session has an authenticated demo user."""
@@ -384,6 +411,10 @@ st.markdown(
     }
 
     [data-testid="stSidebar"] [role="radiogroup"] > label > div:first-child {
+        display: none;
+    }
+
+    [data-testid="stForm"] [data-testid="InputInstructions"] {
         display: none;
     }
     </style>
@@ -934,12 +965,49 @@ elif selected_page == "Chat":
                 if message.get("context"):
                     st.caption(message["context"])
 
-    st.caption(
-        "Try: password policy requirements | security incident reporting procedure | "
-        "annual leave approval process | VPN setup"
-    )
+    st.caption("Suggested questions")
 
-    question = st.chat_input("Ask a question about the knowledge base...")
+    example_prompts = ROLE_AWARE_CHAT_PROMPTS[st.session_state["role"]]
+    example_columns = st.columns(len(example_prompts))
+
+    for column, (label, prompt) in zip(example_columns, example_prompts.items()):
+        with column:
+            st.button(
+                label,
+                key=f"example_prompt_{label}",
+                on_click=select_example_chat_prompt,
+                args=(prompt,),
+                use_container_width=True,
+            )
+
+    if st.session_state["role"] == "General Employee":
+        st.caption("Access control demonstration")
+        st.button(
+            "Try Restricted IT Policy",
+            key="acl_demo_prompt",
+            on_click=select_example_chat_prompt,
+            args=("What are the password policy requirements?",),
+        )
+
+    with st.form("chat_question_form", clear_on_submit=True):
+        question_columns = st.columns([6, 1])
+
+        with question_columns[0]:
+            st.text_input(
+                "Ask a question about the knowledge base",
+                key="chat_question",
+                placeholder="Type or select an example question...",
+                label_visibility="collapsed",
+            )
+
+        with question_columns[1]:
+            send_question = st.form_submit_button(
+                "Send",
+                type="primary",
+                use_container_width=True,
+            )
+
+    question = st.session_state["chat_question"] if send_question else None
 
     if question:
         clean_question = question.strip()
