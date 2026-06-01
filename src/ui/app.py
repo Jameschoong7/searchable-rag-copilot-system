@@ -561,8 +561,8 @@ if selected_page == "Performance":
         )
         st.write("Current simulated benchmark: 95 correct / 104 labelled queries.")
         st.write(
-            "The dashboard is simulated until a labelled evaluation set and "
-            "request logging are implemented."
+            "Benchmark accuracy remains simulated until a labelled evaluation set exists. "
+            "Recent query signals are read from live local SQLite logs."
         )
 
     st.subheader("Retrieval Miss / Improvement Log")
@@ -644,27 +644,67 @@ elif selected_page in ["KB Management", "KB Status"]:
     with summary_columns[0]:
         with st.container(border=True):
             st.markdown("**Source Connectors**")
-            st.caption("Production direction: documents sync from enterprise sources.")
-            st.write("SharePoint Auto Sync: Connected / simulated")
-            st.write("OneNote Sync: Connected / simulated")
-            st.write("Manual Upload: Available")
-            st.write("Batch ZIP: Planned")
+            st.markdown(
+                """
+                <span style="
+                    color: #1d4ed8;
+                    background: #dbeafe;
+                    border-radius: 0.3rem;
+                    padding: 0.2rem 0.45rem;
+                    font-size: 0.7rem;
+                    font-weight: 700;
+                ">DEMO CONNECTORS</span>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.caption("Enterprise source integration direction")
+            st.markdown("- SharePoint\n- OneNote\n- Manual Upload\n- Batch ZIP")
 
     with summary_columns[1]:
         with st.container(border=True):
             st.markdown("**Document Metadata & ACL**")
-            st.caption("Access is decided before retrieval.")
-            st.write(f"Current role: {st.session_state['role']}")
-            st.write(f"Current department: {st.session_state['department']}")
-            st.write(f"Visible documents: {len(visible_documents)}")
+            st.markdown(
+                """
+                <span style="
+                    color: #166534;
+                    background: #dcfce7;
+                    border-radius: 0.3rem;
+                    padding: 0.2rem 0.45rem;
+                    font-size: 0.7rem;
+                    font-weight: 700;
+                ">ACTIVE</span>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.caption("Access is decided before retrieval")
+            st.markdown(
+                f"- Role: {escape(st.session_state['role'])}\n"
+                f"- Department: {escape(st.session_state['department'])}\n"
+                f"- Visible documents: {len(visible_documents)}"
+            )
 
     with summary_columns[2]:
         with st.container(border=True):
             st.markdown("**Visual Content Handling**")
-            st.caption("Supports the A3 diagram/OCR requirement.")
-            st.write("Text extraction: Available")
-            st.write("OCR captions: Planned")
-            st.write("Diagram extraction: Planned")
+            st.markdown(
+                """
+                <span style="
+                    color: #92400e;
+                    background: #fef3c7;
+                    border-radius: 0.3rem;
+                    padding: 0.2rem 0.45rem;
+                    font-size: 0.7rem;
+                    font-weight: 700;
+                ">PARTIAL SUPPORT</span>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.caption("Document extraction capability")
+            st.markdown(
+                "- Text extraction: Active for local files\n"
+                "- OCR captions: Roadmap\n"
+                "- Diagram extraction: Roadmap"
+            )
 
     st.subheader("Document Ingestion")
 
