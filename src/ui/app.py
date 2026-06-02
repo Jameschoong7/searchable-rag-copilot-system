@@ -9,6 +9,8 @@ import sqlite3
 import time
 import requests
 import streamlit as st
+import altair as alt
+import pandas as pd
 
 
 API_URL = "http://127.0.0.1:8000/query"
@@ -92,6 +94,14 @@ def is_api_online() -> bool:
 def select_example_chat_prompt(prompt: str) -> None:
     """Place an example prompt into the chat box so the user can review it."""
     st.session_state["chat_question"] = prompt
+
+
+def submit_chat_question() -> None:
+    """Stage the submitted draft and clear the visible input before rerun."""
+    st.session_state["pending_chat_question"] = st.session_state.get(
+        "chat_question",
+        "",
+    )
 
 
 def is_logged_in() -> bool:
@@ -544,28 +554,60 @@ if selected_page == "Performance":
 
     st.divider()
 
-    chart_columns = st.columns([2, 1])
+    st.subheader("Simulated 7-Day Latency Trend")
+    st.caption("Presentation placeholder. Live query latency appears in the metrics and recent-query table above.")
 
-    with chart_columns[0]:
-        st.subheader("Query Response Latency - Past 7 Days")
-        latency_data = {
-            "Average latency (seconds)": [1.1, 1.4, 0.9, 1.7, 1.3, 1.5, 1.8]
+    latency_data = pd.DataFrame(
+        {
+            "Demo Day": [
+                "Day 1",
+                "Day 2",
+                "Day 3",
+                "Day 4",
+                "Day 5",
+                "Day 6",
+                "Day 7",
+            ],
+            "Latency (seconds)": [1.1, 1.4, 0.9, 1.7, 1.3, 1.5, 1.8],
         }
-        st.line_chart(latency_data)
+    )
 
-    with chart_columns[1]:
-        st.subheader("Benchmark Definition")
-        st.write(
-            "Top-K Accuracy means the correct source document appears within "
-            "the top 5 retrieved chunks."
+    latency_chart = (
+        alt.Chart(latency_data)
+        .mark_bar(color="#6f8bc7", cornerRadiusTopLeft=3, cornerRadiusTopRight=3, size=100,)
+        .encode(
+            x=alt.X(
+                "Demo Day:N",
+                title="Demo Day",
+                sort=None,
+                axis=alt.Axis(labelAngle=0),
+            ),
+            y=alt.Y(
+                "Latency (seconds):Q",
+                title="Latency (seconds)",
+                scale=alt.Scale(domain=[0, 2.0]),
+            ),
+            tooltip=[
+                alt.Tooltip("Demo Day:N"),
+                alt.Tooltip("Latency (seconds):Q", format=".1f"),
+            ],
         )
-        st.write("Current simulated benchmark: 95 correct / 104 labelled queries.")
+        .properties(height=280)
+    )
+
+    st.altair_chart(latency_chart, use_container_width=True)
+
+    with st.expander("How benchmark accuracy is measured"):
         st.write(
-            "Benchmark accuracy remains simulated until a labelled evaluation set exists. "
-            "Recent query signals are read from live local SQLite logs."
+            "Top-K Accuracy checks whether the expected source document appears "
+            "within the top 5 retrieved chunks."
+        )
+        st.caption(
+            "Simulated benchmark: 95 correct / 104 labelled queries = 91.2%. "
+            "Live query signals come from local SQLite logs."
         )
 
-    st.subheader("Retrieval Miss / Improvement Log")
+    st.subheader("Simulated Retrieval Miss Review Log")
 
     miss_rows = [
         {
@@ -573,18 +615,21 @@ if selected_page == "Performance":
             "User Query": "VPN profile missing",
             "Issue": "Correct chunk ranked #7",
             "Next Enhancement": "Improve metadata tags or increase K",
+            "Status": "Reviewed",
         },
         {
             "Query ID": "Q-041",
             "User Query": "Access approval flow",
             "Issue": "Diagram text missing",
             "Next Enhancement": "OCR + diagram caption extraction",
+            "Status": "Reviewed",
         },
         {
             "Query ID": "Q-073",
             "User Query": "HR claim limit",
             "Issue": "Outdated source PDF",
             "Next Enhancement": "Re-index updated SharePoint file",
+            "Status": "Reviewed",
         },
     ]
 
@@ -1029,7 +1074,7 @@ elif selected_page == "Chat":
             args=("What are the password policy requirements?",),
         )
 
-    with st.form("chat_question_form", clear_on_submit=True):
+    with st.form("chat_question_form"):
         question_columns = st.columns([6, 1])
 
         with question_columns[0]:
@@ -1041,13 +1086,14 @@ elif selected_page == "Chat":
             )
 
         with question_columns[1]:
-            send_question = st.form_submit_button(
-                "Send",
-                type="primary",
-                use_container_width=True,
+            st.form_submit_button(
+            "Send",
+            type="primary",
+            use_container_width=True,
+            on_click=submit_chat_question,
             )
 
-    question = st.session_state["chat_question"] if send_question else None
+    question = st.session_state.pop("pending_chat_question", None)
 
     if question:
         clean_question = question.strip()

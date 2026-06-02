@@ -240,7 +240,7 @@ def calculate_chunk_evidence_score(chunk) -> int:
     )
 
 
-def build_context_and_sources(chunks:list) ->tuple[str,list]:
+def build_context_and_sources(chunks:list) -> tuple[str,list]:
     """Convert retrieved LangChain Document chunks into plain text context for LLM and extract source filenames for citation."""
     #store text content for each retrieved chunk
     context_parts = []
