@@ -98,10 +98,11 @@ def select_example_chat_prompt(prompt: str) -> None:
 
 def submit_chat_question() -> None:
     """Stage the submitted draft and clear the visible input before rerun."""
-    st.session_state["pending_chat_question"] = st.session_state.get(
-        "chat_question",
-        "",
-    )
+    draft_question = st.session_state.get("chat_question", "")
+
+    st.session_state["pending_chat_question"] = draft_question
+    st.session_state["chat_question"] = ""
+    st.session_state["chat_is_processing"] = bool(draft_question.strip())
 
 
 def is_logged_in() -> bool:
@@ -459,10 +460,12 @@ st.sidebar.divider()
 kb_page_label = get_kb_page_label()
 
 page_options = [
-    "Performance",
     kb_page_label,
     "Chat",
 ]
+
+if st.session_state["role"] in ["System Admin", "Project Manager"]:
+    page_options.insert(0, "Performance")
 
 if can_access_settings():
     page_options.append("Settings")
@@ -836,7 +839,7 @@ elif selected_page in ["KB Management", "KB Status"]:
 
         with filter_columns[0]:
             selected_department = st.selectbox(
-                "Department",
+                "Visible Document Department",
                 ["All"] + department_options,
             )
 
@@ -976,12 +979,15 @@ elif selected_page == "Chat":
             )
 
         elif st.session_state["role"] == "Project Manager":
-            department_filter = st.session_state["department"]
+            department_filter = None
 
             with filter_columns[0]:
                 st.text_input(
                     "Department",
-                    value=department_filter,
+                    value=(
+                        f"{st.session_state['department']} + "
+                        "ACL-permitted shared documents"
+                    ),
                     disabled=True,
                 )
 
@@ -992,8 +998,8 @@ elif selected_page == "Chat":
                 )
 
             filter_status = (
-                f"Selected filter: Department = {department_filter}, "
-                f"File Type = {file_type_filter}"
+                f"Selected filter: Department = {st.session_state['department']} + "
+                f"ACL-permitted shared documents, File Type = {file_type_filter}"
             )
 
         else:
@@ -1050,6 +1056,8 @@ elif selected_page == "Chat":
                 if message.get("context"):
                     st.caption(message["context"])
 
+    chat_is_processing = st.session_state.get("chat_is_processing", False)
+
     st.caption("Suggested questions")
 
     example_prompts = ROLE_AWARE_CHAT_PROMPTS[st.session_state["role"]]
@@ -1063,6 +1071,7 @@ elif selected_page == "Chat":
                 on_click=select_example_chat_prompt,
                 args=(prompt,),
                 use_container_width=True,
+                disabled=chat_is_processing,
             )
 
     if st.session_state["role"] == "General Employee":
@@ -1072,6 +1081,7 @@ elif selected_page == "Chat":
             key="acl_demo_prompt",
             on_click=select_example_chat_prompt,
             args=("What are the password policy requirements?",),
+            disabled=chat_is_processing,
         )
 
     with st.form("chat_question_form"):
@@ -1099,6 +1109,7 @@ elif selected_page == "Chat":
         clean_question = question.strip()
 
         if not clean_question:
+            st.session_state["chat_is_processing"] = False
             st.warning("Please enter a question before searching.")
         else:
             user_message = {
@@ -1197,6 +1208,7 @@ elif selected_page == "Chat":
                         st.caption(assistant_message["context"])
 
             st.session_state["chat_messages"].append(assistant_message)
+            st.session_state["chat_is_processing"] = False
             st.rerun()
 
 
