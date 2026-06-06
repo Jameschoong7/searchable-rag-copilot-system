@@ -18,6 +18,20 @@ API_HEALTH_URL = "http://127.0.0.1:8000/health"
 METADATA_PATH = Path("data/simulated/document_metadata.json")
 QUERY_LOG_DB_PATH = Path("data/logs/query_logs.db")
 
+ROLE_OPTIONS = [
+    "System Admin",
+    "Project Manager",
+    "General Employee",
+]
+
+DEPARTMENT_OPTIONS = [
+    "IT",
+    "Engineering",
+    "HR",
+    "Security",
+    "Operations",
+]
+
 ROLE_AWARE_CHAT_PROMPTS = {
     "System Admin": {
         "Password Policy": "What are the password policy requirements?",
@@ -322,6 +336,73 @@ def can_view_document(document: dict) -> bool:
     return (
         role in document["allowed_roles"]
         and department in document["allowed_departments"]
+    )
+
+
+def generate_document_id(documents: list[dict]) -> str:
+    """Generate the next local upload document ID."""
+    upload_count = sum(
+        1 for document in documents
+        if document["document_id"].startswith("DOC-UPLOAD-")
+    )
+
+    return f"DOC-UPLOAD-{upload_count + 1:03d}"
+
+
+def normalise_uploaded_filename(filename: str) -> str:
+    """Return the local filename used for uploaded simulated documents."""
+    return filename.replace(" ", "_")
+
+
+def prepare_upload_title_state(uploaded_file, upload_form_version: int) -> str:
+    """Prepare an editable title field when a new TXT file is selected."""
+    title_key = f"txt_upload_title_{upload_form_version}"
+    filename_key = f"txt_upload_filename_{upload_form_version}"
+
+    if uploaded_file is None:
+        return title_key
+
+    current_filename = normalise_uploaded_filename(uploaded_file.name)
+    previous_filename = st.session_state.get(filename_key)
+
+    if previous_filename != current_filename:
+        st.session_state[filename_key] = current_filename
+        st.session_state[title_key] = infer_title_from_uploaded_file(uploaded_file)
+
+    return title_key
+
+
+def save_uploaded_text_file(uploaded_file) -> str:
+    """Save an uploaded TXT file into the simulated data folder."""
+    filename = normalise_uploaded_filename(uploaded_file.name)
+    file_path = Path("data/simulated") / filename
+
+    file_path.write_bytes(uploaded_file.getvalue())
+
+    return filename
+
+
+def append_document_metadata(new_document: dict) -> None:
+    """Append a new document metadata record to the local metadata JSON file."""
+    documents = load_document_metadata()
+    documents.append(new_document)
+
+    with METADATA_PATH.open("w", encoding="utf-8") as metadata_file:
+        json.dump(documents, metadata_file, indent=2)
+
+
+def infer_title_from_uploaded_file(uploaded_file) -> str:
+    """Infer a default document title from the uploaded filename."""
+    return Path(uploaded_file.name).stem.replace("_", " ").replace("-", " ").title()
+
+
+def metadata_exists_for_filename(filename: str) -> bool:
+    """Check whether metadata already exists for an uploaded filename."""
+    documents = load_document_metadata()
+
+    return any(
+        document["filename"] == filename
+        for document in documents
     )
 
 
@@ -760,6 +841,118 @@ elif selected_page in ["KB Management", "KB Status"]:
         st.session_state["upload_message"] = ""
 
     with st.container(border=True):
+        if st.session_state["role"] == "System Admin":
+            st.markdown("**Real Local TXT Upload**")
+            st.caption(
+                "Uploads a TXT file into data/simulated and appends trusted metadata. "
+                "Rebuild the vector index after upload before searching the new document."
+            )
+
+            if "upload_form_version" not in st.session_state:
+                st.session_state["upload_form_version"] = 0
+
+            upload_form_version = st.session_state["upload_form_version"]
+
+            uploaded_file = st.file_uploader(
+                "TXT file",
+                type=["txt"],
+                key=f"txt_upload_file_{upload_form_version}",
+            )
+            
+            title_key = prepare_upload_title_state(uploaded_file, upload_form_version)
+
+            with st.form(f"real_txt_upload_form{upload_form_version}"):
+
+                title = st.text_input(
+                    "Document title",
+                    key=title_key,
+                    help="Auto-filled from the uploaded filename. Admin may edit it.",
+                )
+                department = st.selectbox(
+                    "Department",
+                    DEPARTMENT_OPTIONS,
+                    key=f"txt_upload_department_{upload_form_version}",
+                )
+                category = st.text_input(
+                    "Category",
+                    value="General",
+                    key=f"txt_upload_category_{upload_form_version}",
+                )
+                tags_text = st.text_input(
+                    "Tags",
+                    value="policy, internal",
+                    help="Separate tags with commas.",
+                    key=f"txt_upload_tags_{upload_form_version}",
+                )
+                allowed_roles = st.multiselect(
+                    "Allowed roles",
+                    ROLE_OPTIONS,
+                    default=["System Admin"],
+                    key=f"txt_upload_roles_{upload_form_version}",
+                )
+                allowed_departments = st.multiselect(
+                    "Allowed departments",
+                    DEPARTMENT_OPTIONS,
+                    default=[department],
+                    key=f"txt_upload_departments_{upload_form_version}",
+                )
+
+                submitted_upload = st.form_submit_button("Save TXT + Metadata")
+
+                if submitted_upload:
+                    if uploaded_file is None:
+                        st.error("Please choose a TXT file before saving.")
+                    elif not title.strip():
+                        st.error("Please enter a document title.")
+                    elif not allowed_roles:
+                        st.error("Please select at least one allowed role.")
+                    elif not allowed_departments:
+                        st.error("Please select at least one allowed department.")
+                    else:
+                        documents = load_document_metadata()
+                        filename = normalise_uploaded_filename(uploaded_file.name)
+
+                        if metadata_exists_for_filename(filename):
+                            st.error(
+                                "Metadata already exists for this filename. Rename the file or remove the existing metadata record first."
+                            )
+                            st.stop()
+                        
+                        filename = save_uploaded_text_file(uploaded_file)
+
+                        new_document = {
+                            "document_id": generate_document_id(documents),
+                            "title": title.strip(),
+                            "filename": filename,
+                            "file_type": "TXT",
+                            "source": "Manual Upload",
+                            "department": department,
+                            "category": category.strip() or "General",
+                            "tags": [
+                                tag.strip()
+                                for tag in tags_text.split(",")
+                                if tag.strip()
+                            ],
+                            "allowed_roles": allowed_roles,
+                            "allowed_departments": allowed_departments,
+                            "uploaded_by": st.session_state["user"],
+                            "uploaded_at": datetime.now().isoformat(timespec="minutes"),
+                            "page_number": None,
+                            "chunk_id": "pending",
+                            "visual_extraction_status": "Text only",
+                        }
+
+                        append_document_metadata(new_document)
+
+                        st.session_state["upload_message"] = (
+                            f"Saved {filename} and appended metadata record "
+                            f"{new_document['document_id']}. Rebuild ChromaDB before searching it."
+                        )
+
+                        st.session_state["upload_form_version"] += 1
+                        st.rerun()
+
+            st.divider()
         if st.session_state["role"] == "General Employee":
             st.info(
                 "Knowledge base upload controls are hidden because General Employee "

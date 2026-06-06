@@ -1,0 +1,179 @@
+CENTIFIC MALAYSIA — IT POLICY
+Document: Data Retention and Backup Policy
+Version: 1.0 | Effective Date: 10 April 2026
+Department: IT & Security
+Classification: Internal Use Only
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. PURPOSE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+This document defines how Centific Malaysia stores, retains, backs up,
+and disposes of internal business data. The purpose of this policy is
+to ensure that important company information remains available,
+recoverable, and protected from accidental loss, unauthorised access,
+or improper deletion.
+
+All employees who create, modify, store, or manage company data must
+follow this policy.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. DATA CLASSIFICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Company data must be handled according to its classification level.
+
+PUBLIC
+  - Information approved for public release.
+  - Examples: published blog posts, public website content, marketing
+    material.
+
+INTERNAL USE ONLY
+  - Information intended for employees and authorised contractors.
+  - Examples: internal procedures, onboarding documents, engineering
+    guidelines.
+
+CONFIDENTIAL
+  - Sensitive business or client-related information.
+  - Examples: client project documents, financial records, internal
+    reports, system architecture documents.
+
+RESTRICTED
+  - Highly sensitive data with strict access controls.
+  - Examples: credentials, security incident records, legal documents,
+    privileged system access records.
+
+Employees must not change the classification of a document unless they
+are authorised by the document owner or department manager.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. DATA RETENTION PERIODS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Centific Malaysia retains data based on business, legal, and operational
+requirements.
+
+GENERAL INTERNAL DOCUMENTS
+  - Retention period: 3 years
+  - Examples: internal guides, SOP drafts, meeting notes.
+
+ENGINEERING DOCUMENTATION
+  - Retention period: 5 years
+  - Examples: architecture diagrams, deployment notes, API documents,
+    troubleshooting guides.
+
+HR AND EMPLOYEE RECORDS
+  - Retention period: 7 years or according to applicable legal
+    requirements.
+  - Examples: employment records, leave records, expense claim records.
+
+SECURITY LOGS
+  - Retention period: 1 year minimum
+  - Examples: VPN access logs, authentication logs, endpoint security
+    alerts.
+
+PROJECT DOCUMENTS
+  - Retention period: Based on client agreement or project closure
+    requirements.
+  - Confidential client documents must not be retained beyond the
+    approved retention period.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. BACKUP REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Critical company data must be backed up regularly to prevent data loss.
+
+The following backup schedule applies:
+
+  - Daily backup for active project repositories and shared workspaces.
+  - Weekly backup for internal knowledge base documents.
+  - Monthly backup for archived business records.
+  - Immediate backup after major system configuration changes.
+
+Backups must be stored in approved company-managed storage locations
+only. Employees must not create personal backup copies on USB drives,
+personal laptops, or personal cloud storage accounts.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. APPROVED STORAGE LOCATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Company data must be stored only in approved platforms.
+
+Approved storage locations include:
+
+  - Microsoft SharePoint
+  - Microsoft OneDrive for Business
+  - Azure Blob Storage
+  - Approved GitHub organisation repositories
+  - Company-managed internal file servers
+
+The following storage locations are not allowed for company data:
+
+  - Personal Google Drive
+  - Personal Dropbox
+  - Personal iCloud
+  - Personal USB drives
+  - Personal email accounts
+  - Unapproved external file-sharing websites
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. DATA RESTORATION PROCEDURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+If data is accidentally deleted, corrupted, or overwritten, employees
+must submit a restoration request through the IT Helpdesk portal.
+
+The request must include:
+
+  - File or folder name
+  - Original storage location
+  - Approximate date and time of deletion or corruption
+  - Business reason for restoration
+  - Department manager approval if the data is confidential or restricted
+
+IT will review and process restoration requests based on backup
+availability and data classification.
+
+Standard restoration requests are typically processed within 2 business
+days. Urgent business-critical requests may be escalated by the
+department manager.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. DATA DISPOSAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Data that has exceeded its retention period must be securely deleted or
+archived according to company procedures.
+
+Employees must not manually delete confidential or restricted data
+unless instructed by the document owner, department manager, or IT
+Security Team.
+
+For restricted data, deletion must be verified by IT Security to ensure
+that no unauthorised copies remain in shared folders, local devices, or
+backup locations.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+8. EMPLOYEE RESPONSIBILITIES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Employees are responsible for handling company data properly.
+
+Employees must:
+
+  - Store work files in approved company platforms.
+  - Avoid keeping duplicate local copies unnecessarily.
+  - Report missing, corrupted, or accidentally deleted files promptly.
+  - Follow document classification labels.
+  - Avoid sharing files with unauthorised users.
+  - Delete temporary working files when they are no longer needed.
+
+Failure to follow this policy may result in loss of access privileges or
+disciplinary action.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9. REVIEW AND COMPLIANCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The IT Security Team may conduct periodic audits to verify that company
+data is stored, retained, backed up, and disposed of correctly.
+
+Departments are responsible for reviewing their own documents and
+informing IT when outdated or expired information should be archived or
+removed.
+
+Document Owner: IT Security Team, Centific Malaysia
+Next Review Date: 10 April 2027
