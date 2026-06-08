@@ -1,6 +1,7 @@
 # REQ_F001: ETL pipeline — Extract, Transform, Load for local documents
 # REQ_F002: Chunking and embedding for vector search
 
+import shutil
 import os
 from pathlib import Path
 from dotenv import load_dotenv  #read .env config file
@@ -118,6 +119,36 @@ def embed_and_store(chunks: list, db_path: str, collection_name: str) -> Chroma:
 
     print(f"Stored {len(chunks)} chunks to ChromaDB at {db_path}")
     return vector_store
+
+
+def rebuild_vector_store(
+    docs_path: str | None = None,
+    db_path: str | None = None,
+    collection_name: str | None = None,
+) -> dict:
+    """Rebuild the local ChromaDB vector store from the simulated documents folder."""
+    docs_path = docs_path or os.getenv("DOCUMENTS_PATH")
+    db_path = db_path or os.getenv("CHROMA_DB_PATH")
+    collection_name = collection_name or os.getenv("CHROMA_COLLECTION_NAME")
+
+    if docs_path is None or db_path is None or collection_name is None:
+        raise ValueError("DOCUMENTS_PATH, CHROMA_DB_PATH, and CHROMA_COLLECTION_NAME are required.")
+
+    chroma_directory = Path(db_path)
+
+    if chroma_directory.exists():
+        shutil.rmtree(chroma_directory)
+
+    documents = load_documents(docs_path)
+    chunks = chunk_documents(documents)
+    embed_and_store(chunks, db_path, collection_name)
+
+    return {
+        "documents_indexed": len(documents),
+        "chunks_indexed": len(chunks),
+        "collection_name": collection_name,
+        "db_path": db_path,
+    }
 
 
 #main entry point

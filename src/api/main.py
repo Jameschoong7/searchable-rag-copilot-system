@@ -43,6 +43,15 @@ class QueryResponse(BaseModel):
     department: str
 
 
+class ReindexResponse(BaseModel):
+    """Represent the result of a local vector index rebuild."""
+
+    status: str
+    documents_indexed: int
+    chunks_indexed: int
+    message: str
+
+
 @app.post("/query", response_model=QueryResponse)
 def query_knowledge_base(request: QueryRequest) -> QueryResponse:
     """Answer a user question by calling the shared RAG engine."""
@@ -76,4 +85,28 @@ def query_knowledge_base(request: QueryRequest) -> QueryResponse:
         sources=result["sources"],
         role=request.role,
         department=request.department,
+    )
+
+
+@app.post("/admin/reindex", response_model=ReindexResponse)
+def reindex_knowledge_base() -> ReindexResponse:
+    """Rebuild the local vector index through the shared backend API."""
+    try:
+        from src.etl.pipeline import rebuild_vector_store
+
+        result = rebuild_vector_store()
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Index rebuild failed: {error}",
+        ) from error
+
+    return ReindexResponse(
+        status="success",
+        documents_indexed=result["documents_indexed"],
+        chunks_indexed=result["chunks_indexed"],
+        message=(
+            f"Rebuilt ChromaDB with {result['documents_indexed']} document(s) "
+            f"and {result['chunks_indexed']} chunk(s)."
+        ),
     )

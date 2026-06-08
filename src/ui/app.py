@@ -11,8 +11,6 @@ import requests
 import streamlit as st
 import altair as alt
 import pandas as pd
-import shutil
-import os
 from dotenv import load_dotenv
 import sys
 
@@ -77,10 +75,22 @@ if str(PROJECT_ROOT) not in sys.path:
 
 load_dotenv()
 
+REINDEX_URL = "http://127.0.0.1:8000/admin/reindex"
 API_URL = "http://127.0.0.1:8000/query"
 API_HEALTH_URL = "http://127.0.0.1:8000/health"
 METADATA_PATH = PROJECT_ROOT / "data/simulated/document_metadata.json"
 QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
+
+
+def request_backend_reindex() -> dict:
+    """Ask the FastAPI backend to rebuild the local vector index."""
+    response = requests.post(
+        REINDEX_URL,
+        timeout=300,
+    )
+
+    response.raise_for_status()
+    return response.json()
 
 
 def ask_backend(
@@ -415,26 +425,6 @@ def metadata_exists_for_filename(filename: str) -> bool:
         document["filename"] == filename
         for document in documents
     )
-
-
-def rebuild_local_vector_index() -> str:
-    """Rebuild the local ChromaDB index from simulated documents."""
-    from src.etl.pipeline import load_documents, chunk_documents, embed_and_store
-
-    documents_path = PROJECT_ROOT / os.getenv("DOCUMENTS_PATH", "./data/simulated")
-    chroma_path = PROJECT_ROOT / os.getenv("CHROMA_DB_PATH", "./data/chroma_db")
-    collection_name = os.getenv("CHROMA_COLLECTION_NAME", "rag_documents")
-
-    chroma_directory = Path(chroma_path)
-
-    if chroma_directory.exists():
-        shutil.rmtree(chroma_directory)
-
-    documents = load_documents(str(documents_path))
-    chunks = chunk_documents(documents)
-    embed_and_store(chunks, str(chroma_path), collection_name)
-
-    return f"Rebuilt ChromaDB with {len(documents)} document(s) and {len(chunks)} chunk(s)."
 
 
 st.set_page_config(
@@ -991,7 +981,8 @@ elif selected_page in ["KB Management", "KB Status"]:
             if st.button("Rebuild Local Vector Index"):
                 with st.spinner("Rebuilding local ChromaDB index..."):
                     try:
-                        rebuild_message = rebuild_local_vector_index()
+                        rebuild_result = request_backend_reindex()
+                        rebuild_message = rebuild_result["message"]
                     except Exception as error:
                         st.error(f"Index rebuild failed: {error}")
                     else:
