@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+from functools import lru_cache
 
 from langchain_community.vectorstores import Chroma
 
@@ -27,6 +28,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 METADATA_PATH = PROJECT_ROOT / "data/simulated/document_metadata.json"
 
 #function to load ChromaDB knowledge base data
+@lru_cache(maxsize=1)
 def load_vector_store() -> Chroma:
 
     embedding_model = HuggingFaceEmbeddings(
@@ -150,10 +152,18 @@ def get_allowed_source_path(
 
         allowed_filenames.append(document["filename"])
 
-    return [
-        str(PROJECT_ROOT / "data/simulated" / filename)
-        for filename in allowed_filenames
-    ]
+    allowed_sources = []
+
+    for filename in allowed_filenames:
+        allowed_sources.extend(
+            [
+                f"data/simulated/{filename}",
+                f"./data/simulated/{filename}",
+                str(PROJECT_ROOT / "data/simulated" / filename),
+            ]
+        )
+
+    return allowed_sources
 
 
 def retrieve_relevant_chunks(

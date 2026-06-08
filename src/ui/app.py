@@ -108,7 +108,7 @@ def ask_backend(
             "department_filter": department_filter,
             "file_type_filter": file_type_filter,
         },
-        timeout=120,
+        timeout=180,
     )
 
     response.raise_for_status()

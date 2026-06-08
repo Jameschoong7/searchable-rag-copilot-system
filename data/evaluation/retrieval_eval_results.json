@@ -1,0 +1,112 @@
+{
+  "summary": {
+    "total_queries": 10,
+    "correct_queries": 10,
+    "miss_count": 0,
+    "top_k_accuracy": 1.0,
+    "top_k_accuracy_percent": 100.0
+  },
+  "miss_rows": [],
+  "results": [
+    {
+      "query_id": "Q-001",
+      "question": "What are the password policy requirements?",
+      "expected_source": "IT_Policy_Password.txt",
+      "retrieved_sources": [
+        "IT_Policy_Password.txt"
+      ],
+      "hit": true,
+      "issue": ""
+    },
+    {
+      "query_id": "Q-002",
+      "question": "What software pre-approved for Engineering staff?",
+      "expected_source": "IT_Policy_Software.txt",
+      "retrieved_sources": [
+        "IT_Policy_Software.txt"
+      ],
+      "hit": true,
+      "issue": ""
+    },
+    {
+      "query_id": "Q-003",
+      "question": "How do I connect to the company VPN?",
+      "expected_source": "VPN_Setup_Guide.txt",
+      "retrieved_sources": [
+        "VPN_Setup_Guide.txt"
+      ],
+      "hit": true,
+      "issue": ""
+    },
+    {
+      "query_id": "Q-004",
+      "question": "What is the annual leave approval process?",
+      "expected_source": "HR_Leave_Policy_2026.txt",
+      "retrieved_sources": [
+        "HR_Leave_Policy_2026.txt"
+      ],
+      "hit": true,
+      "issue": ""
+    },
+    {
+      "query_id": "Q-005",
+      "question": "How do I submit an expense claim?",
+      "expected_source": "HR_Expense_Claim_Guide.txt",
+      "retrieved_sources": [
+        "HR_Expense_Claim_Guide.txt"
+      ],
+      "hit": true,
+      "issue": ""
+    },
+    {
+      "query_id": "Q-006",
+      "question": "What are the Python coding standards?",
+      "expected_source": "Engineering_Coding_Standards.txt",
+      "retrieved_sources": [
+        "Engineering_Coding_Standards.txt"
+      ],
+      "hit": true,
+      "issue": ""
+    },
+    {
+      "query_id": "Q-007",
+      "question": "What is the pull request review workflow?",
+      "expected_source": "Engineering_Development_Workflow.txt",
+      "retrieved_sources": [
+        "Engineering_Development_Workflow.txt"
+      ],
+      "hit": true,
+      "issue": ""
+    },
+    {
+      "query_id": "Q-008",
+      "question": "How should I report a phishing incident?",
+      "expected_source": "Security_Incident_Response_Guide.txt",
+      "retrieved_sources": [
+        "Security_Incident_Response_Guide.txt"
+      ],
+      "hit": true,
+      "issue": ""
+    },
+    {
+      "query_id": "Q-009",
+      "question": "How are access roles assigned and reviewed?",
+      "expected_source": "Security_Access_Control_Policy.txt",
+      "retrieved_sources": [
+        "Security_Access_Control_Policy.txt"
+      ],
+      "hit": true,
+      "issue": ""
+    },
+    {
+      "query_id": "Q-010",
+      "question": "What is the internal service escalation procedure?",
+      "expected_source": "Operations_Service_Escalation_SOP.txt",
+      "retrieved_sources": [
+        "Operations_Service_Escalation_SOP.txt"
+      ],
+      "hit": true,
+      "issue": ""
+    }
+  ]
+}

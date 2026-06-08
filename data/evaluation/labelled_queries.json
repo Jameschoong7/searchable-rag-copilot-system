@@ -1,0 +1,92 @@
+[
+    {
+        "query_id": "Q-001",
+        "question": "What are the password policy requirements?",
+        "role": "System Admin",
+        "department": "IT",
+        "department_filter": "All",
+        "file_type_filter": "TXT",
+        "expected_source": "IT_Policy_Password.txt"
+    },
+    {
+        "query_id": "Q-002",
+        "question": "What software pre-approved for Engineering staff?",
+        "role": "Project Manager",
+        "department": "Engineering",
+        "department_filter": "All",
+        "file_type_filter": "TXT",
+        "expected_source": "IT_Policy_Software.txt"
+    },
+    {
+        "query_id": "Q-003",
+        "question": "How do I connect to the company VPN?",
+        "role": "Project Manager",
+        "department": "Engineering",
+        "department_filter": "All",
+        "file_type_filter": "TXT",
+        "expected_source": "VPN_Setup_Guide.txt"
+    },
+    {
+        "query_id": "Q-004",
+        "question": "What is the annual leave approval process?",
+        "role": "General Employee",
+        "department": "HR",
+        "department_filter": null,
+        "file_type_filter": "TXT",
+        "expected_source": "HR_Leave_Policy_2026.txt"
+    },
+    {
+        "query_id": "Q-005",
+        "question": "How do I submit an expense claim?",
+        "role": "General Employee",
+        "department": "HR",
+        "department_filter": null,
+        "file_type_filter": "TXT",
+        "expected_source": "HR_Expense_Claim_Guide.txt"
+    },
+    {
+        "query_id": "Q-006",
+        "question": "What are the Python coding standards?",
+        "role": "Project Manager",
+        "department": "Engineering",
+        "department_filter": "Engineering",
+        "file_type_filter": "TXT",
+        "expected_source": "Engineering_Coding_Standards.txt"
+    },
+    {
+        "query_id": "Q-007",
+        "question": "What is the pull request review workflow?",
+        "role": "Project Manager",
+        "department": "Engineering",
+        "department_filter": "Engineering",
+        "file_type_filter": "TXT",
+        "expected_source": "Engineering_Development_Workflow.txt"
+    },
+    {
+        "query_id": "Q-008",
+        "question": "How should I report a phishing incident?",
+        "role": "General Employee",
+        "department": "HR",
+        "department_filter": null,
+        "file_type_filter": "TXT",
+        "expected_source": "Security_Incident_Response_Guide.txt"
+    },
+    {
+        "query_id": "Q-009",
+        "question": "How are access roles assigned and reviewed?",
+        "role": "System Admin",
+        "department": "IT",
+        "department_filter": "All",
+        "file_type_filter": "TXT",
+        "expected_source": "Security_Access_Control_Policy.txt"
+    },
+    {
+        "query_id": "Q-010",
+        "question": "What is the internal service escalation procedure?",
+        "role": "System Admin",
+        "department": "IT",
+        "department_filter": "All",
+        "file_type_filter": "TXT",
+        "expected_source": "Operations_Service_Escalation_SOP.txt"
+    }
+]
