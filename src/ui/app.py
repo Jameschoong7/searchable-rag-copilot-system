@@ -11,6 +11,9 @@ import requests
 import streamlit as st
 import altair as alt
 import pandas as pd
+import shutil
+import os
+from dotenv import load_dotenv
 
 
 API_URL = "http://127.0.0.1:8000/query"
@@ -70,6 +73,8 @@ DEMO_ACCOUNTS = {
         "department": "HR",
     },
 }
+
+load_dotenv()
 
 
 def ask_backend(
@@ -404,6 +409,26 @@ def metadata_exists_for_filename(filename: str) -> bool:
         document["filename"] == filename
         for document in documents
     )
+
+
+def rebuild_local_vector_index() -> str:
+    """Rebuild the local ChromaDB index from simulated documents."""
+    from src.etl.pipeline import load_documents, chunk_documents, embed_and_store
+
+    documents_path = os.getenv("DOCUMENTS_PATH", "./data/simulated")
+    chroma_path = os.getenv("CHROMA_DB_PATH", "./data/chroma_db")
+    collection_name = os.getenv("CHROMA_COLLECTION_NAME", "rag_documents")
+
+    chroma_directory = Path(chroma_path)
+
+    if chroma_directory.exists():
+        shutil.rmtree(chroma_directory)
+
+    documents = load_documents(documents_path)
+    chunks = chunk_documents(documents)
+    embed_and_store(chunks, chroma_path, collection_name)
+
+    return f"Rebuilt ChromaDB with {len(documents)} document(s) and {len(chunks)} chunk(s)."
 
 
 st.set_page_config(
@@ -858,10 +883,10 @@ elif selected_page in ["KB Management", "KB Status"]:
                 type=["txt"],
                 key=f"txt_upload_file_{upload_form_version}",
             )
-            
+
             title_key = prepare_upload_title_state(uploaded_file, upload_form_version)
 
-            with st.form(f"real_txt_upload_form{upload_form_version}"):
+            with st.form(f"real_txt_upload_form_{upload_form_version}"):
 
                 title = st.text_input(
                     "Document title",
@@ -917,7 +942,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                                 "Metadata already exists for this filename. Rename the file or remove the existing metadata record first."
                             )
                             st.stop()
-                        
+
                         filename = save_uploaded_text_file(uploaded_file)
 
                         new_document = {
@@ -951,7 +976,20 @@ elif selected_page in ["KB Management", "KB Status"]:
 
                         st.session_state["upload_form_version"] += 1
                         st.rerun()
+            st.markdown("**Local Vector Index**")
+            st.caption(
+                "Rebuild after adding or changing simulated documents so ChromaDB "
+                "can retrieve the latest content."
+            )
 
+            if st.button("Rebuild Local Vector Index"):
+                with st.spinner("Rebuilding local ChromaDB index..."):
+                    try:
+                        rebuild_message = rebuild_local_vector_index()
+                    except Exception as error:
+                        st.error(f"Index rebuild failed: {error}")
+                    else:
+                        st.success(rebuild_message)
             st.divider()
         if st.session_state["role"] == "General Employee":
             st.info(
