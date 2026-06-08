@@ -1,0 +1,201 @@
+CENTIFIC MALAYSIA — IT POLICY
+Document: Knowledge Base Governance Policy
+Version: 1.0 | Effective Date: 20 April 2026
+Department: IT & Engineering
+Classification: Internal Use Only
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. PURPOSE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+This document defines the rules for creating, reviewing, approving,
+publishing, and maintaining internal knowledge base documents at
+Centific Malaysia.
+
+The purpose of this policy is to ensure that employees can access
+accurate, current, and approved information when using internal
+documentation platforms, search tools, and AI-assisted knowledge
+retrieval systems.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. SCOPE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+This policy applies to all internal knowledge base documents used by
+Centific Malaysia employees, including but not limited to:
+
+  - IT procedures
+  - Engineering setup guides
+  - Troubleshooting documents
+  - Onboarding materials
+  - Standard operating procedures
+  - Internal FAQ documents
+  - Security and access control guides
+
+This policy applies to documents stored in approved company platforms
+such as SharePoint, OneDrive for Business, approved GitHub repositories,
+and company-managed knowledge base systems.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. DOCUMENT OWNERSHIP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Every knowledge base document must have a clearly assigned document
+owner.
+
+The document owner is responsible for:
+
+  - Ensuring the document is accurate.
+  - Reviewing the document on schedule.
+  - Updating outdated procedures.
+  - Removing incorrect or duplicated content.
+  - Confirming the correct classification label.
+  - Approving the document before publication.
+
+Documents without an assigned owner may be archived or removed from
+active search results.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. DOCUMENT APPROVAL REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Before a document is published to the internal knowledge base, it must
+be reviewed and approved by the relevant department owner.
+
+Approval is required for:
+
+  - New documents
+  - Major procedure changes
+  - Security-related updates
+  - Access control instructions
+  - Client-impacting operational procedures
+  - Documents used by AI search or chatbot systems
+
+Draft documents must not be indexed into AI-assisted knowledge systems
+unless clearly marked as draft and approved for testing.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. DOCUMENT QUALITY STANDARDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Knowledge base documents must be written clearly and consistently.
+
+Each document should include:
+
+  - Document title
+  - Version number
+  - Effective date
+  - Department owner
+  - Classification label
+  - Purpose section
+  - Step-by-step procedures where applicable
+  - Troubleshooting section where applicable
+  - Review date
+
+Documents should avoid unclear wording, outdated screenshots, broken
+links, duplicated instructions, and unsupported assumptions.
+
+Technical documents should include enough detail for another authorised
+employee to repeat the procedure without depending on informal verbal
+guidance.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. CLASSIFICATION AND ACCESS CONTROL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Each knowledge base document must use one of the approved classification
+labels:
+
+  - Public
+  - Internal Use Only
+  - Confidential
+  - Restricted
+
+Access permissions must match the classification level.
+
+Internal Use Only documents may be accessible to general employees.
+Confidential and Restricted documents must only be accessible to
+authorised users based on role, department, or business need.
+
+AI-assisted search tools must respect the same document permissions as
+the original storage location. A user must not receive answers generated
+from documents they are not authorised to view.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. REVIEW CYCLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Knowledge base documents must be reviewed regularly to ensure accuracy.
+
+The standard review cycle is:
+
+  - IT procedures: every 6 months
+  - Engineering guides: every 6 months
+  - Security documents: every 3 months
+  - HR and onboarding documents: every 12 months
+  - Project-specific documents: at project closure or major milestone
+
+If a document is found to be inaccurate before the scheduled review
+date, the document owner must update or archive it immediately.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+8. OUTDATED OR DUPLICATED DOCUMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Outdated or duplicated documents must not remain active in the knowledge
+base.
+
+When duplicate documents exist, the document owner must:
+
+  - Identify the most accurate version.
+  - Merge useful content if needed.
+  - Archive older versions.
+  - Update internal links to point to the approved version.
+  - Notify relevant users if a commonly used document has changed.
+
+Archived documents must be clearly marked as archived and must not be
+used as the source of official procedures.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9. AI KNOWLEDGE RETRIEVAL USAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Documents indexed into AI-assisted knowledge retrieval systems must be
+approved, current, and properly classified.
+
+The AI system must not generate answers from:
+
+  - Expired documents
+  - Draft documents without approval
+  - Archived documents
+  - Restricted documents without user permission
+  - Personal notes or unofficial instructions
+
+When the AI system cannot find approved information, it must respond
+that the information is not available instead of guessing or generating
+an unsupported answer.
+
+All AI-generated answers must include source citations where possible.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10. EMPLOYEE RESPONSIBILITIES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Employees are responsible for using the knowledge base correctly.
+
+Employees must:
+
+  - Refer to approved documents when performing company procedures.
+  - Report outdated or incorrect documentation.
+  - Avoid creating unofficial duplicate guides.
+  - Avoid uploading confidential content into unauthorised systems.
+  - Verify critical procedures against the original source document.
+  - Follow document classification and sharing rules.
+
+Employees must not rely only on informal chat messages or personal notes
+when performing security-sensitive or client-impacting tasks.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+11. COMPLIANCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The IT Engineering Team may audit knowledge base documents to ensure
+compliance with this policy.
+
+Documents that fail governance checks may be removed from active search,
+archived, or returned to the owner for correction.
+
+Repeated failure to maintain accurate documentation may be escalated to
+the relevant department manager.
+
+Document Owner: IT Engineering Team, Centific Malaysia
+Next Review Date: 20 April 2027

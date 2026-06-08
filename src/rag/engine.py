@@ -23,7 +23,8 @@ from langchain_community.llms import Ollama
 #load .env file values
 load_dotenv()
 
-METADATA_PATH = Path("data/simulated/document_metadata.json")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+METADATA_PATH = PROJECT_ROOT / "data/simulated/document_metadata.json"
 
 #function to load ChromaDB knowledge base data
 def load_vector_store() -> Chroma:
@@ -150,7 +151,7 @@ def get_allowed_source_path(
         allowed_filenames.append(document["filename"])
 
     return [
-        f"data/simulated/{filename}"
+        str(PROJECT_ROOT / "data/simulated" / filename)
         for filename in allowed_filenames
     ]
 

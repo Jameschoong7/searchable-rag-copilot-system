@@ -14,12 +14,8 @@ import pandas as pd
 import shutil
 import os
 from dotenv import load_dotenv
+import sys
 
-
-API_URL = "http://127.0.0.1:8000/query"
-API_HEALTH_URL = "http://127.0.0.1:8000/health"
-METADATA_PATH = Path("data/simulated/document_metadata.json")
-QUERY_LOG_DB_PATH = Path("data/logs/query_logs.db")
 
 ROLE_OPTIONS = [
     "System Admin",
@@ -74,7 +70,17 @@ DEMO_ACCOUNTS = {
     },
 }
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 load_dotenv()
+
+API_URL = "http://127.0.0.1:8000/query"
+API_HEALTH_URL = "http://127.0.0.1:8000/health"
+METADATA_PATH = PROJECT_ROOT / "data/simulated/document_metadata.json"
+QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
 
 
 def ask_backend(
@@ -415,8 +421,8 @@ def rebuild_local_vector_index() -> str:
     """Rebuild the local ChromaDB index from simulated documents."""
     from src.etl.pipeline import load_documents, chunk_documents, embed_and_store
 
-    documents_path = os.getenv("DOCUMENTS_PATH", "./data/simulated")
-    chroma_path = os.getenv("CHROMA_DB_PATH", "./data/chroma_db")
+    documents_path = PROJECT_ROOT / os.getenv("DOCUMENTS_PATH", "./data/simulated")
+    chroma_path = PROJECT_ROOT / os.getenv("CHROMA_DB_PATH", "./data/chroma_db")
     collection_name = os.getenv("CHROMA_COLLECTION_NAME", "rag_documents")
 
     chroma_directory = Path(chroma_path)
@@ -424,9 +430,9 @@ def rebuild_local_vector_index() -> str:
     if chroma_directory.exists():
         shutil.rmtree(chroma_directory)
 
-    documents = load_documents(documents_path)
+    documents = load_documents(str(documents_path))
     chunks = chunk_documents(documents)
-    embed_and_store(chunks, chroma_path, collection_name)
+    embed_and_store(chunks, str(chroma_path), collection_name)
 
     return f"Rebuilt ChromaDB with {len(documents)} document(s) and {len(chunks)} chunk(s)."
 
