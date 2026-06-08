@@ -1,6 +1,7 @@
 [
     {
         "query_id": "Q-001",
+        "suite": "smoke",
         "question": "What are the password policy requirements?",
         "role": "System Admin",
         "department": "IT",
@@ -10,6 +11,7 @@
     },
     {
         "query_id": "Q-002",
+        "suite": "smoke",
         "question": "What software pre-approved for Engineering staff?",
         "role": "Project Manager",
         "department": "Engineering",
@@ -19,6 +21,7 @@
     },
     {
         "query_id": "Q-003",
+        "suite": "smoke",
         "question": "How do I connect to the company VPN?",
         "role": "Project Manager",
         "department": "Engineering",
@@ -28,6 +31,7 @@
     },
     {
         "query_id": "Q-004",
+        "suite": "smoke",
         "question": "What is the annual leave approval process?",
         "role": "General Employee",
         "department": "HR",
@@ -37,6 +41,7 @@
     },
     {
         "query_id": "Q-005",
+        "suite": "smoke",
         "question": "How do I submit an expense claim?",
         "role": "General Employee",
         "department": "HR",
@@ -46,6 +51,7 @@
     },
     {
         "query_id": "Q-006",
+        "suite": "smoke",
         "question": "What are the Python coding standards?",
         "role": "Project Manager",
         "department": "Engineering",
@@ -55,6 +61,7 @@
     },
     {
         "query_id": "Q-007",
+        "suite": "smoke",
         "question": "What is the pull request review workflow?",
         "role": "Project Manager",
         "department": "Engineering",
@@ -64,6 +71,7 @@
     },
     {
         "query_id": "Q-008",
+        "suite": "smoke",
         "question": "How should I report a phishing incident?",
         "role": "General Employee",
         "department": "HR",
@@ -73,6 +81,7 @@
     },
     {
         "query_id": "Q-009",
+        "suite": "smoke",
         "question": "How are access roles assigned and reviewed?",
         "role": "System Admin",
         "department": "IT",
@@ -82,6 +91,7 @@
     },
     {
         "query_id": "Q-010",
+        "suite": "smoke",
         "question": "What is the internal service escalation procedure?",
         "role": "System Admin",
         "department": "IT",
