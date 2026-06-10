@@ -80,6 +80,7 @@ API_URL = "http://127.0.0.1:8000/query"
 API_HEALTH_URL = "http://127.0.0.1:8000/health"
 METADATA_PATH = PROJECT_ROOT / "data/simulated/document_metadata.json"
 QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
+EVALUATION_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/retrieval_eval_results.json"
 
 
 def request_backend_reindex() -> dict:
@@ -180,7 +181,16 @@ def load_document_metadata() -> list[dict]:
     """Load simulated document metadata for the KB Management/Status page."""
     with METADATA_PATH.open("r", encoding="utf-8") as metadata_file:
         return json.load(metadata_file)
-    
+
+
+def load_retrieval_evaluation_results() -> dict | None:
+    """Load the latest local retrieval evaluation output if it exists."""
+    if not EVALUATION_RESULTS_PATH.exists():
+        return None
+
+    with EVALUATION_RESULTS_PATH.open("r", encoding="utf-8") as results_file:
+        return json.load(results_file)
+
 
 def initialise_query_log_database() -> None:
     """Create the local SQLite query log table if it does not exist."""
@@ -336,12 +346,26 @@ def read_query_log_summary() -> dict:
             """
         ).fetchall()
 
+        daily_latency_rows = connection.execute(
+            """
+            SELECT
+                DATE(timestamp) AS query_date,
+                COUNT(*) AS query_count,
+                AVG(latency_seconds) AS average_latency
+            FROM query_logs
+            WHERE DATE(timestamp) >= DATE('now', '-6 days')
+            GROUP BY DATE(timestamp)
+            ORDER BY DATE(timestamp)
+            """
+        ).fetchall()
+
         return {
             "total_queries": summary_row[0],
             "average_latency": summary_row[1],
             "permission_blocks": summary_row[2] or 0,
             "unresolved_queries": summary_row[3] or 0,
             "recent_queries": recent_rows,
+            "daily_latency_rows": daily_latency_rows,
         }
     
 
@@ -584,37 +608,58 @@ if st.sidebar.button("Logout", use_container_width=True):
 if selected_page == "Performance":
     st.title("Performance")
     st.caption(
-        "Simulated retrieval evaluation dashboard. Later this will be backed by "
-        "labelled query tests and real request logs."
+        "Performance dashboard using local query logs, labelled retrieval evaluation, "
+        "and clearly marked simulated benchmark placeholders."
     )
 
     documents = load_document_metadata()
     indexed_document_count = len(documents)
     query_log_summary = read_query_log_summary()
+    evaluation_results = load_retrieval_evaluation_results()
 
-    st.subheader("Planned Benchmark Metrics")
+    if evaluation_results:
+        evaluation_summary = evaluation_results["summary"]["overall"]
+        top_k_accuracy = f"{evaluation_summary['top_k_accuracy_percent']}%"
+        miss_rate_value = (
+            evaluation_summary["miss_count"] / evaluation_summary["total_queries"]
+            if evaluation_summary["total_queries"]
+            else 0
+        )
+        miss_rate = f"{miss_rate_value * 100:.1f}%"
+        top_k_delta = (
+            f"{evaluation_summary['correct_queries']} / "
+            f"{evaluation_summary['total_queries']} labelled queries"
+        )
+        miss_delta = f"{evaluation_summary['miss_count']} misses"
+    else:
+        top_k_accuracy = "No run"
+        miss_rate = "No run"
+        top_k_delta = "Run retrieval evaluation"
+        miss_delta = "Awaiting labelled result"
+
+    st.subheader("Performance Metrics")
 
     metric_columns = st.columns(4)
 
     with metric_columns[0]:
         st.metric(
-            "Target Time-to-First-Answer",
-            "1.8s",
-            "Target: < 10s",
+            "Time-to-First-Answer",
+            f"{query_log_summary['average_latency']:.2f}s",
+            "Local logged average",
         )
 
     with metric_columns[1]:
         st.metric(
-              "Simulated Top-K Accuracy (K=5)",
-              "91.2%",
-              "95 / 104 test queries",
+            "Top-K Accuracy (K=5)",
+            top_k_accuracy,
+            top_k_delta,
         )
 
     with metric_columns[2]:
         st.metric(
-            "Simulated Miss Rate",
-            "8.8%",
-            "9 queries need review",
+            "Miss Rate",
+            miss_rate,
+            miss_delta,
         )
 
     with metric_columns[3]:
@@ -625,13 +670,13 @@ if selected_page == "Performance":
         )
 
     st.caption(
-        "Benchmark cards above are simulated presentation placeholders until a "
-        "labelled evaluation dataset exists."
+        "TTFA is calculated from local chat logs. Top-K Accuracy and Miss Rate come "
+        "from the latest labelled retrieval evaluation run."
     )
 
     st.subheader("Live Query Signals")
 
-    live_metric_columns = st.columns(4)
+    live_metric_columns = st.columns(3)
 
     with live_metric_columns[0]:
         st.metric(
@@ -641,17 +686,11 @@ if selected_page == "Performance":
 
     with live_metric_columns[1]:
         st.metric(
-            "Average Local Latency",
-            f"{query_log_summary['average_latency']:.2f}s",
-        )
-
-    with live_metric_columns[2]:
-        st.metric(
             "Permission Blocks",
             query_log_summary["permission_blocks"],
         )
 
-    with live_metric_columns[3]:
+    with live_metric_columns[2]:
         st.metric(
             "Not Found / Errors",
             query_log_summary["unresolved_queries"],
@@ -659,48 +698,59 @@ if selected_page == "Performance":
 
     st.divider()
 
-    st.subheader("Simulated 7-Day Latency Trend")
-    st.caption("Presentation placeholder. Live query latency appears in the metrics and recent-query table above.")
+    st.subheader("Daily Average Query Latency")
 
-    latency_data = pd.DataFrame(
-        {
-            "Demo Day": [
-                "Day 1",
-                "Day 2",
-                "Day 3",
-                "Day 4",
-                "Day 5",
-                "Day 6",
-                "Day 7",
-            ],
-            "Latency (seconds)": [1.1, 1.4, 0.9, 1.7, 1.3, 1.5, 1.8],
-        }
-    )
+    latency_rows = []
 
-    latency_chart = (
-        alt.Chart(latency_data)
-        .mark_bar(color="#6f8bc7", cornerRadiusTopLeft=3, cornerRadiusTopRight=3, size=100,)
-        .encode(
-            x=alt.X(
-                "Demo Day:N",
-                title="Demo Day",
-                sort=None,
-                axis=alt.Axis(labelAngle=0),
-            ),
-            y=alt.Y(
-                "Latency (seconds):Q",
-                title="Latency (seconds)",
-                scale=alt.Scale(domain=[0, 2.0]),
-            ),
-            tooltip=[
-                alt.Tooltip("Demo Day:N"),
-                alt.Tooltip("Latency (seconds):Q", format=".1f"),
-            ],
+    for row in query_log_summary["daily_latency_rows"]:
+        query_date = datetime.fromisoformat(row[0])
+
+        latency_rows.append(
+            {
+                "Date Key": row[0],
+                "Display Label": query_date.strftime("%a %d %b"),
+                "Day": query_date.strftime("%a"),
+                "Date": query_date.strftime("%d %b"),
+                "Average Latency (seconds)": round(row[2], 2),
+                "Query Count": row[1],
+            }
         )
-        .properties(height=280)
-    )
 
-    st.altair_chart(latency_chart, use_container_width=True)
+    if latency_rows:
+        latency_data = pd.DataFrame(latency_rows).sort_values("Date Key")
+
+        latency_chart = (
+            alt.Chart(latency_data)
+            .mark_bar(
+                color="#6f8bc7",
+                cornerRadiusTopLeft=3,
+                cornerRadiusTopRight=3,
+                size=80,
+            )
+            .encode(
+                x=alt.X(
+                    "Display Label:N",
+                    title="Day",
+                    sort=None,
+                    axis=alt.Axis(labelAngle=0),
+                ),
+                y=alt.Y(
+                    "Average Latency (seconds):Q",
+                    title="Average Latency (seconds)",
+                ),
+                tooltip=[
+                    alt.Tooltip("Day:N"),
+                    alt.Tooltip("Date:N"),
+                    alt.Tooltip("Average Latency (seconds):Q", format=".2f"),
+                    alt.Tooltip("Query Count:Q"),
+                ],
+            )
+            .properties(height=280)
+        )
+
+        st.altair_chart(latency_chart, use_container_width=True)
+    else:
+        st.info("No query latency data yet. Submit a Chat query to populate this chart.")
 
     with st.expander("How benchmark accuracy is measured"):
         st.write(
@@ -708,41 +758,41 @@ if selected_page == "Performance":
             "within the top 5 retrieved chunks."
         )
         st.caption(
-            "Simulated benchmark: 95 correct / 104 labelled queries = 91.2%. "
-            "Live query signals come from local SQLite logs."
+            "Current Top-K Accuracy and Miss Rate use the latest local labelled "
+            "retrieval evaluation result. Prototype benchmark values should be treated "
+            "as presentation examples only."
         )
 
-    st.subheader("Simulated Retrieval Miss Review Log")
+    st.subheader("Retrieval Miss Review Log")
 
-    miss_rows = [
-        {
-            "Query ID": "Q-018",
-            "User Query": "VPN profile missing",
-            "Issue": "Correct chunk ranked #7",
-            "Next Enhancement": "Improve metadata tags or increase K",
-            "Status": "Reviewed",
-        },
-        {
-            "Query ID": "Q-041",
-            "User Query": "Access approval flow",
-            "Issue": "Diagram text missing",
-            "Next Enhancement": "OCR + diagram caption extraction",
-            "Status": "Reviewed",
-        },
-        {
-            "Query ID": "Q-073",
-            "User Query": "HR claim limit",
-            "Issue": "Outdated source PDF",
-            "Next Enhancement": "Re-index updated SharePoint file",
-            "Status": "Reviewed",
-        },
-    ]
+    if evaluation_results and evaluation_results["miss_rows"]:
+      real_miss_rows = [
+          {
+              "Query ID": row["query_id"],
+              "Suite": row["suite"],
+              "Question": row["question"],
+              "Expected Source": row["expected_source"],
+              "Retrieved Sources": ", ".join(row["retrieved_sources"]),
+              "Issue": row["issue"],
+              "Next Enhancement": "Review metadata, chunking, filters, or Top-K ranking",
+          }
+          for row in evaluation_results["miss_rows"]
+      ]
 
-    st.dataframe(
-        miss_rows,
-        use_container_width=True,
-        hide_index=True,
-    )
+      st.dataframe(
+          real_miss_rows,
+          use_container_width=True,
+          hide_index=True,
+      )
+
+    elif evaluation_results:
+        st.success("No retrieval misses in the latest labelled retrieval evaluation.")
+
+    else:
+        st.info(
+            "No retrieval evaluation result found yet. Run "
+            "`python -m src.evaluation.retrieval_eval` to generate miss review data."
+        )
 
     st.subheader("Recent Logged Queries")
 
