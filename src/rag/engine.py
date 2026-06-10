@@ -192,7 +192,7 @@ def retrieve_relevant_chunks(
         filter={"source": {"$in": allowed_sources}},
     )
 
-    minimum_relevance_score = 0.30
+    minimum_relevance_score = 0.25
 
     return [
         document

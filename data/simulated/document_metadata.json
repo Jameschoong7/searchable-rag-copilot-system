@@ -402,5 +402,29 @@
     "page_number": null,
     "chunk_id": "pending",
     "visual_extraction_status": "Text only"
+  },
+  {
+    "document_id": "DOC-UPLOAD-003",
+    "title": "Time Matters",
+    "filename": "Time_Matters.pdf",
+    "file_type": "PDF",
+    "source": "Manual Upload",
+    "department": "IT",
+    "category": "General",
+    "tags": [
+      "policy",
+      "internal"
+    ],
+    "allowed_roles": [
+      "System Admin"
+    ],
+    "allowed_departments": [
+      "IT"
+    ],
+    "uploaded_by": "admin_jc",
+    "uploaded_at": "2026-06-10T17:26",
+    "page_number": null,
+    "chunk_id": "pending",
+    "visual_extraction_status": "PDF text extraction"
   }
 ]

@@ -393,7 +393,6 @@ def read_query_log_summary() -> dict:
             "recent_queries": recent_rows,
             "daily_latency_rows": daily_latency_rows,
         }
-    
 
 
 def can_view_document(document: dict) -> bool:
@@ -425,10 +424,31 @@ def normalise_uploaded_filename(filename: str) -> str:
     return filename.replace(" ", "_")
 
 
+def get_uploaded_file_type(filename: str) -> str:
+    """Return the metadata file type for a supported uploaded file."""
+    suffix = Path(filename).suffix.lower()
+
+    if suffix == ".txt":
+        return "TXT"
+
+    if suffix == ".pdf":
+        return "PDF"
+
+    return "UNKNOWN"
+
+
+def get_visual_extraction_status(file_type: str) -> str:
+    """Return the local extraction status label for the uploaded file type."""
+    if file_type == "PDF":
+        return "PDF text extraction"
+
+    return "Text only"
+
+
 def prepare_upload_title_state(uploaded_file, upload_form_version: int) -> str:
     """Prepare an editable title field when a new TXT file is selected."""
-    title_key = f"txt_upload_title_{upload_form_version}"
-    filename_key = f"txt_upload_filename_{upload_form_version}"
+    title_key = f"upload_title{upload_form_version}"
+    filename_key = f"upload_filename{upload_form_version}"
 
     if uploaded_file is None:
         return title_key
@@ -443,7 +463,7 @@ def prepare_upload_title_state(uploaded_file, upload_form_version: int) -> str:
     return title_key
 
 
-def save_uploaded_text_file(uploaded_file) -> str:
+def save_uploaded_file(uploaded_file) -> str:
     """Save an uploaded TXT file into the simulated data folder."""
     filename = normalise_uploaded_filename(uploaded_file.name)
     file_path = Path("data/simulated") / filename
@@ -939,7 +959,7 @@ elif selected_page in ["KB Management", "KB Status"]:
 
     with st.container(border=True):
         if st.session_state["role"] in ["System Admin", "Project Manager"]:
-            st.markdown("**Real Local TXT Upload**")
+            st.markdown("**Real Local TXT/PDF Upload**")
             st.caption(
                 "Uploads a TXT file into data/simulated and appends trusted metadata. "
                 "Rebuild the vector index after upload before searching the new document."
@@ -951,9 +971,9 @@ elif selected_page in ["KB Management", "KB Status"]:
             upload_form_version = st.session_state["upload_form_version"]
 
             uploaded_file = st.file_uploader(
-                "TXT file",
-                type=["txt"],
-                key=f"txt_upload_file_{upload_form_version}",
+                "TXT or PDF file",
+                type=["txt", "pdf"],
+                key=f"upload_file{upload_form_version}",
             )
 
             title_key = prepare_upload_title_state(uploaded_file, upload_form_version)
@@ -1018,7 +1038,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                         key=f"txt_upload_departments_{upload_form_version}",
                     )
 
-                submitted_upload = st.form_submit_button("Save TXT + Metadata")
+                submitted_upload = st.form_submit_button("Save File + Metadata")
 
                 if submitted_upload:
                     if uploaded_file is None:
@@ -1032,6 +1052,11 @@ elif selected_page in ["KB Management", "KB Status"]:
                     else:
                         documents = load_document_metadata()
                         filename = normalise_uploaded_filename(uploaded_file.name)
+                        file_type = get_uploaded_file_type(filename)
+                        
+                        if file_type == "UNKNOWN":
+                            st.error("Only TXT and PDF uploads are supported in the current local prototype.")
+                            st.stop()
 
                         if metadata_exists_for_filename(filename):
                             st.error(
@@ -1052,13 +1077,13 @@ elif selected_page in ["KB Management", "KB Status"]:
                             st.error(f"Could not validate upload metadata: {error}")
                             st.stop()
 
-                        filename = save_uploaded_text_file(uploaded_file)
+                        filename = save_uploaded_file(uploaded_file)
 
                         new_document = {
                             "document_id": generate_document_id(documents),
                             "title": title.strip(),
                             "filename": filename,
-                            "file_type": "TXT",
+                            "file_type": file_type,
                             "source": "Manual Upload",
                             "department": approved_metadata["document_department"],
                             "category": category.strip() or "General",
@@ -1073,7 +1098,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                             "uploaded_at": datetime.now().isoformat(timespec="minutes"),
                             "page_number": None,
                             "chunk_id": "pending",
-                            "visual_extraction_status": "Text only",
+                            "visual_extraction_status": get_visual_extraction_status(file_type),
                         }
 
                         append_document_metadata(new_document)
