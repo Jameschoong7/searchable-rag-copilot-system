@@ -75,6 +75,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 load_dotenv()
 
+UPLOAD_VALIDATE_URL = "http://127.0.0.1:8000/admin/validate-upload"
 REINDEX_URL = "http://127.0.0.1:8000/admin/reindex"
 API_URL = "http://127.0.0.1:8000/query"
 API_HEALTH_URL = "http://127.0.0.1:8000/health"
@@ -87,7 +88,32 @@ def request_backend_reindex() -> dict:
     """Ask the FastAPI backend to rebuild the local vector index."""
     response = requests.post(
         REINDEX_URL,
+        json={
+            "role": st.session_state["role"],
+        },
         timeout=300,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_upload_validation(
+    document_department: str,
+    allowed_roles: list[str],
+    allowed_departments: list[str],
+) -> dict:
+    """Ask FastAPI to validate upload metadata for the current user."""
+    response = requests.post(
+        UPLOAD_VALIDATE_URL,
+        json={
+            "role": st.session_state["role"],
+            "user_department": st.session_state["department"],
+            "document_department": document_department,
+            "allowed_roles": allowed_roles,
+            "allowed_departments": allowed_departments,
+        },
+        timeout=30,
     )
 
     response.raise_for_status()
@@ -912,7 +938,7 @@ elif selected_page in ["KB Management", "KB Status"]:
         st.session_state["upload_message"] = ""
 
     with st.container(border=True):
-        if st.session_state["role"] == "System Admin":
+        if st.session_state["role"] in ["System Admin", "Project Manager"]:
             st.markdown("**Real Local TXT Upload**")
             st.caption(
                 "Uploads a TXT file into data/simulated and appends trusted metadata. "
@@ -939,11 +965,19 @@ elif selected_page in ["KB Management", "KB Status"]:
                     key=title_key,
                     help="Auto-filled from the uploaded filename. Admin may edit it.",
                 )
-                department = st.selectbox(
-                    "Department",
-                    DEPARTMENT_OPTIONS,
-                    key=f"txt_upload_department_{upload_form_version}",
-                )
+                if st.session_state["role"] == "System Admin":
+                    department = st.selectbox(
+                        "Department",
+                        DEPARTMENT_OPTIONS,
+                        key=f"txt_upload_department_{upload_form_version}",
+                    )
+                else:
+                    department = st.text_input(
+                        "Department",
+                        value=st.session_state["department"],
+                        disabled=True,
+                        key=f"txt_upload_department_{upload_form_version}",
+                    )
                 category = st.text_input(
                     "Category",
                     value="General",
@@ -955,18 +989,34 @@ elif selected_page in ["KB Management", "KB Status"]:
                     help="Separate tags with commas.",
                     key=f"txt_upload_tags_{upload_form_version}",
                 )
-                allowed_roles = st.multiselect(
-                    "Allowed roles",
-                    ROLE_OPTIONS,
-                    default=["System Admin"],
-                    key=f"txt_upload_roles_{upload_form_version}",
-                )
-                allowed_departments = st.multiselect(
-                    "Allowed departments",
-                    DEPARTMENT_OPTIONS,
-                    default=[department],
-                    key=f"txt_upload_departments_{upload_form_version}",
-                )
+                if st.session_state["role"] == "System Admin":
+                    allowed_roles = st.multiselect(
+                        "Allowed roles",
+                        ROLE_OPTIONS,
+                        default=["System Admin"],
+                        key=f"txt_upload_roles_{upload_form_version}",
+                    )
+                else:
+                    allowed_roles = st.multiselect(
+                        "Allowed roles",
+                        ["Project Manager", "General Employee"],
+                        default=["Project Manager"],
+                        key=f"txt_upload_roles_{upload_form_version}",
+                    )
+                if st.session_state["role"] == "System Admin":
+                    allowed_departments = st.multiselect(
+                        "Allowed departments",
+                        DEPARTMENT_OPTIONS,
+                        default=[department],
+                        key=f"txt_upload_departments_{upload_form_version}",
+                    )
+                else:
+                    allowed_departments = st.multiselect(
+                        "Allowed departments",
+                        [st.session_state["department"]],
+                        default=[st.session_state["department"]],
+                        key=f"txt_upload_departments_{upload_form_version}",
+                    )
 
                 submitted_upload = st.form_submit_button("Save TXT + Metadata")
 
@@ -989,6 +1039,19 @@ elif selected_page in ["KB Management", "KB Status"]:
                             )
                             st.stop()
 
+                        try:
+                            approved_metadata = request_upload_validation(
+                                document_department=department,
+                                allowed_roles=allowed_roles,
+                                allowed_departments=allowed_departments,
+                            )
+                        except requests.exceptions.HTTPError as error:
+                            st.error(f"Upload rejected by backend: {error.response.text}")
+                            st.stop()
+                        except requests.exceptions.RequestException as error:
+                            st.error(f"Could not validate upload metadata: {error}")
+                            st.stop()
+
                         filename = save_uploaded_text_file(uploaded_file)
 
                         new_document = {
@@ -997,15 +1060,15 @@ elif selected_page in ["KB Management", "KB Status"]:
                             "filename": filename,
                             "file_type": "TXT",
                             "source": "Manual Upload",
-                            "department": department,
+                            "department": approved_metadata["document_department"],
                             "category": category.strip() or "General",
                             "tags": [
                                 tag.strip()
                                 for tag in tags_text.split(",")
                                 if tag.strip()
                             ],
-                            "allowed_roles": allowed_roles,
-                            "allowed_departments": allowed_departments,
+                            "allowed_roles": approved_metadata["allowed_roles"],
+                            "allowed_departments": approved_metadata["allowed_departments"],
                             "uploaded_by": st.session_state["user"],
                             "uploaded_at": datetime.now().isoformat(timespec="minutes"),
                             "page_number": None,

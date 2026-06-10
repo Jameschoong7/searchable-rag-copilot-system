@@ -43,6 +43,12 @@ class QueryResponse(BaseModel):
     department: str
 
 
+class ReindexRequest(BaseModel):
+    """Represent an admin reindex request from a frontend client."""
+
+    role: str
+
+
 class ReindexResponse(BaseModel):
     """Represent the result of a local vector index rebuild."""
 
@@ -50,6 +56,25 @@ class ReindexResponse(BaseModel):
     documents_indexed: int
     chunks_indexed: int
     message: str
+
+
+class UploadValidationRequest(BaseModel):
+    """Represent metadata proposed for a local simulated document upload."""
+
+    role: str
+    user_department: str
+    document_department: str
+    allowed_roles: list[str]
+    allowed_departments: list[str]
+
+
+class UploadValidationResponse(BaseModel):
+    """Represent backend-approved upload metadata scope."""
+
+    status: str
+    document_department: str
+    allowed_roles: list[str]
+    allowed_departments: list[str]
 
 
 @app.post("/query", response_model=QueryResponse)
@@ -89,8 +114,13 @@ def query_knowledge_base(request: QueryRequest) -> QueryResponse:
 
 
 @app.post("/admin/reindex", response_model=ReindexResponse)
-def reindex_knowledge_base() -> ReindexResponse:
+def reindex_knowledge_base(request: ReindexRequest) -> ReindexResponse:
     """Rebuild the local vector index through the shared backend API."""
+    if request.role != "System Admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Only System Admin can rebuild the vector index.",
+        )
     try:
         from src.etl.pipeline import rebuild_vector_store
 
@@ -110,3 +140,51 @@ def reindex_knowledge_base() -> ReindexResponse:
             f"and {result['chunks_indexed']} chunk(s)."
         ),
     )
+
+
+@app.post("/admin/validate-upload", response_model=UploadValidationResponse)
+def validate_upload_metadata(
+    request: UploadValidationRequest,
+) -> UploadValidationResponse:
+    """Validate upload metadata permissions before local file/metadata writes."""
+    if request.role == "General Employee":
+        raise HTTPException(
+            status_code=403,
+            detail="General Employee cannot upload knowledge base documents.",
+        )
+
+    if request.role == "Project Manager":
+        return UploadValidationResponse(
+            status="approved",
+            document_department=request.user_department,
+            allowed_roles=[
+                role for role in request.allowed_roles
+                if role in ["Project Manager", "General Employee"]
+            ] or ["Project Manager"],
+            allowed_departments=[request.user_department],
+        )
+
+    if request.role == "System Admin":
+        if not request.allowed_roles:
+            raise HTTPException(
+                status_code=400,
+                detail="At least one allowed role is required.",
+            )
+
+        if not request.allowed_departments:
+            raise HTTPException(
+                status_code=400,
+                detail="At least one allowed department is required.",
+            )
+
+        return UploadValidationResponse(
+            status="approved",
+            document_department=request.document_department,
+            allowed_roles=request.allowed_roles,
+            allowed_departments=request.allowed_departments,
+        )
+
+    raise HTTPException(
+        status_code=403,
+        detail="Unknown role cannot upload knowledge base documents.",
+      )
