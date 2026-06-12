@@ -957,240 +957,187 @@ elif selected_page in ["KB Management", "KB Status"]:
                 "- OCR captions: Roadmap\n"
                 "- Diagram extraction: Roadmap"
             )
+    
+    if st.session_state["role"] != "General Employee":
 
-    st.subheader("Document Ingestion")
+        st.subheader("Document Ingestion")
 
-    if "upload_message" not in st.session_state:
-        st.session_state["upload_message"] = ""
+        if "upload_message" not in st.session_state:
+            st.session_state["upload_message"] = ""
 
-    with st.container(border=True):
-        if st.session_state["role"] in ["System Admin", "Project Manager"]:
-            st.markdown("**Real Local TXT/PDF/DOCX Upload**")
-            st.caption(
-                "Uploads a TXT file into data/simulated and appends trusted metadata. "
-                "Rebuild the vector index after upload before searching the new document."
-            )
-
-            if "upload_form_version" not in st.session_state:
-                st.session_state["upload_form_version"] = 0
-
-            upload_form_version = st.session_state["upload_form_version"]
-
-            uploaded_file = st.file_uploader(
-                "TXT, PDF, or DOCX file",
-                type=["txt", "pdf", "docx"],
-                key=f"upload_file{upload_form_version}",
-            )
-
-            title_key = prepare_upload_title_state(uploaded_file, upload_form_version)
-
-            with st.form(f"real_txt_upload_form_{upload_form_version}"):
-
-                title = st.text_input(
-                    "Document title",
-                    key=title_key,
-                    help="Auto-filled from the uploaded filename. Admin may edit it.",
-                )
-                if st.session_state["role"] == "System Admin":
-                    department = st.selectbox(
-                        "Department",
-                        DEPARTMENT_OPTIONS,
-                        key=f"txt_upload_department_{upload_form_version}",
-                    )
-                else:
-                    department = st.text_input(
-                        "Department",
-                        value=st.session_state["department"],
-                        disabled=True,
-                        key=f"txt_upload_department_{upload_form_version}",
-                    )
-                category = st.text_input(
-                    "Category",
-                    value="General",
-                    key=f"txt_upload_category_{upload_form_version}",
-                )
-                tags_text = st.text_input(
-                    "Tags",
-                    value="policy, internal",
-                    help="Separate tags with commas.",
-                    key=f"txt_upload_tags_{upload_form_version}",
-                )
-                if st.session_state["role"] == "System Admin":
-                    allowed_roles = st.multiselect(
-                        "Allowed roles",
-                        ROLE_OPTIONS,
-                        default=["System Admin"],
-                        key=f"txt_upload_roles_{upload_form_version}",
-                    )
-                else:
-                    allowed_roles = st.multiselect(
-                        "Allowed roles",
-                        ["Project Manager", "General Employee"],
-                        default=["Project Manager"],
-                        key=f"txt_upload_roles_{upload_form_version}",
-                    )
-                if st.session_state["role"] == "System Admin":
-                    allowed_departments = st.multiselect(
-                        "Allowed departments",
-                        DEPARTMENT_OPTIONS,
-                        default=[department],
-                        key=f"txt_upload_departments_{upload_form_version}",
-                    )
-                else:
-                    allowed_departments = st.multiselect(
-                        "Allowed departments",
-                        [st.session_state["department"]],
-                        default=[st.session_state["department"]],
-                        key=f"txt_upload_departments_{upload_form_version}",
-                    )
-
-                submitted_upload = st.form_submit_button("Save File + Metadata")
-
-                if submitted_upload:
-                    if uploaded_file is None:
-                        st.error("Please choose a supported file before saving.")
-                    elif not title.strip():
-                        st.error("Please enter a document title.")
-                    elif not allowed_roles:
-                        st.error("Please select at least one allowed role.")
-                    elif not allowed_departments:
-                        st.error("Please select at least one allowed department.")
-                    else:
-                        documents = load_document_metadata()
-                        filename = normalise_uploaded_filename(uploaded_file.name)
-                        file_type = get_uploaded_file_type(filename)
-                        
-                        if file_type == "UNKNOWN":
-                            st.error("Only TXT, PDF, and DOCX uploads are supported in the current local prototype.")
-                            st.stop()
-
-                        if metadata_exists_for_filename(filename):
-                            st.error(
-                                "Metadata already exists for this filename. Rename the file or remove the existing metadata record first."
-                            )
-                            st.stop()
-
-                        try:
-                            approved_metadata = request_upload_validation(
-                                document_department=department,
-                                allowed_roles=allowed_roles,
-                                allowed_departments=allowed_departments,
-                            )
-                        except requests.exceptions.HTTPError as error:
-                            st.error(f"Upload rejected by backend: {error.response.text}")
-                            st.stop()
-                        except requests.exceptions.RequestException as error:
-                            st.error(f"Could not validate upload metadata: {error}")
-                            st.stop()
-
-                        filename = save_uploaded_file(uploaded_file)
-
-                        new_document = {
-                            "document_id": generate_document_id(documents),
-                            "title": title.strip(),
-                            "filename": filename,
-                            "file_type": file_type,
-                            "source": "Manual Upload",
-                            "department": approved_metadata["document_department"],
-                            "category": category.strip() or "General",
-                            "tags": [
-                                tag.strip()
-                                for tag in tags_text.split(",")
-                                if tag.strip()
-                            ],
-                            "allowed_roles": approved_metadata["allowed_roles"],
-                            "allowed_departments": approved_metadata["allowed_departments"],
-                            "uploaded_by": st.session_state["user"],
-                            "uploaded_at": datetime.now().isoformat(timespec="minutes"),
-                            "page_number": None,
-                            "chunk_id": "pending",
-                            "visual_extraction_status": get_visual_extraction_status(file_type),
-                        }
-
-                        append_document_metadata(new_document)
-
-                        st.session_state["upload_message"] = (
-                            f"Saved {filename} and appended metadata record "
-                            f"{new_document['document_id']}. Rebuild ChromaDB before searching it."
-                        )
-
-                        st.session_state["upload_form_version"] += 1
-                        st.rerun()
-            st.markdown("**Local Vector Index**")
-            st.caption(
-                "Rebuild after adding or changing simulated documents so ChromaDB "
-                "can retrieve the latest content."
-            )
-
-            if st.button("Rebuild Local Vector Index"):
-                with st.spinner("Rebuilding local ChromaDB index..."):
-                    try:
-                        rebuild_result = request_backend_reindex()
-                        rebuild_message = rebuild_result["message"]
-                    except Exception as error:
-                        st.error(f"Index rebuild failed: {error}")
-                    else:
-                        st.success(rebuild_message)
-            st.divider()
-        if st.session_state["role"] == "General Employee":
-            st.info(
-                "Knowledge base upload controls are hidden because General Employee "
-                "is a view-only role."
-            )
-        else:
-            if st.session_state["role"] == "System Admin":
+        with st.container(border=True):
+            if st.session_state["role"] in ["System Admin", "Project Manager"]:
+                st.markdown("**Real Local TXT/PDF/DOCX Upload**")
                 st.caption(
-                    "System Admin can simulate global document ingestion across departments."
-                )
-            else:
-                st.caption(
-                    "Project Manager can simulate department-scoped ingestion for "
-                    f"{st.session_state['department']} only."
+                    "Uploads a TXT file into data/simulated and appends trusted metadata. "
+                    "Rebuild the vector index after upload before searching the new document."
                 )
 
-            upload_columns = st.columns(5)
+                if "upload_form_version" not in st.session_state:
+                    st.session_state["upload_form_version"] = 0
 
-            with upload_columns[0]:
-                if st.button("Upload PDF"):
+                upload_form_version = st.session_state["upload_form_version"]
+
+                uploaded_file = st.file_uploader(
+                    "TXT, PDF, or DOCX file",
+                    type=["txt", "pdf", "docx"],
+                    key=f"upload_file{upload_form_version}",
+                )
+
+                title_key = prepare_upload_title_state(uploaded_file, upload_form_version)
+
+                with st.form(f"real_txt_upload_form_{upload_form_version}"):
+
+                    title = st.text_input(
+                        "Document title",
+                        key=title_key,
+                        help="Auto-filled from the uploaded filename. Admin may edit it.",
+                    )
                     if st.session_state["role"] == "System Admin":
-                        st.session_state["upload_message"] = (
-                            "Document successfully chunked, embedded, permission-tagged, "
-                            "and indexed with global admin permissions."
+                        department = st.selectbox(
+                            "Department",
+                            DEPARTMENT_OPTIONS,
+                            key=f"txt_upload_department_{upload_form_version}",
                         )
                     else:
-                        st.session_state["upload_message"] = (
-                            "Department-scoped document upload queued for "
-                            f"{st.session_state['department']} review and indexing."
+                        department = st.text_input(
+                            "Department",
+                            value=st.session_state["department"],
+                            disabled=True,
+                            key=f"txt_upload_department_{upload_form_version}",
+                        )
+                    category = st.text_input(
+                        "Category",
+                        value="General",
+                        key=f"txt_upload_category_{upload_form_version}",
+                    )
+                    tags_text = st.text_input(
+                        "Tags",
+                        value="policy, internal",
+                        help="Separate tags with commas.",
+                        key=f"txt_upload_tags_{upload_form_version}",
+                    )
+                    if st.session_state["role"] == "System Admin":
+                        allowed_roles = st.multiselect(
+                            "Allowed roles",
+                            ROLE_OPTIONS,
+                            default=["System Admin"],
+                            key=f"txt_upload_roles_{upload_form_version}",
+                        )
+                    else:
+                        allowed_roles = st.multiselect(
+                            "Allowed roles",
+                            ["Project Manager", "General Employee"],
+                            default=["Project Manager"],
+                            key=f"txt_upload_roles_{upload_form_version}",
+                        )
+                    if st.session_state["role"] == "System Admin":
+                        allowed_departments = st.multiselect(
+                            "Allowed departments",
+                            DEPARTMENT_OPTIONS,
+                            default=[department],
+                            key=f"txt_upload_departments_{upload_form_version}",
+                        )
+                    else:
+                        allowed_departments = st.multiselect(
+                            "Allowed departments",
+                            [st.session_state["department"]],
+                            default=[st.session_state["department"]],
+                            key=f"txt_upload_departments_{upload_form_version}",
                         )
 
-            with upload_columns[1]:
-                if st.button("Batch ZIP Upload"):
-                    st.session_state["upload_message"] = (
-                        "Batch ingestion simulation completed. Multiple files were extracted, "
-                        "metadata was inherited, and indexing was queued."
+                    submitted_upload = st.form_submit_button("Save File + Metadata")
+
+                    if submitted_upload:
+                        if uploaded_file is None:
+                            st.error("Please choose a supported file before saving.")
+                        elif not title.strip():
+                            st.error("Please enter a document title.")
+                        elif not allowed_roles:
+                            st.error("Please select at least one allowed role.")
+                        elif not allowed_departments:
+                            st.error("Please select at least one allowed department.")
+                        else:
+                            documents = load_document_metadata()
+                            filename = normalise_uploaded_filename(uploaded_file.name)
+                            file_type = get_uploaded_file_type(filename)
+                            
+                            if file_type == "UNKNOWN":
+                                st.error("Only TXT, PDF, and DOCX uploads are supported in the current local prototype.")
+                                st.stop()
+
+                            if metadata_exists_for_filename(filename):
+                                st.error(
+                                    "Metadata already exists for this filename. Rename the file or remove the existing metadata record first."
+                                )
+                                st.stop()
+
+                            try:
+                                approved_metadata = request_upload_validation(
+                                    document_department=department,
+                                    allowed_roles=allowed_roles,
+                                    allowed_departments=allowed_departments,
+                                )
+                            except requests.exceptions.HTTPError as error:
+                                st.error(f"Upload rejected by backend: {error.response.text}")
+                                st.stop()
+                            except requests.exceptions.RequestException as error:
+                                st.error(f"Could not validate upload metadata: {error}")
+                                st.stop()
+
+                            filename = save_uploaded_file(uploaded_file)
+
+                            new_document = {
+                                "document_id": generate_document_id(documents),
+                                "title": title.strip(),
+                                "filename": filename,
+                                "file_type": file_type,
+                                "source": "Manual Upload",
+                                "department": approved_metadata["document_department"],
+                                "category": category.strip() or "General",
+                                "tags": [
+                                    tag.strip()
+                                    for tag in tags_text.split(",")
+                                    if tag.strip()
+                                ],
+                                "allowed_roles": approved_metadata["allowed_roles"],
+                                "allowed_departments": approved_metadata["allowed_departments"],
+                                "uploaded_by": st.session_state["user"],
+                                "uploaded_at": datetime.now().isoformat(timespec="minutes"),
+                                "page_number": None,
+                                "chunk_id": "pending",
+                                "visual_extraction_status": get_visual_extraction_status(file_type),
+                            }
+
+                            append_document_metadata(new_document)
+
+                            st.session_state["upload_message"] = (
+                                f"Saved {filename} and appended metadata record "
+                                f"{new_document['document_id']}. Rebuild ChromaDB before searching it."
+                            )
+
+                            st.session_state["upload_form_version"] += 1
+                            st.rerun()
+                if st.session_state["role"] == "System Admin":
+                    st.markdown("**Local Vector Index**")
+                    st.caption(
+                        "Rebuild after adding or changing simulated documents so ChromaDB "
+                        "can retrieve the latest content."
                     )
 
-            with upload_columns[2]:
-                if st.button("PDF with Diagram/OCR"):
-                    st.session_state["upload_message"] = (
-                        "Document indexed with OCR and diagram-caption extraction enabled. "
-                        "Embedded flowcharts are now searchable in the simulation."
-                    )
+                
+                    if st.button("Rebuild Local Vector Index"):
+                        with st.spinner("Rebuilding local ChromaDB index..."):
+                            try:
+                                rebuild_result = request_backend_reindex()
+                                rebuild_message = rebuild_result["message"]
+                            except Exception as error:
+                                st.error(f"Index rebuild failed: {error}")
+                            else:
+                                st.success(rebuild_message)
 
-            with upload_columns[3]:
-                if st.button("File Too Large"):
-                    st.session_state["upload_message"] = (
-                        "Upload rejected. Detected file size exceeds the simulated 50 MB limit."
-                    )
-
-            with upload_columns[4]:
-                if st.button("Network Error"):
-                    st.session_state["upload_message"] = (
-                        "Ingestion failed. Simulated connection loss during embedding/indexing."
-                    )
-
-        if st.session_state["upload_message"]:
-            st.warning(st.session_state["upload_message"])
+            if st.session_state["upload_message"]:
+                st.warning(st.session_state["upload_message"])
 
     st.subheader("Document Index & Permission Metadata")
 

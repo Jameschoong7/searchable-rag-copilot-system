@@ -7,6 +7,7 @@
         "department": "IT",
         "department_filter": "All",
         "file_type_filter": "TXT",
+        "expected_behavior": "hit",
         "expected_source": "IT_Policy_Password.txt"
     },
     {
@@ -17,6 +18,7 @@
         "department": "Engineering",
         "department_filter": "All",
         "file_type_filter": "TXT",
+        "expected_behavior": "hit",
         "expected_source": "IT_Policy_Software.txt"
     },
     {
@@ -27,6 +29,7 @@
         "department": "Engineering",
         "department_filter": "All",
         "file_type_filter": "TXT",
+        "expected_behavior": "hit",
         "expected_source": "VPN_Setup_Guide.txt"
     },
     {
@@ -37,6 +40,7 @@
         "department": "HR",
         "department_filter": null,
         "file_type_filter": "TXT",
+        "expected_behavior": "hit",
         "expected_source": "HR_Leave_Policy_2026.txt"
     },
     {
@@ -47,6 +51,7 @@
         "department": "HR",
         "department_filter": null,
         "file_type_filter": "TXT",
+        "expected_behavior": "hit",
         "expected_source": "HR_Expense_Claim_Guide.txt"
     },
     {
@@ -57,6 +62,7 @@
         "department": "Engineering",
         "department_filter": "Engineering",
         "file_type_filter": "TXT",
+        "expected_behavior": "hit",
         "expected_source": "Engineering_Coding_Standards.txt"
     },
     {
@@ -67,6 +73,7 @@
         "department": "Engineering",
         "department_filter": "Engineering",
         "file_type_filter": "TXT",
+        "expected_behavior": "hit",
         "expected_source": "Engineering_Development_Workflow.txt"
     },
     {
@@ -77,6 +84,7 @@
         "department": "HR",
         "department_filter": null,
         "file_type_filter": "TXT",
+        "expected_behavior": "hit",
         "expected_source": "Security_Incident_Response_Guide.txt"
     },
     {
@@ -87,6 +95,7 @@
         "department": "IT",
         "department_filter": "All",
         "file_type_filter": "TXT",
+        "expected_behavior": "hit",
         "expected_source": "Security_Access_Control_Policy.txt"
     },
     {
@@ -97,6 +106,29 @@
         "department": "IT",
         "department_filter": "All",
         "file_type_filter": "TXT",
+        "expected_behavior": "hit",
         "expected_source": "Operations_Service_Escalation_SOP.txt"
+    },
+    {
+        "query_id": "Q-011",
+        "suite": "guardrail",
+        "question": "policy",
+        "role": "General Employee",
+        "department": "HR",
+        "department_filter": null,
+        "file_type_filter": "TXT",
+        "expected_behavior": "miss",
+        "expected_source": null
+    },
+    {
+        "query_id": "Q-012",
+        "suite": "acl",
+        "question": "How are access roles assigned and reviewed?",
+        "role": "General Employee",
+        "department": "HR",
+        "department_filter": null,
+        "file_type_filter": "TXT",
+        "expected_behavior": "permission_block",
+        "expected_source": "Security_Access_Control_Policy.txt"
     }
 ]

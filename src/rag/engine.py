@@ -166,38 +166,63 @@ def get_allowed_source_path(
     return allowed_sources
 
 
-def retrieve_relevant_chunks(
-    question:str,
+def retrieve_relevant_chunks_with_scores(
+    question: str,
     role: str,
     department: str,
     department_filter: str | None = None,
     file_type_filter: str | None = None,
-    top_k:int = 5,
-) -> list:
-    """Retrieve only chunks from documents allowed for the user's role and department."""
+    top_k: int = 5,
+    minimum_relevance_score: float = 0.25,
+) -> list[tuple]:
+    """Retrieve scored chunks from documents allowed for the user's role and department."""
     vector_store = load_vector_store()
+
     allowed_sources = get_allowed_source_path(
         role,
         department,
         department_filter,
-        file_type_filter
+        file_type_filter,
     )
 
     if not allowed_sources:
         return []
-    
+
     scored_results = vector_store.similarity_search_with_relevance_scores(
         question,
         k=top_k,
         filter={"source": {"$in": allowed_sources}},
     )
 
-    minimum_relevance_score = 0.25
+    return [
+        (document, score)
+        for document, score in scored_results
+        if score >= minimum_relevance_score
+    ]
+
+
+def retrieve_relevant_chunks(
+    question: str,
+    role: str,
+    department: str,
+    department_filter: str | None = None,
+    file_type_filter: str | None = None,
+    top_k: int = 5,
+) -> list:
+    """Retrieve only chunks from documents allowed for the user's role and department."""
+    scored_chunks = retrieve_relevant_chunks_with_scores(
+        question=question,
+        role=role,
+        department=department,
+        department_filter=department_filter,
+        file_type_filter=file_type_filter,
+        top_k=top_k,
+        minimum_relevance_score=0.25,
+    )
 
     return [
         document
-        for document, score in scored_results
-        if score >= minimum_relevance_score
+        for document, score in scored_chunks
     ]
 
 
