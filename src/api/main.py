@@ -122,9 +122,17 @@ def reindex_knowledge_base(request: ReindexRequest) -> ReindexResponse:
             detail="Only System Admin can rebuild the vector index.",
         )
     try:
+        import gc
+        from src.rag.engine import load_vector_store
         from src.etl.pipeline import rebuild_vector_store
 
+        load_vector_store.cache_clear()
+        gc.collect()
+
         result = rebuild_vector_store()
+
+        load_vector_store.cache_clear()
+        gc.collect()
     except Exception as error:
         raise HTTPException(
             status_code=500,

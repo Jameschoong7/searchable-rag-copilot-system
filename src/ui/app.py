@@ -434,6 +434,9 @@ def get_uploaded_file_type(filename: str) -> str:
     if suffix == ".pdf":
         return "PDF"
 
+    if suffix == ".docx":
+        return "DOCX"
+
     return "UNKNOWN"
 
 
@@ -441,6 +444,9 @@ def get_visual_extraction_status(file_type: str) -> str:
     """Return the local extraction status label for the uploaded file type."""
     if file_type == "PDF":
         return "PDF text extraction"
+    
+    if file_type == "DOCX":
+        return "Word text extraction"
 
     return "Text only"
 
@@ -959,7 +965,7 @@ elif selected_page in ["KB Management", "KB Status"]:
 
     with st.container(border=True):
         if st.session_state["role"] in ["System Admin", "Project Manager"]:
-            st.markdown("**Real Local TXT/PDF Upload**")
+            st.markdown("**Real Local TXT/PDF/DOCX Upload**")
             st.caption(
                 "Uploads a TXT file into data/simulated and appends trusted metadata. "
                 "Rebuild the vector index after upload before searching the new document."
@@ -971,8 +977,8 @@ elif selected_page in ["KB Management", "KB Status"]:
             upload_form_version = st.session_state["upload_form_version"]
 
             uploaded_file = st.file_uploader(
-                "TXT or PDF file",
-                type=["txt", "pdf"],
+                "TXT, PDF, or DOCX file",
+                type=["txt", "pdf", "docx"],
                 key=f"upload_file{upload_form_version}",
             )
 
@@ -1042,7 +1048,7 @@ elif selected_page in ["KB Management", "KB Status"]:
 
                 if submitted_upload:
                     if uploaded_file is None:
-                        st.error("Please choose a TXT file before saving.")
+                        st.error("Please choose a supported file before saving.")
                     elif not title.strip():
                         st.error("Please enter a document title.")
                     elif not allowed_roles:
@@ -1055,7 +1061,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                         file_type = get_uploaded_file_type(filename)
                         
                         if file_type == "UNKNOWN":
-                            st.error("Only TXT and PDF uploads are supported in the current local prototype.")
+                            st.error("Only TXT, PDF, and DOCX uploads are supported in the current local prototype.")
                             st.stop()
 
                         if metadata_exists_for_filename(filename):

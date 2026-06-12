@@ -7,8 +7,11 @@ from pathlib import Path
 from dotenv import load_dotenv  #read .env config file
 
 from langchain_community.document_loaders import TextLoader, PyPDFLoader
+from langchain_core.documents import Document
+from docx import Document as DocxDocument
 #TextLoader read .txt files into LangChain Document objects
 #PyPDFLoader read .pdf files into LangChain Document objects
+#Docx allow use of python-docx to extract text then wrap into LangChain Document objects
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 #split long documents into smaller overlapping chunks
@@ -29,6 +32,31 @@ from langchain_huggingface import HuggingFaceEmbeddings
 #load all values from .env into environment variables
 load_dotenv() 
 
+
+def extract_docx_text(file_path: Path) -> str:
+    """Extract searchable paragraph and table text from a DOCX file."""
+    docx_file = DocxDocument(str(file_path))
+    text_parts = []
+
+    for paragraph in docx_file.paragraphs:
+        paragraph_text = paragraph.text.strip()
+
+        if paragraph_text:
+            text_parts.append(paragraph_text)
+
+    for table in docx_file.tables:
+        for row in table.rows:
+            row_text = " | ".join(
+                cell.text.strip()
+                for cell in row.cells
+                if cell.text.strip()
+            )
+
+            if row_text:
+                text_parts.append(row_text)
+
+    return "\n".join(text_parts)
+
 #function to handle E in ETL
 def load_documents(folder_path:str) -> list:
     #(REQ_F001) E in ETL, read all .txt and .pdf files from given folder
@@ -42,18 +70,29 @@ def load_documents(folder_path:str) -> list:
 
     #loop through every file in the folder
     for file_path in folder.iterdir():
-        #validate file extension if it's .txt
-        if file_path.suffix == ".txt":
-            #create text loader
-            loader = TextLoader(str(file_path), encoding="utf-8")
+        if not file_path.is_file():
+          continue
 
-            #load and add to list
+        suffix = file_path.suffix.lower()
+
+        if suffix == ".txt":
+            loader = TextLoader(str(file_path), encoding="utf-8")
             documents.extend(loader.load())
-        
-        #if it's .pdf
-        elif file_path.suffix == ".pdf":
+
+        elif suffix == ".pdf":
             loader = PyPDFLoader(str(file_path))
             documents.extend(loader.load())
+
+        elif suffix == ".docx":
+            docx_text = extract_docx_text(file_path)
+
+            if docx_text.strip():
+                documents.append(
+                    Document(
+                        page_content=docx_text,
+                        metadata={"source": str(file_path)},
+                    )
+                )
     
     #feedback for the progress
     print(f"Loaded {len(documents)} document(s) from {folder_path}")
