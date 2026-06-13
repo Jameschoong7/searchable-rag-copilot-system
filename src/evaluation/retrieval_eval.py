@@ -203,6 +203,64 @@ def build_threshold_comparison(test_cases: list[dict]) -> dict:
     return comparison
 
 
+def interpret_threshold_comparison(threshold_comparison: dict) -> dict:
+    """Explain whether candidate thresholds change labelled retrieval outcomes."""
+    threshold_summaries = {
+        threshold: comparison_result["summary"]["overall"]
+        for threshold, comparison_result in threshold_comparison.items()
+    }
+
+    best_threshold = max(
+        threshold_summaries,
+        key=lambda threshold: (
+            threshold_summaries[threshold]["correct_queries"],
+            threshold_summaries[threshold]["top_k_accuracy"],
+        ),
+    )
+
+    comparison_rows = []
+
+    for threshold, comparison_result in threshold_comparison.items():
+        failed_query_ids = [
+            result["query_id"]
+            for result in comparison_result["results"]
+            if not result["hit"]
+        ]
+
+        comparison_rows.append(
+            {
+                "threshold": float(threshold),
+                "correct_queries": comparison_result["summary"]["overall"]["correct_queries"],
+                "total_queries": comparison_result["summary"]["overall"]["total_queries"],
+                "top_k_accuracy_percent": comparison_result["summary"]["overall"]["top_k_accuracy_percent"],
+                "failed_query_ids": failed_query_ids,
+            }
+        )
+
+    unique_accuracy_values = {
+        row["top_k_accuracy_percent"]
+        for row in comparison_rows
+    }
+
+    if len(unique_accuracy_values) == 1:
+        recommendation = (
+            "Current labelled set shows no accuracy difference between candidate "
+            "thresholds. Keep the lower threshold only as a cautious local setting "
+            "until more borderline PDF/DOCX cases are added."
+        )
+    else:
+        recommendation = (
+            f"Threshold {best_threshold} performs best on the current labelled set. "
+            "Review failed query IDs before changing production defaults."
+        )
+
+    return {
+        "best_threshold": float(best_threshold),
+        "comparison_rows": comparison_rows,
+        "recommendation": recommendation,
+    }
+
+
 def run_evaluation() -> dict:
     """Run all labelled retrieval cases and calculate Top-K Accuracy."""
     test_cases = load_labelled_queries()
@@ -223,11 +281,14 @@ def run_evaluation() -> dict:
         if not result["hit"]
     ]
 
+    threshold_comparison = build_threshold_comparison(test_cases)
+
     return {
         "summary": summary,
         "miss_rows": miss_rows,
         "results": results,
         "threshold_comparison": build_threshold_comparison(test_cases),
+        "threshold_interpretation": interpret_threshold_comparison(threshold_comparison),
     }
 
 
