@@ -242,20 +242,25 @@ def interpret_threshold_comparison(threshold_comparison: dict) -> dict:
         for row in comparison_rows
     }
 
-    if len(unique_accuracy_values) == 1:
+    has_clear_winner = len(unique_accuracy_values) > 1
+
+    if not has_clear_winner:
         recommendation = (
             "Current labelled set shows no accuracy difference between candidate "
-            "thresholds. Keep the lower threshold only as a cautious local setting "
+            "thresholds. Keep the current local threshold only as a cautious setting "
             "until more borderline PDF/DOCX cases are added."
         )
+        best_threshold_value = None
     else:
         recommendation = (
             f"Threshold {best_threshold} performs best on the current labelled set. "
             "Review failed query IDs before changing production defaults."
         )
+        best_threshold_value = float(best_threshold)
 
     return {
-        "best_threshold": float(best_threshold),
+        "best_threshold": best_threshold_value,
+        "has_clear_winner": has_clear_winner,
         "comparison_rows": comparison_rows,
         "recommendation": recommendation,
     }
