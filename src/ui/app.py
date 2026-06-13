@@ -805,15 +805,35 @@ if selected_page == "Performance":
         st.info("No query latency data yet. Submit a Chat query to populate this chart.")
 
     with st.expander("How benchmark accuracy is measured"):
-        st.write(
-            "Top-K Accuracy checks whether the expected source document appears "
-            "within the top 5 retrieved chunks."
+        st.markdown(
+            "**Top-K Accuracy checks whether the expected source document appears "
+            "within the top 5 retrieved chunks.**"
         )
         st.caption(
             "Current Top-K Accuracy and Miss Rate use the latest local labelled "
             "retrieval evaluation result. Prototype benchmark values should be treated "
             "as presentation examples only."
         )
+        if evaluation_results and evaluation_results.get("threshold_interpretation"):
+            threshold_interpretation = evaluation_results["threshold_interpretation"]
+
+            st.markdown("**Relevance Threshold Comparison**")
+            st.caption(
+                "This compares candidate retrieval score thresholds using the same "
+                "labelled query set. It helps justify whether a lower threshold "
+                "recovers useful documents or only adds noise."
+            )
+
+            st.dataframe(
+                threshold_interpretation["comparison_rows"],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            if threshold_interpretation["has_clear_winner"]:
+                st.success(threshold_interpretation["recommendation"])
+            else:
+                st.info(threshold_interpretation["recommendation"])
 
     st.subheader("Retrieval Miss Review Log")
 
