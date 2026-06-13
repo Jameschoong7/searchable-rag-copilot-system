@@ -58,12 +58,15 @@ def extract_docx_text(file_path: Path) -> str:
     return "\n".join(text_parts)
 
 #function to handle E in ETL
-def load_documents(folder_path:str) -> list:
+def load_documents(folder_path:str) -> tuple[list, int]:
     #(REQ_F001) E in ETL, read all .txt and .pdf files from given folder
     #Return a list of LangChain Document object, each holding file text + metadata
     
     #list for storing all loaded Document objects
     documents = []
+
+    #count physical files separately because PDFs can produce one Document per page
+    source_file_count = 0
 
     #converet string path to Path object 
     folder = Path(folder_path)
@@ -74,6 +77,11 @@ def load_documents(folder_path:str) -> list:
           continue
 
         suffix = file_path.suffix.lower()
+
+        if suffix not in [".txt", ".pdf", ".docx"]:
+            continue
+
+        source_file_count += 1
 
         if suffix == ".txt":
             loader = TextLoader(str(file_path), encoding="utf-8")
@@ -95,8 +103,11 @@ def load_documents(folder_path:str) -> list:
                 )
     
     #feedback for the progress
-    print(f"Loaded {len(documents)} document(s) from {folder_path}")
-    return documents
+    print(
+        f"Loaded {source_file_count} file(s) and "
+        f"{len(documents)} document object(s) from {folder_path}"
+    )
+    return documents, source_file_count
 
 #function to handle T in ETL
 def chunk_documents(documents: list) -> list:
@@ -178,12 +189,13 @@ def rebuild_vector_store(
     if chroma_directory.exists():
         shutil.rmtree(chroma_directory)
 
-    documents = load_documents(docs_path)
+    documents, source_file_count = load_documents(docs_path)
     chunks = chunk_documents(documents)
     embed_and_store(chunks, db_path, collection_name)
 
     return {
-        "documents_indexed": len(documents),
+        "documents_indexed": source_file_count,
+        "document_objects_loaded": len(documents),
         "chunks_indexed": len(chunks),
         "collection_name": collection_name,
         "db_path": db_path,
@@ -203,7 +215,7 @@ if __name__ =="__main__":
     print("Starting ETL pipeline...")
 
     #step 1: Extract (E)
-    documents = load_documents(docs_path)
+    documents, source_file_count = load_documents(docs_path)
 
     #step 2: Transform (T)
     chunks = chunk_documents(documents)

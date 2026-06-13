@@ -142,9 +142,11 @@ def reindex_knowledge_base(request: ReindexRequest) -> ReindexResponse:
     return ReindexResponse(
         status="success",
         documents_indexed=result["documents_indexed"],
+        document_objects_loaded=result["document_objects_loaded"],
         chunks_indexed=result["chunks_indexed"],
         message=(
-            f"Rebuilt ChromaDB with {result['documents_indexed']} document(s) "
+            f"Rebuilt ChromaDB with {result['documents_indexed']} file(s), "
+            f"{result['document_objects_loaded']} document object(s), "
             f"and {result['chunks_indexed']} chunk(s)."
         ),
     )

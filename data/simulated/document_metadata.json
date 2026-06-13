@@ -402,5 +402,60 @@
     "page_number": null,
     "chunk_id": "pending",
     "visual_extraction_status": "Text only"
+  },
+  {
+    "document_id": "DOC-UPLOAD-003",
+    "title": "Client Data Handling Policy",
+    "filename": "Client_Data_Handling_Policy.pdf",
+    "file_type": "PDF",
+    "source": "Manual Upload",
+    "department": "IT",
+    "category": "General",
+    "tags": [
+      "policy",
+      "internal"
+    ],
+    "allowed_roles": [
+      "System Admin",
+      "Project Manager",
+      "General Employee"
+    ],
+    "allowed_departments": [
+      "IT",
+      "Engineering",
+      "Operations"
+    ],
+    "uploaded_by": "admin_jc",
+    "uploaded_at": "2026-06-13T10:11",
+    "page_number": null,
+    "chunk_id": "pending",
+    "visual_extraction_status": "PDF text extraction"
+  },
+  {
+    "document_id": "DOC-UPLOAD-004",
+    "title": "Ai Tools Usage Policy",
+    "filename": "AI_Tools_Usage_Policy.docx",
+    "file_type": "DOCX",
+    "source": "Manual Upload",
+    "department": "IT",
+    "category": "General",
+    "tags": [
+      "policy",
+      "internal"
+    ],
+    "allowed_roles": [
+      "System Admin",
+      "Project Manager",
+      "General Employee"
+    ],
+    "allowed_departments": [
+      "IT",
+      "Security"
+    ],
+    "uploaded_by": "admin_jc",
+    "uploaded_at": "2026-06-13T10:12",
+    "page_number": null,
+    "chunk_id": "pending",
+    "visual_extraction_status": "Word text extraction"
   }
 ]
