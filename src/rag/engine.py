@@ -1,11 +1,13 @@
 #REQ_F004: Retrieve relevant documents chunks and generate cited answers
 
 import re
-import json
 from pathlib import Path
 import os
 from dotenv import load_dotenv
 from functools import lru_cache
+
+
+from src.metadata.repository import load_document_metadata
 
 from langchain_community.vectorstores import Chroma
 
@@ -25,7 +27,6 @@ from langchain_community.llms import Ollama
 load_dotenv()
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-METADATA_PATH = PROJECT_ROOT / "data/simulated/document_metadata.json"
 
 #function to load ChromaDB knowledge base data
 @lru_cache(maxsize=1)
@@ -52,12 +53,6 @@ def load_vector_store() -> Chroma:
     )
 
     return vector_store
-
-
-def load_document_metadata() -> list[dict]:
-    """Load simulated document metadata used for ACL filtering before retrieval."""
-    with METADATA_PATH.open("r", encoding="utf-8") as metadata_file:
-        return json.load(metadata_file)
 
 
 def can_access_document(document: dict, role: str, department: str) -> bool:

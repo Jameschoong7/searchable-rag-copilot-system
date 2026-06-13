@@ -14,6 +14,12 @@ import pandas as pd
 from dotenv import load_dotenv
 import sys
 
+from src.metadata.repository import (
+    append_document_metadata,
+    generate_document_id,
+    load_document_metadata,
+    metadata_exists_for_filename,
+)
 
 ROLE_OPTIONS = [
     "System Admin",
@@ -79,7 +85,6 @@ UPLOAD_VALIDATE_URL = "http://127.0.0.1:8000/admin/validate-upload"
 REINDEX_URL = "http://127.0.0.1:8000/admin/reindex"
 API_URL = "http://127.0.0.1:8000/query"
 API_HEALTH_URL = "http://127.0.0.1:8000/health"
-METADATA_PATH = PROJECT_ROOT / "data/simulated/document_metadata.json"
 QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
 EVALUATION_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/retrieval_eval_results.json"
 
@@ -201,12 +206,6 @@ def get_kb_page_label() -> str:
 def can_access_settings() -> bool:
     """Check whether the current user can access admin-only settings."""
     return st.session_state["role"] == "System Admin"
-
-
-def load_document_metadata() -> list[dict]:
-    """Load simulated document metadata for the KB Management/Status page."""
-    with METADATA_PATH.open("r", encoding="utf-8") as metadata_file:
-        return json.load(metadata_file)
 
 
 def load_retrieval_evaluation_results() -> dict | None:
@@ -409,16 +408,6 @@ def can_view_document(document: dict) -> bool:
     )
 
 
-def generate_document_id(documents: list[dict]) -> str:
-    """Generate the next local upload document ID."""
-    upload_count = sum(
-        1 for document in documents
-        if document["document_id"].startswith("DOC-UPLOAD-")
-    )
-
-    return f"DOC-UPLOAD-{upload_count + 1:03d}"
-
-
 def normalise_uploaded_filename(filename: str) -> str:
     """Return the local filename used for uploaded simulated documents."""
     return filename.replace(" ", "_")
@@ -479,28 +468,9 @@ def save_uploaded_file(uploaded_file) -> str:
     return filename
 
 
-def append_document_metadata(new_document: dict) -> None:
-    """Append a new document metadata record to the local metadata JSON file."""
-    documents = load_document_metadata()
-    documents.append(new_document)
-
-    with METADATA_PATH.open("w", encoding="utf-8") as metadata_file:
-        json.dump(documents, metadata_file, indent=2)
-
-
 def infer_title_from_uploaded_file(uploaded_file) -> str:
     """Infer a default document title from the uploaded filename."""
     return Path(uploaded_file.name).stem.replace("_", " ").replace("-", " ").title()
-
-
-def metadata_exists_for_filename(filename: str) -> bool:
-    """Check whether metadata already exists for an uploaded filename."""
-    documents = load_document_metadata()
-
-    return any(
-        document["filename"] == filename
-        for document in documents
-    )
 
 
 st.set_page_config(
