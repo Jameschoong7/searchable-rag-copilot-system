@@ -131,4 +131,27 @@
         "expected_behavior": "permission_block",
         "expected_source": "Security_Access_Control_Policy.txt"
     }
+    ,
+    {
+      "query_id": "Q-013",
+      "suite": "uploaded",
+      "question": "Where may client data be stored?",
+      "role": "System Admin",
+      "department": "IT",
+      "department_filter": "All",
+      "file_type_filter": "PDF",
+      "expected_behavior": "hit",
+      "expected_source": "Client_Data_Handling_Policy.pdf"
+    },
+    {
+      "query_id": "Q-014",
+      "suite": "uploaded",
+      "question": "What AI tool usage is prohibited?",
+      "role": "System Admin",
+      "department": "IT",
+      "department_filter": "All",
+      "file_type_filter": "DOCX",
+      "expected_behavior": "hit",
+      "expected_source": "AI_Tools_Usage_Policy.docx"
+    }
 ]
