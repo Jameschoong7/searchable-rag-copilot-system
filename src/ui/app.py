@@ -26,6 +26,7 @@ from src.metadata.repository import (
     generate_document_id,
     load_document_metadata,
     metadata_exists_for_filename,
+    update_document_metadata,
 )
 
 
@@ -81,6 +82,7 @@ DEMO_ACCOUNTS = {
 load_dotenv()
 
 UPLOAD_VALIDATE_URL = "http://127.0.0.1:8000/admin/validate-upload"
+METADATA_UPDATE_VALIDATE_URL = "http://127.0.0.1:8000/admin/validate-metadata-update"
 REINDEX_URL = "http://127.0.0.1:8000/admin/reindex"
 API_URL = "http://127.0.0.1:8000/query"
 API_HEALTH_URL = "http://127.0.0.1:8000/health"
@@ -110,6 +112,28 @@ def request_upload_validation(
     """Ask FastAPI to validate upload metadata for the current user."""
     response = requests.post(
         UPLOAD_VALIDATE_URL,
+        json={
+            "role": st.session_state["role"],
+            "user_department": st.session_state["department"],
+            "document_department": document_department,
+            "allowed_roles": allowed_roles,
+            "allowed_departments": allowed_departments,
+        },
+        timeout=30,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_metadata_update_validation(
+    document_department: str,
+    allowed_roles: list[str],
+    allowed_departments: list[str],
+) -> dict:
+    """Ask FastAPI to validate metadata edits for the current user."""
+    response = requests.post(
+        METADATA_UPDATE_VALIDATE_URL,
         json={
             "role": st.session_state["role"],
             "user_department": st.session_state["department"],
@@ -1245,6 +1269,111 @@ elif selected_page in ["KB Management", "KB Status"]:
                         f"{selected_document['visual_extraction_status']}"
                     )
 
+                    if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
+                        with st.expander("Edit Metadata & Access", expanded=False):
+                            with st.form(f"metadata_edit_form_{selected_document['document_id']}"):
+                                edited_title = st.text_input(
+                                    "Title",
+                                    value=selected_document["title"],
+                                )
+
+                                if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+                                    edited_department = st.selectbox(
+                                        "Department",
+                                        DEPARTMENT_OPTIONS,
+                                        index=DEPARTMENT_OPTIONS.index(selected_document["department"]),
+                                    )
+                                else:
+                                    edited_department = st.text_input(
+                                        "Department",
+                                        value=st.session_state["department"],
+                                        disabled=True,
+                                    )
+
+                                edited_category = st.text_input(
+                                    "Category",
+                                    value=selected_document["category"],
+                                )
+
+                                edited_tags_text = st.text_input(
+                                    "Tags",
+                                    value=", ".join(selected_document["tags"]),
+                                    help="Separate tags with commas.",
+                                )
+
+                                if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+                                    edited_allowed_roles = st.multiselect(
+                                        "Allowed roles",
+                                        ROLE_OPTIONS,
+                                        default=selected_document["allowed_roles"],
+                                    )
+                                    edited_allowed_departments = st.multiselect(
+                                        "Allowed departments",
+                                        [FILTER_ALL] + DEPARTMENT_OPTIONS,
+                                        default=selected_document["allowed_departments"],
+                                    )
+                                else:
+                                    edited_allowed_roles = st.multiselect(
+                                        "Allowed roles",
+                                        [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE],
+                                        default=[
+                                            role for role in selected_document["allowed_roles"]
+                                            if role in [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE]
+                                        ] or [PROJECT_MANAGER_ROLE],
+                                    )
+                                    edited_allowed_departments = st.multiselect(
+                                        "Allowed departments",
+                                        [st.session_state["department"]],
+                                        default=[st.session_state["department"]],
+                                    )
+
+                                submitted_metadata_update = st.form_submit_button("Save Metadata")
+
+                                if submitted_metadata_update:
+                                    if not edited_title.strip():
+                                        st.error("Please enter a document title.")
+                                    elif not edited_allowed_roles:
+                                        st.error("Please select at least one allowed role.")
+                                    elif not edited_allowed_departments:
+                                        st.error("Please select at least one allowed department.")
+                                    else:
+                                        try:
+                                            approved_metadata = request_metadata_update_validation(
+                                                document_department=edited_department,
+                                                allowed_roles=edited_allowed_roles,
+                                                allowed_departments=edited_allowed_departments,
+                                            )
+                                        except requests.exceptions.HTTPError as error:
+                                            st.error(f"Metadata update rejected by backend: {error.response.text}")
+                                            st.stop()
+                                        except requests.exceptions.RequestException as error:
+                                            st.error(f"Could not validate metadata update: {error}")
+                                            st.stop()
+
+                                        updated_document = selected_document.copy()
+                                        updated_document.update(
+                                            {
+                                                "title": edited_title.strip(),
+                                                "department": approved_metadata["document_department"],
+                                                "category": edited_category.strip() or "General",
+                                                "tags": [
+                                                    tag.strip()
+                                                    for tag in edited_tags_text.split(",")
+                                                    if tag.strip()
+                                                ],
+                                                "allowed_roles": approved_metadata["allowed_roles"],
+                                                "allowed_departments": approved_metadata["allowed_departments"],
+                                            }
+                                        )
+
+                                        update_document_metadata(
+                                            selected_document["document_id"],
+                                            updated_document,
+                                        )
+
+                                        st.success("Metadata updated. ACL changes apply to chat immediately.")
+                                        st.rerun()
+                    
 
 elif selected_page == "Chat":
     st.title("Chat")
