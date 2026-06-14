@@ -14,12 +14,6 @@ import pandas as pd
 from dotenv import load_dotenv
 import sys
 
-from src.metadata.repository import (
-    append_document_metadata,
-    generate_document_id,
-    load_document_metadata,
-    metadata_exists_for_filename,
-)
 
 ROLE_OPTIONS = [
     "System Admin",
@@ -78,6 +72,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+
+from src.metadata.repository import (
+    append_document_metadata,
+    generate_document_id,
+    load_document_metadata,
+    metadata_exists_for_filename,
+)
 
 load_dotenv()
 
