@@ -161,6 +161,39 @@ def append_document_metadata(new_document: dict) -> None:
         )
 
 
+def update_document_metadata(document_id: str, updated_document: dict) -> None:
+    """Update one document metadata record in the local SQLite metadata store."""
+    initialise_metadata_database()
+    encoded_document = encode_document_for_sqlite(updated_document)
+
+    update_columns = [
+        column
+        for column in DOCUMENT_COLUMNS
+        if column != "document_id"
+    ]
+
+    set_clause = ", ".join(
+        f"{column} = ?"
+        for column in update_columns
+    )
+
+    values = [
+        encoded_document.get(column)
+        for column in update_columns
+    ]
+    values.append(document_id)
+
+    with sqlite3.connect(METADATA_DB_PATH) as connection:
+        connection.execute(
+            f"""
+            UPDATE document_metadata
+            SET {set_clause}
+            WHERE document_id = ?
+            """,
+            values,
+        )
+
+
 def metadata_exists_for_filename(filename: str) -> bool:
     """Check whether a metadata record already exists for a filename."""
     seed_metadata_database_from_json()

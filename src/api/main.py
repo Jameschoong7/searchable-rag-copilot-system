@@ -13,6 +13,14 @@ app = FastAPI(
     version="0.1.0",
 )
 
+from src.core.constants import (
+    GENERAL_EMPLOYEE_ROLE,
+    PROJECT_MANAGER_ROLE,
+    SYSTEM_ADMIN_ROLE,
+    expand_allowed_departments,
+    expand_allowed_roles,
+)
+
 
 @app.get("/health")
 def health_check() -> dict:
@@ -27,7 +35,7 @@ class QueryRequest(BaseModel):
     """Represent one user question sent from a frontend client."""
 
     question: str
-    role: str = "General Employee"
+    role: str = GENERAL_EMPLOYEE_ROLE
     department: str = "General"
     department_filter: str | None = None
     file_type_filter: str | None = None
@@ -77,6 +85,25 @@ class UploadValidationResponse(BaseModel):
     allowed_departments: list[str]
 
 
+class MetadataUpdateValidationRequest(BaseModel):
+    """Represent metadata proposed for an existing document update."""
+
+    role: str
+    user_department: str
+    document_department: str
+    allowed_roles: list[str]
+    allowed_departments: list[str]
+
+
+class MetadataUpdateValidationResponse(BaseModel):
+    """Represent backend-approved metadata update scope."""
+
+    status: str
+    document_department: str
+    allowed_roles: list[str]
+    allowed_departments: list[str]
+
+
 @app.post("/query", response_model=QueryResponse)
 def query_knowledge_base(request: QueryRequest) -> QueryResponse:
     """Answer a user question by calling the shared RAG engine."""
@@ -116,7 +143,7 @@ def query_knowledge_base(request: QueryRequest) -> QueryResponse:
 @app.post("/admin/reindex", response_model=ReindexResponse)
 def reindex_knowledge_base(request: ReindexRequest) -> ReindexResponse:
     """Rebuild the local vector index through the shared backend API."""
-    if request.role != "System Admin":
+    if request.role != SYSTEM_ADMIN_ROLE:
         raise HTTPException(
             status_code=403,
             detail="Only System Admin can rebuild the vector index.",
@@ -157,24 +184,26 @@ def validate_upload_metadata(
     request: UploadValidationRequest,
 ) -> UploadValidationResponse:
     """Validate upload metadata permissions before local file/metadata writes."""
-    if request.role == "General Employee":
+    if request.role == GENERAL_EMPLOYEE_ROLE:
         raise HTTPException(
             status_code=403,
             detail="General Employee cannot upload knowledge base documents.",
         )
 
-    if request.role == "Project Manager":
+    if request.role == PROJECT_MANAGER_ROLE:
         return UploadValidationResponse(
             status="approved",
             document_department=request.user_department,
-            allowed_roles=[
-                role for role in request.allowed_roles
-                if role in ["Project Manager", "General Employee"]
-            ] or ["Project Manager"],
+            allowed_roles=expand_allowed_roles(
+                [
+                    role for role in request.allowed_roles
+                    if role in [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE]
+                ] or [PROJECT_MANAGER_ROLE]
+            ),
             allowed_departments=[request.user_department],
         )
 
-    if request.role == "System Admin":
+    if request.role == SYSTEM_ADMIN_ROLE:
         if not request.allowed_roles:
             raise HTTPException(
                 status_code=400,
@@ -190,11 +219,61 @@ def validate_upload_metadata(
         return UploadValidationResponse(
             status="approved",
             document_department=request.document_department,
-            allowed_roles=request.allowed_roles,
-            allowed_departments=request.allowed_departments,
+            allowed_roles=expand_allowed_roles(request.allowed_roles),
+            allowed_departments=expand_allowed_departments(request.allowed_departments),
         )
 
     raise HTTPException(
         status_code=403,
         detail="Unknown role cannot upload knowledge base documents.",
       )
+
+
+@app.post("/admin/validate-metadata-update", response_model=MetadataUpdateValidationResponse)
+def validate_metadata_update(
+    request: MetadataUpdateValidationRequest,
+) -> MetadataUpdateValidationResponse:
+    """Validate metadata edit permissions before local SQLite metadata updates."""
+    if request.role == GENERAL_EMPLOYEE_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="General Employee cannot edit knowledge base metadata.",
+        )
+
+    if request.role == PROJECT_MANAGER_ROLE:
+        return MetadataUpdateValidationResponse(
+            status="approved",
+            document_department=request.user_department,
+            allowed_roles=expand_allowed_roles(
+                [
+                    role for role in request.allowed_roles
+                    if role in [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE]
+                ] or [PROJECT_MANAGER_ROLE]
+            ),
+            allowed_departments=[request.user_department],
+        )
+
+    if request.role == SYSTEM_ADMIN_ROLE:
+        if not request.allowed_roles:
+            raise HTTPException(
+                status_code=400,
+                detail="At least one allowed role is required.",
+            )
+
+        if not request.allowed_departments:
+            raise HTTPException(
+                status_code=400,
+                detail="At least one allowed department is required.",
+            )
+
+        return MetadataUpdateValidationResponse(
+            status="approved",
+            document_department=request.document_department,
+            allowed_roles=expand_allowed_roles(request.allowed_roles),
+            allowed_departments=expand_allowed_departments(request.allowed_departments),
+        )
+
+    raise HTTPException(
+        status_code=403,
+        detail="Unknown role cannot edit knowledge base metadata.",
+    )

@@ -15,59 +15,6 @@ from dotenv import load_dotenv
 import sys
 
 
-ROLE_OPTIONS = [
-    "System Admin",
-    "Project Manager",
-    "General Employee",
-]
-
-DEPARTMENT_OPTIONS = [
-    "IT",
-    "Engineering",
-    "HR",
-    "Security",
-    "Operations",
-]
-
-ROLE_AWARE_CHAT_PROMPTS = {
-    "System Admin": {
-        "Password Policy": "What are the password policy requirements?",
-        "Security Incident": "What is the security incident reporting procedure?",
-        "Annual Leave": "What is the annual leave approval process?",
-        "VPN Setup": "How do I set up the company VPN?",
-    },
-    "Project Manager": {
-        "Development Workflow": "What is the software development workflow?",
-        "Coding Standards": "What are the Python coding standards?",
-        "VPN Setup": "How do I set up the company VPN?",
-        "Security Incident": "What is the security incident reporting procedure?",
-    },
-    "General Employee": {
-        "Annual Leave": "What is the annual leave approval process?",
-        "Expense Claims": "How do I submit an expense claim?",
-        "Security Incident": "What is the security incident reporting procedure?",
-        "Onboarding": "What is the employee onboarding process?",
-    },
-}
-
-DEMO_ACCOUNTS = {
-    "admin_jc": {
-        "password": "password123",
-        "role": "System Admin",
-        "department": "IT",
-    },
-    "pm_engineering": {
-        "password": "password123",
-        "role": "Project Manager",
-        "department": "Engineering",
-    },
-    "employee_hr": {
-        "password": "password123",
-        "role": "General Employee",
-        "department": "HR",
-    },
-}
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 if str(PROJECT_ROOT) not in sys.path:
@@ -80,6 +27,56 @@ from src.metadata.repository import (
     load_document_metadata,
     metadata_exists_for_filename,
 )
+
+
+from src.core.constants import (
+    FILTER_ALL,
+    DEPARTMENT_OPTIONS,
+    GENERAL_EMPLOYEE_ROLE,
+    PROJECT_MANAGER_ROLE,
+    ROLE_OPTIONS,
+    SYSTEM_ADMIN_ROLE,
+)
+
+ROLE_AWARE_CHAT_PROMPTS = {
+    SYSTEM_ADMIN_ROLE: {
+        "Password Policy": "What are the password policy requirements?",
+        "Security Incident": "What is the security incident reporting procedure?",
+        "Annual Leave": "What is the annual leave approval process?",
+        "VPN Setup": "How do I set up the company VPN?",
+    },
+    PROJECT_MANAGER_ROLE: {
+        "Development Workflow": "What is the software development workflow?",
+        "Coding Standards": "What are the Python coding standards?",
+        "VPN Setup": "How do I set up the company VPN?",
+        "Security Incident": "What is the security incident reporting procedure?",
+    },
+    GENERAL_EMPLOYEE_ROLE: {
+        "Annual Leave": "What is the annual leave approval process?",
+        "Expense Claims": "How do I submit an expense claim?",
+        "Security Incident": "What is the security incident reporting procedure?",
+        "Onboarding": "What is the employee onboarding process?",
+    },
+}
+
+DEMO_ACCOUNTS = {
+    "admin_jc": {
+        "password": "password123",
+        "role": SYSTEM_ADMIN_ROLE,
+        "department": "IT",
+    },
+    "pm_engineering": {
+        "password": "password123",
+        "role": PROJECT_MANAGER_ROLE,
+        "department": "Engineering",
+    },
+    "employee_hr": {
+        "password": "password123",
+        "role": GENERAL_EMPLOYEE_ROLE,
+        "department": "HR",
+    },
+}
+
 
 load_dotenv()
 
@@ -199,7 +196,7 @@ def logout_user() -> None:
 
 def get_kb_page_label() -> str:
     """Return the KB page label based on the current user's role."""
-    if st.session_state["role"] in ["System Admin", "Project Manager"]:
+    if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
         return "KB Management"
 
     return "KB Status"
@@ -207,7 +204,7 @@ def get_kb_page_label() -> str:
 
 def can_access_settings() -> bool:
     """Check whether the current user can access admin-only settings."""
-    return st.session_state["role"] == "System Admin"
+    return st.session_state["role"] == SYSTEM_ADMIN_ROLE
 
 
 def load_retrieval_evaluation_results() -> dict | None:
@@ -401,7 +398,7 @@ def can_view_document(document: dict) -> bool:
     role = st.session_state["role"]
     department = st.session_state["department"]
 
-    if role == "System Admin":
+    if role == SYSTEM_ADMIN_ROLE:
         return True
 
     return (
@@ -614,7 +611,7 @@ page_options = [
     "Chat",
 ]
 
-if st.session_state["role"] in ["System Admin", "Project Manager"]:
+if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
     page_options.insert(0, "Performance")
 
 if can_access_settings():
@@ -868,9 +865,9 @@ if selected_page == "Performance":
 elif selected_page in ["KB Management", "KB Status"]:
     st.title(selected_page)
 
-    if st.session_state["role"] == "System Admin":
+    if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
         st.caption("Global knowledge base management for all departments.")
-    elif st.session_state["role"] == "Project Manager":
+    elif st.session_state["role"] == PROJECT_MANAGER_ROLE:
         st.caption("Department-scoped knowledge base management.")
     else:
         st.caption("Department-scoped knowledge base status.")
@@ -950,7 +947,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                 "- Diagram extraction: Roadmap"
             )
     
-    if st.session_state["role"] != "General Employee":
+    if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
 
         st.subheader("Document Ingestion")
 
@@ -958,7 +955,7 @@ elif selected_page in ["KB Management", "KB Status"]:
             st.session_state["upload_message"] = ""
 
         with st.container(border=True):
-            if st.session_state["role"] in ["System Admin", "Project Manager"]:
+            if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
                 st.markdown("**Real Local TXT/PDF/DOCX Upload**")
                 st.caption(
                     "Uploads a TXT file into data/simulated and appends trusted metadata. "
@@ -985,7 +982,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                         key=title_key,
                         help="Auto-filled from the uploaded filename. Admin may edit it.",
                     )
-                    if st.session_state["role"] == "System Admin":
+                    if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
                         department = st.selectbox(
                             "Department",
                             DEPARTMENT_OPTIONS,
@@ -1009,21 +1006,21 @@ elif selected_page in ["KB Management", "KB Status"]:
                         help="Separate tags with commas.",
                         key=f"txt_upload_tags_{upload_form_version}",
                     )
-                    if st.session_state["role"] == "System Admin":
+                    if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
                         allowed_roles = st.multiselect(
                             "Allowed roles",
                             ROLE_OPTIONS,
-                            default=["System Admin"],
+                            default=[SYSTEM_ADMIN_ROLE],
                             key=f"txt_upload_roles_{upload_form_version}",
                         )
                     else:
                         allowed_roles = st.multiselect(
                             "Allowed roles",
-                            ["Project Manager", "General Employee"],
-                            default=["Project Manager"],
+                            [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE],
+                            default=[PROJECT_MANAGER_ROLE],
                             key=f"txt_upload_roles_{upload_form_version}",
                         )
-                    if st.session_state["role"] == "System Admin":
+                    if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
                         allowed_departments = st.multiselect(
                             "Allowed departments",
                             DEPARTMENT_OPTIONS,
@@ -1110,7 +1107,7 @@ elif selected_page in ["KB Management", "KB Status"]:
 
                             st.session_state["upload_form_version"] += 1
                             st.rerun()
-                if st.session_state["role"] == "System Admin":
+                if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
                     st.markdown("**Local Vector Index**")
                     st.caption(
                         "Rebuild after adding or changing simulated documents so ChromaDB "
@@ -1151,36 +1148,36 @@ elif selected_page in ["KB Management", "KB Status"]:
         with filter_columns[0]:
             selected_department = st.selectbox(
                 "Visible Document Department",
-                ["All"] + department_options,
+                [FILTER_ALL] + department_options,
             )
 
         with filter_columns[1]:
             selected_category = st.selectbox(
                 "Category",
-                ["All"] + category_options,
+                [FILTER_ALL] + category_options,
             )
 
         with filter_columns[2]:
             selected_source = st.selectbox(
                 "Source",
-                ["All"] + source_options,
+                [FILTER_ALL] + source_options,
             )
 
         filtered_documents = visible_documents
 
-        if selected_department != "All":
+        if selected_department != FILTER_ALL:
             filtered_documents = [
                 document for document in filtered_documents
                 if document["department"] == selected_department
             ]
 
-        if selected_category != "All":
+        if selected_category != FILTER_ALL:
             filtered_documents = [
                 document for document in filtered_documents
                 if document["category"] == selected_category
             ]
 
-        if selected_source != "All":
+        if selected_source != FILTER_ALL:
             filtered_documents = [
                 document for document in filtered_documents
                 if document["source"] == selected_source
@@ -1271,17 +1268,17 @@ elif selected_page == "Chat":
 
     with st.container(border=True):
         filter_columns = st.columns([1, 1, 2])
-        if st.session_state["role"] == "System Admin":
+        if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
             with filter_columns[0]:
                 department_filter = st.selectbox(
                     "Department",
-                    ["All"] + available_departments,
+                    [FILTER_ALL] + available_departments,
                 )
 
             with filter_columns[1]:
                 file_type_filter = st.selectbox(
                     "File Type",
-                    ["All"] + available_file_types,
+                    [FILTER_ALL] + available_file_types,
                 )
 
             filter_status = (
@@ -1289,7 +1286,7 @@ elif selected_page == "Chat":
                 f"File Type = {file_type_filter}"
             )
 
-        elif st.session_state["role"] == "Project Manager":
+        elif st.session_state["role"] == PROJECT_MANAGER_ROLE:
             department_filter = None
 
             with filter_columns[0]:
@@ -1305,7 +1302,7 @@ elif selected_page == "Chat":
             with filter_columns[1]:
                 file_type_filter = st.selectbox(
                     "File Type",
-                    ["All"] + available_file_types,
+                    [FILTER_ALL] + available_file_types,
                 )
 
             filter_status = (
@@ -1315,7 +1312,7 @@ elif selected_page == "Chat":
 
         else:
             department_filter = None
-            file_type_filter = "All"
+            file_type_filter = FILTER_ALL
 
             with filter_columns[0]:
                 st.text_input(
@@ -1385,7 +1382,7 @@ elif selected_page == "Chat":
                 disabled=chat_is_processing,
             )
 
-    if st.session_state["role"] == "General Employee":
+    if st.session_state["role"] == GENERAL_EMPLOYEE_ROLE:
         st.caption("Access control demonstration")
         st.button(
             "Try Restricted IT Policy",
