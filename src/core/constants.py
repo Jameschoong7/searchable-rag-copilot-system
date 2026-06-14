@@ -31,7 +31,7 @@ ROLE_HIERARCHY = {
 
 def expand_allowed_roles(selected_roles: list[str]) -> list[str]:
     """Expand selected minimum roles into the actual roles allowed to access a document."""
-    expanded_roles = []
+    expanded_roles = [SYSTEM_ADMIN_ROLE]
 
     for selected_role in selected_roles:
         for role in ROLE_HIERARCHY.get(selected_role, []):
