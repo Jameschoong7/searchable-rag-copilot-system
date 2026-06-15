@@ -5,6 +5,7 @@ import shutil
 import os
 from pathlib import Path
 from dotenv import load_dotenv  #read .env config file
+from src.metadata.repository import load_document_metadata
 
 from langchain_community.document_loaders import TextLoader, PyPDFLoader
 from langchain_core.documents import Document
@@ -33,6 +34,16 @@ from langchain_huggingface import HuggingFaceEmbeddings
 load_dotenv() 
 
 
+def get_active_metadata_filenames() -> set[str]:
+    """Return filenames that belong to active metadata records only."""
+    active_documents = load_document_metadata()
+
+    return {
+        document["filename"]
+        for document in active_documents
+    }
+
+
 def extract_docx_text(file_path: Path) -> str:
     """Extract searchable paragraph and table text from a DOCX file."""
     docx_file = DocxDocument(str(file_path))
@@ -58,7 +69,10 @@ def extract_docx_text(file_path: Path) -> str:
     return "\n".join(text_parts)
 
 #function to handle E in ETL
-def load_documents(folder_path:str) -> tuple[list, int]:
+def load_documents(
+    folder_path: str,
+    allowed_filenames: set[str] | None = None,
+) -> tuple[list, int]:
     #(REQ_F001) E in ETL, read all .txt and .pdf files from given folder
     #Return a list of LangChain Document object, each holding file text + metadata
     
@@ -75,6 +89,9 @@ def load_documents(folder_path:str) -> tuple[list, int]:
     for file_path in folder.iterdir():
         if not file_path.is_file():
           continue
+
+        if allowed_filenames is not None and file_path.name not in allowed_filenames:
+            continue
 
         suffix = file_path.suffix.lower()
 
@@ -189,7 +206,8 @@ def rebuild_vector_store(
     if chroma_directory.exists():
         shutil.rmtree(chroma_directory)
 
-    documents, source_file_count = load_documents(docs_path)
+    active_filenames = get_active_metadata_filenames()
+    documents, source_file_count = load_documents(docs_path, active_filenames)
     chunks = chunk_documents(documents)
     embed_and_store(chunks, db_path, collection_name)
 
@@ -215,7 +233,8 @@ if __name__ =="__main__":
     print("Starting ETL pipeline...")
 
     #step 1: Extract (E)
-    documents, source_file_count = load_documents(docs_path)
+    active_filenames = get_active_metadata_filenames()
+    documents, source_file_count = load_documents(docs_path, active_filenames)
 
     #step 2: Transform (T)
     chunks = chunk_documents(documents)
