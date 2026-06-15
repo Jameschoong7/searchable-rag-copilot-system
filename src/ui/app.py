@@ -12,6 +12,7 @@ import streamlit as st
 import altair as alt
 import pandas as pd
 from dotenv import load_dotenv
+import os
 import sys
 
 
@@ -81,11 +82,13 @@ DEMO_ACCOUNTS = {
 
 load_dotenv()
 
-UPLOAD_VALIDATE_URL = "http://127.0.0.1:8000/admin/validate-upload"
-METADATA_UPDATE_VALIDATE_URL = "http://127.0.0.1:8000/admin/validate-metadata-update"
-REINDEX_URL = "http://127.0.0.1:8000/admin/reindex"
-API_URL = "http://127.0.0.1:8000/query"
-API_HEALTH_URL = "http://127.0.0.1:8000/health"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
+
+UPLOAD_VALIDATE_URL = f"{API_BASE_URL}/admin/validate-upload"
+REINDEX_URL = f"{API_BASE_URL}/admin/reindex"
+API_URL = f"{API_BASE_URL}/query"
+API_HEALTH_URL = f"{API_BASE_URL}/health"
+METADATA_UPDATE_VALIDATE_URL = f"{API_BASE_URL}/admin/validate-metadata-update"
 QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
 EVALUATION_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/retrieval_eval_results.json"
 
@@ -1321,11 +1324,14 @@ elif selected_page in ["KB Management", "KB Status"]:
                                             if role in [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE]
                                         ] or [PROJECT_MANAGER_ROLE],
                                     )
-                                    edited_allowed_departments = st.multiselect(
+                                    st.text_input(
                                         "Allowed departments",
-                                        [st.session_state["department"]],
-                                        default=[st.session_state["department"]],
+                                        value=st.session_state["department"],
+                                        disabled=True,
+                                        help="Project Manager metadata edits are limited to their own department.",
                                     )
+
+                                    edited_allowed_departments = [st.session_state["department"]]
 
                                 submitted_metadata_update = st.form_submit_button("Save Metadata")
 

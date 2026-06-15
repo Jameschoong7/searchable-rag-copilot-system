@@ -23,6 +23,12 @@ DOCUMENT_COLUMNS = [
     "page_number",
     "chunk_id",
     "visual_extraction_status",
+    "source_document_id",
+    "version_number",
+    "is_active",
+    "content_hash",
+    "archived_at",
+    "replaced_by_document_id",
 ]
 
 
@@ -48,8 +54,47 @@ def initialise_metadata_database() -> None:
                 uploaded_at TEXT NOT NULL,
                 page_number TEXT,
                 chunk_id TEXT,
-                visual_extraction_status TEXT NOT NULL
+                visual_extraction_status TEXT NOT NULL,
+                source_document_id TEXT,
+                version_number INTEGER DEFAULT 1,
+                is_active INTEGER DEFAULT 1,
+                content_hash TEXT,
+                archived_at TEXT,
+                replaced_by_document_id TEXT
             )
+            """
+        )
+    ensure_versioning_columns()
+
+
+def ensure_versioning_columns() -> None:
+    """Add document versioning columns to existing local SQLite metadata stores."""
+    versioning_columns = {
+        "source_document_id": "TEXT",
+        "version_number": "INTEGER DEFAULT 1",
+        "is_active": "INTEGER DEFAULT 1",
+        "content_hash": "TEXT",
+        "archived_at": "TEXT",
+        "replaced_by_document_id": "TEXT",
+    }
+
+    with sqlite3.connect(METADATA_DB_PATH) as connection:
+        existing_columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(document_metadata)")
+        }
+
+        for column_name, column_type in versioning_columns.items():
+            if column_name not in existing_columns:
+                connection.execute(
+                    f"ALTER TABLE document_metadata ADD COLUMN {column_name} {column_type}"
+                )
+
+        connection.execute(
+            """
+            UPDATE document_metadata
+            SET source_document_id = document_id
+            WHERE source_document_id IS NULL
             """
         )
 
@@ -61,6 +106,16 @@ def encode_document_for_sqlite(document: dict) -> dict:
     encoded_document["tags_json"] = json.dumps(document.get("tags", []))
     encoded_document["allowed_roles_json"] = json.dumps(document.get("allowed_roles", []))
     encoded_document["allowed_departments_json"] = json.dumps(document.get("allowed_departments", []))
+    
+    encoded_document["source_document_id"] = document.get(
+        "source_document_id",
+        document.get("document_id"),
+    )
+    encoded_document["version_number"] = document.get("version_number", 1)
+    encoded_document["is_active"] = document.get("is_active", 1)
+    encoded_document["content_hash"] = document.get("content_hash")
+    encoded_document["archived_at"] = document.get("archived_at")
+    encoded_document["replaced_by_document_id"] = document.get("replaced_by_document_id")
 
     encoded_document.pop("tags", None)
     encoded_document.pop("allowed_roles", None)
@@ -102,15 +157,17 @@ def seed_metadata_database_from_json() -> None:
         append_document_metadata(document)
 
 
-def load_document_metadata() -> list[dict]:
+def load_document_metadata(include_inactive: bool = False) -> list[dict]:
     """Load document metadata records from the local SQLite metadata store."""
     seed_metadata_database_from_json()
 
     with sqlite3.connect(METADATA_DB_PATH) as connection:
         connection.row_factory = sqlite3.Row
 
+        where_clause = "" if include_inactive else "WHERE is_active = 1"
+
         rows = connection.execute(
-            """
+            f"""
             SELECT
                 document_id,
                 title,
@@ -126,8 +183,15 @@ def load_document_metadata() -> list[dict]:
                 uploaded_at,
                 page_number,
                 chunk_id,
-                visual_extraction_status
+                visual_extraction_status,
+                source_document_id,
+                version_number,
+                is_active,
+                content_hash,
+                archived_at,
+                replaced_by_document_id
             FROM document_metadata
+            {where_clause}
             ORDER BY document_id
             """
         ).fetchall()
@@ -192,6 +256,77 @@ def update_document_metadata(document_id: str, updated_document: dict) -> None:
             """,
             values,
         )
+
+
+def archive_document_version(
+    document_id: str,
+    replaced_by_document_id: str | None = None,
+    archived_at: str | None = None,
+) -> None:
+    """Mark one document version as archived so it is excluded from normal retrieval."""
+    initialise_metadata_database()
+
+    with sqlite3.connect(METADATA_DB_PATH) as connection:
+        connection.execute(
+            """
+            UPDATE document_metadata
+            SET
+                is_active = 0,
+                archived_at = ?,
+                replaced_by_document_id = ?
+            WHERE document_id = ?
+            """,
+            (
+                archived_at,
+                replaced_by_document_id,
+                document_id,
+            ),
+        )
+
+
+def create_new_document_version(
+    previous_document_id: str,
+    new_document: dict,
+    archived_at: str,
+) -> None:
+    """Archive the previous version and insert a new active version for the same source document."""
+    initialise_metadata_database()
+
+    all_documents = load_document_metadata(include_inactive=True)
+
+    previous_document = next(
+        (
+            document
+            for document in all_documents
+            if document["document_id"] == previous_document_id
+        ),
+        None,
+    )
+
+    if previous_document is None:
+        raise ValueError(f"Document not found: {previous_document_id}")
+
+    source_document_id = previous_document.get(
+        "source_document_id",
+        previous_document["document_id"],
+    )
+
+    previous_version_number = previous_document.get("version_number") or 1
+
+    versioned_document = new_document.copy()
+    versioned_document["source_document_id"] = source_document_id
+    versioned_document["version_number"] = previous_version_number + 1
+    versioned_document["is_active"] = 1
+    versioned_document["archived_at"] = None
+    versioned_document["replaced_by_document_id"] = None
+
+    archive_document_version(
+        document_id=previous_document_id,
+        replaced_by_document_id=versioned_document["document_id"],
+        archived_at=archived_at,
+    )
+
+    append_document_metadata(versioned_document)
 
 
 def metadata_exists_for_filename(filename: str) -> bool:
