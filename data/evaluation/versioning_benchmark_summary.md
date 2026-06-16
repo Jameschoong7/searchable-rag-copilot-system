@@ -61,7 +61,22 @@ Source:
 data/simulated/IT_Policy_Password_v2.txt
 ```
 
-This confirms that the active/latest version is used and the archived 90-day version does not appear in the answer.
+```markdown
+## Full Rebuild vs Single-Document Update Benchmark
+
+| Benchmark | Scope | Chunks Processed | Deleted Vectors | Final Vector Count | Elapsed Time |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Active-aware full rebuild | All active documents | 84 | Recreated index | 84 | 10.678s |
+| Single-document update | `IT_Policy_Password_v2.txt` only | 6 | 6 | 84 | 6.213s |
+
+## Benchmark Interpretation
+
+The active-aware full rebuild is useful for complete index cleanup because it reconstructs Chroma from the current active metadata set. It guarantees archived documents are removed from the active vector index, but it reprocesses all active documents.
+
+The single-document update path is more efficient for normal document changes. It deletes vectors for the changed source file, re-embeds only that file, and keeps the final vector count stable. In this small local corpus, it processed 6 chunks instead of 84 chunks and completed faster than the full rebuild.
+
+This supports the supervisor feedback that incremental update can reduce unnecessary re-embedding work, control vector database growth, and lower future Azure embedding cost when the corpus becomes larger.
+```
 
 ## Conclusion
 
