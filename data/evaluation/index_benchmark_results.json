@@ -1,7 +1,30 @@
 {
-  "active_metadata_records": 16,
-  "simulated_source_files": 17,
-  "chroma_vector_count": 84,
-  "chroma_db_size_bytes": 1564836,
-  "chroma_db_size_mb": 1.49
+  "benchmark_type": "single_document_update",
+  "source": "data/simulated/IT_Policy_Password_v2.txt",
+  "elapsed_seconds": 6.213,
+  "before": {
+    "active_metadata_records": 16,
+    "simulated_source_files": 17,
+    "chroma_vector_count": 84,
+    "chroma_db_size_bytes": 1564836,
+    "chroma_db_size_mb": 1.49
+  },
+  "deleted_vector_count": 6,
+  "index_result": {
+    "source": "data/simulated/IT_Policy_Password_v2.txt",
+    "document_objects_loaded": 1,
+    "chunks_indexed": 6
+  },
+  "after": {
+    "active_metadata_records": 16,
+    "simulated_source_files": 17,
+    "chroma_vector_count": 84,
+    "chroma_db_size_bytes": 1564836,
+    "chroma_db_size_mb": 1.49
+  },
+  "delta": {
+    "chroma_vector_count": 0,
+    "chroma_db_size_bytes": 0,
+    "chroma_db_size_mb": 0.0
+  }
 }

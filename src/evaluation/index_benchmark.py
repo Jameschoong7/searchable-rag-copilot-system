@@ -110,6 +110,47 @@ def build_full_rebuild_benchmark() -> dict:
     }
 
 
+def build_single_document_update_benchmark(source_path: str) -> dict:
+    """Measure the cost of deleting and re-indexing one source document only."""
+    from src.etl.pipeline import delete_vectors_for_source, index_single_document
+
+    before_snapshot = build_index_benchmark_snapshot()
+
+    start_time = time.perf_counter()
+
+    deleted_vector_count = delete_vectors_for_source(source_path)
+    index_result = index_single_document(source_path)
+
+    elapsed_seconds = round(time.perf_counter() - start_time, 3)
+
+    after_snapshot = build_index_benchmark_snapshot()
+
+    return {
+        "benchmark_type": "single_document_update",
+        "source": source_path,
+        "elapsed_seconds": elapsed_seconds,
+        "before": before_snapshot,
+        "deleted_vector_count": deleted_vector_count,
+        "index_result": index_result,
+        "after": after_snapshot,
+        "delta": {
+            "chroma_vector_count": (
+                after_snapshot["chroma_vector_count"]
+                - before_snapshot["chroma_vector_count"]
+            ),
+            "chroma_db_size_bytes": (
+                after_snapshot["chroma_db_size_bytes"]
+                - before_snapshot["chroma_db_size_bytes"]
+            ),
+            "chroma_db_size_mb": round(
+                after_snapshot["chroma_db_size_mb"]
+                - before_snapshot["chroma_db_size_mb"],
+                2,
+            ),
+        },
+    }
+
+
 def save_benchmark_result(result: dict) -> None:
     """Save the latest index benchmark result for dashboard/report evidence."""
     BENCHMARK_RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -121,6 +162,15 @@ def save_benchmark_result(result: dict) -> None:
 if __name__ == "__main__":
     if "--full-rebuild" in sys.argv:
         snapshot = build_full_rebuild_benchmark()
+    elif "--single-document" in sys.argv:
+        source_argument_index = sys.argv.index("--single-document") + 1
+
+        if source_argument_index >= len(sys.argv):
+            raise SystemExit("Usage: python -m src.evaluation.index_benchmark --single-document <source_path>")
+
+        snapshot = build_single_document_update_benchmark(
+            sys.argv[source_argument_index]
+        )
     else:
         snapshot = build_index_benchmark_snapshot()
 
