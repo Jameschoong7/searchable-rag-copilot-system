@@ -91,6 +91,7 @@ API_HEALTH_URL = f"{API_BASE_URL}/health"
 METADATA_UPDATE_VALIDATE_URL = f"{API_BASE_URL}/admin/validate-metadata-update"
 QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
 EVALUATION_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/retrieval_eval_results.json"
+INDEX_BENCHMARK_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_results.json"
 
 
 def request_backend_reindex() -> dict:
@@ -240,6 +241,15 @@ def load_retrieval_evaluation_results() -> dict | None:
         return None
 
     with EVALUATION_RESULTS_PATH.open("r", encoding="utf-8") as results_file:
+        return json.load(results_file)
+
+
+def load_index_benchmark_results() -> dict | None:
+    """Load the latest local vector index benchmark output if it exists."""
+    if not INDEX_BENCHMARK_RESULTS_PATH.exists():
+        return None
+
+    with INDEX_BENCHMARK_RESULTS_PATH.open("r", encoding="utf-8") as results_file:
         return json.load(results_file)
 
 
@@ -664,6 +674,7 @@ if selected_page == "Performance":
     indexed_document_count = len(documents)
     query_log_summary = read_query_log_summary()
     evaluation_results = load_retrieval_evaluation_results()
+    index_benchmark_results = load_index_benchmark_results()
 
     if evaluation_results:
         evaluation_summary = evaluation_results["summary"]["overall"]
@@ -742,6 +753,110 @@ if selected_page == "Performance":
         st.metric(
             "Not Found / Errors",
             query_log_summary["unresolved_queries"],
+        )
+
+    st.subheader("Incremental Index Health")
+
+    if index_benchmark_results:
+        after_snapshot = index_benchmark_results.get("after", index_benchmark_results)
+        benchmark_type = index_benchmark_results.get("benchmark_type", "snapshot")
+
+        active_vectors = after_snapshot["chroma_vector_count"]
+        active_records = after_snapshot["active_metadata_records"]
+        physical_files = after_snapshot["simulated_source_files"]
+        archived_file_count = max(physical_files - active_records, 0)
+
+        if benchmark_type == "single_document_update":
+            changed_document_count = 1
+            chunks_indexed = index_benchmark_results["index_result"]["chunks_indexed"]
+            deleted_vectors = index_benchmark_results["deleted_vector_count"]
+            elapsed_seconds = index_benchmark_results["elapsed_seconds"]
+            avoided_chunks = max(active_vectors - chunks_indexed, 0)
+            avoided_percent = avoided_chunks / active_vectors * 100 if active_vectors else 0
+
+            st.success(
+                f"Latest incremental benchmark refreshed {changed_document_count} changed document "
+                f"in {elapsed_seconds}s. {chunks_indexed} chunks were re-indexed while "
+                f"{avoided_chunks} unchanged chunks were left untouched."
+            )
+
+            metric_columns = st.columns(4)
+
+            with metric_columns[0]:
+                st.metric("Changed Documents", changed_document_count, "Controlled benchmark case")
+
+            with metric_columns[1]:
+                st.metric("Chunks Refreshed", chunks_indexed, f"{avoided_percent:.1f}% work avoided")
+
+            with metric_columns[2]:
+                st.metric("Vectors Replaced", deleted_vectors, "Old chunks removed first")
+
+            with metric_columns[3]:
+                st.metric("Active Index", f"{active_vectors} vectors", f"{after_snapshot['chroma_db_size_mb']} MB")
+
+            st.caption(
+                "This benchmark currently uses one changed document as a controlled test. "
+                "The same delete-and-reindex mechanism can later run as a batch update for "
+                "multiple changed SharePoint or OneNote items."
+            )
+
+
+        else:
+            st.info(
+                "Latest benchmark is a vector index snapshot. Run a full rebuild or "
+                "single-document update benchmark to compare update performance."
+            )
+
+            metric_columns = st.columns(3)
+
+            with metric_columns[0]:
+                st.metric("Active Vectors", active_vectors)
+
+            with metric_columns[1]:
+                st.metric("Active Metadata Records", active_records)
+
+            with metric_columns[2]:
+                st.metric("Chroma DB Size", f"{after_snapshot['chroma_db_size_mb']} MB")
+
+        if archived_file_count:
+            st.warning(
+                f"{archived_file_count} archived source file(s) still exist on disk for audit, "
+                "but active-aware indexing excludes them from Chroma retrieval."
+            )
+        else:
+            st.caption("Physical source files and active metadata records are aligned.")
+
+        with st.expander("Technical benchmark details", expanded=False):
+            detail_rows = [
+                {"Metric": "Benchmark Type", "Value": "Incremental Update Benchmark"},
+                {"Metric": "Changed Documents", "Value": changed_document_count},
+                {"Metric": "Active Metadata Records", "Value": active_records},
+                {"Metric": "Physical Source Files", "Value": physical_files},
+                {"Metric": "Archived Physical Files", "Value": archived_file_count},
+                {"Metric": "Chroma Vector Count", "Value": active_vectors},
+                {"Metric": "Chroma DB Size MB", "Value": after_snapshot["chroma_db_size_mb"]},
+            ]
+
+            if benchmark_type == "single_document_update":
+                detail_rows.extend(
+                    [
+                        {"Metric": "Updated Source", "Value": index_benchmark_results["source"]},
+                        {"Metric": "Deleted Vectors", "Value": deleted_vectors},
+                        {"Metric": "Chunks Re-indexed", "Value": chunks_indexed},
+                        {"Metric": "Elapsed Seconds", "Value": elapsed_seconds},
+                    ]
+                )
+
+            st.dataframe(
+                detail_rows,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    else:
+        st.info(
+            "No vector index benchmark found yet. Run "
+            "`python -m src.evaluation.index_benchmark` to generate one."
         )
 
     st.divider()

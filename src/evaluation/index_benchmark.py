@@ -151,6 +151,80 @@ def build_single_document_update_benchmark(source_path: str) -> dict:
     }
 
 
+def build_batch_update_benchmark(source_paths: list[str]) -> dict:
+    """Measure the cost of updating multiple changed source documents."""
+    from src.etl.pipeline import delete_vectors_for_source, index_single_document
+
+    unique_source_paths = list(dict.fromkeys(source_paths))
+
+    if not unique_source_paths:
+        raise ValueError("At least one source path is required for batch update benchmark.")
+
+    before_snapshot = build_index_benchmark_snapshot()
+
+    start_time = time.perf_counter()
+
+    update_results = []
+    total_deleted_vectors = 0
+    total_chunks_indexed = 0
+    total_document_objects_loaded = 0
+
+    for source_path in unique_source_paths:
+        deleted_vector_count = delete_vectors_for_source(source_path)
+        index_result = index_single_document(source_path)
+
+        total_deleted_vectors += deleted_vector_count
+        total_chunks_indexed += index_result["chunks_indexed"]
+        total_document_objects_loaded += index_result["document_objects_loaded"]
+
+        update_results.append(
+            {
+                "source": source_path,
+                "deleted_vector_count": deleted_vector_count,
+                "document_objects_loaded": index_result["document_objects_loaded"],
+                "chunks_indexed": index_result["chunks_indexed"],
+            }
+        )
+
+    elapsed_seconds = round(time.perf_counter() - start_time, 3)
+
+    after_snapshot = build_index_benchmark_snapshot()
+
+    estimated_unchanged_chunks_avoided = max(
+        after_snapshot["chroma_vector_count"] - total_chunks_indexed,
+        0,
+    )
+
+    return {
+        "benchmark_type": "batch_incremental_update",
+        "changed_document_count": len(unique_source_paths),
+        "updated_sources": unique_source_paths,
+        "elapsed_seconds": elapsed_seconds,
+        "before": before_snapshot,
+        "update_results": update_results,
+        "total_deleted_vectors": total_deleted_vectors,
+        "total_document_objects_loaded": total_document_objects_loaded,
+        "total_chunks_indexed": total_chunks_indexed,
+        "estimated_unchanged_chunks_avoided": estimated_unchanged_chunks_avoided,
+        "after": after_snapshot,
+        "delta": {
+            "chroma_vector_count": (
+                after_snapshot["chroma_vector_count"]
+                - before_snapshot["chroma_vector_count"]
+            ),
+            "chroma_db_size_bytes": (
+                after_snapshot["chroma_db_size_bytes"]
+                - before_snapshot["chroma_db_size_bytes"]
+            ),
+            "chroma_db_size_mb": round(
+                after_snapshot["chroma_db_size_mb"]
+                - before_snapshot["chroma_db_size_mb"],
+                2,
+            ),
+        },
+    }
+
+
 def save_benchmark_result(result: dict) -> None:
     """Save the latest index benchmark result for dashboard/report evidence."""
     BENCHMARK_RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -171,6 +245,17 @@ if __name__ == "__main__":
         snapshot = build_single_document_update_benchmark(
             sys.argv[source_argument_index]
         )
+    elif "--batch-update" in sys.argv:
+        source_argument_index = sys.argv.index("--batch-update") + 1
+        source_paths = sys.argv[source_argument_index:]
+
+        if not source_paths:
+            raise SystemExit(
+                "Usage: python -m src.evaluation.index_benchmark "
+                "--batch-update <source_path> [<source_path> ...]"
+            )
+
+        snapshot = build_batch_update_benchmark(source_paths)
     else:
         snapshot = build_index_benchmark_snapshot()
 
