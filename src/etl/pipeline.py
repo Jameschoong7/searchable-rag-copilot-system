@@ -1,6 +1,7 @@
 # REQ_F001: ETL pipeline — Extract, Transform, Load for local documents
 # REQ_F002: Chunking and embedding for vector search
 
+import chromadb
 import shutil
 import os
 from pathlib import Path
@@ -126,6 +127,33 @@ def load_documents(
     )
     return documents, source_file_count
 
+
+def load_single_document(file_path: Path) -> list:
+    """Load one supported source file into LangChain Document object(s)."""
+    suffix = file_path.suffix.lower()
+
+    if suffix == ".txt":
+        loader = TextLoader(str(file_path), encoding="utf-8")
+        return loader.load()
+
+    if suffix == ".pdf":
+        loader = PyPDFLoader(str(file_path))
+        return loader.load()
+
+    if suffix == ".docx":
+        docx_text = extract_docx_text(file_path)
+
+        if docx_text.strip():
+            return [
+                Document(
+                    page_content=docx_text,
+                    metadata={"source": str(file_path)},
+                )
+            ]
+
+    return []
+
+
 #function to handle T in ETL
 def chunk_documents(documents: list) -> list:
     #(REQ_F002): splits large documents into smaller overlapping chunks.
@@ -186,6 +214,78 @@ def embed_and_store(chunks: list, db_path: str, collection_name: str) -> Chroma:
 
     print(f"Stored {len(chunks)} chunks to ChromaDB at {db_path}")
     return vector_store
+
+
+def delete_vectors_for_source(
+    source_path: str,
+    db_path: str | None = None,
+    collection_name: str | None = None,
+) -> int:
+    """Delete existing Chroma vectors that came from one source file."""
+    db_path = db_path or os.getenv("CHROMA_DB_PATH")
+    collection_name = collection_name or os.getenv("CHROMA_COLLECTION_NAME")
+
+    if db_path is None or collection_name is None:
+        raise ValueError("CHROMA_DB_PATH and CHROMA_COLLECTION_NAME are required.")
+
+    client = chromadb.PersistentClient(path=db_path)
+    collection = client.get_collection(collection_name)
+
+    existing = collection.get(
+        where={"source": source_path},
+        include=[],
+    )
+
+    deleted_count = len(existing["ids"])
+
+    if deleted_count:
+        collection.delete(
+            ids=existing["ids"],
+        )
+
+    return deleted_count
+
+
+def index_single_document(
+    file_path: str | Path,
+    db_path: str | None = None,
+    collection_name: str | None = None,
+) -> dict:
+    """Chunk, embed, and append one source file into the existing Chroma vector store."""
+    db_path = db_path or os.getenv("CHROMA_DB_PATH")
+    collection_name = collection_name or os.getenv("CHROMA_COLLECTION_NAME")
+
+    if db_path is None or collection_name is None:
+        raise ValueError("CHROMA_DB_PATH and CHROMA_COLLECTION_NAME are required.")
+
+    source_file = Path(file_path)
+    documents = load_single_document(source_file)
+    chunks = chunk_documents(documents)
+
+    if not chunks:
+        return {
+            "source": str(source_file),
+            "document_objects_loaded": 0,
+            "chunks_indexed": 0,
+        }
+
+    embedding_model = HuggingFaceEmbeddings(
+        model_name=os.getenv("EMBEDDING_MODEL")
+    )
+
+    vector_store = Chroma(
+        persist_directory=db_path,
+        embedding_function=embedding_model,
+        collection_name=collection_name,
+    )
+
+    vector_store.add_documents(chunks)
+
+    return {
+        "source": str(source_file),
+        "document_objects_loaded": len(documents),
+        "chunks_indexed": len(chunks),
+    }
 
 
 def rebuild_vector_store(
