@@ -180,7 +180,7 @@ def reindex_knowledge_base(request: ReindexRequest) -> ReindexResponse:
         benchmark_result = build_full_rebuild_benchmark()
         save_benchmark_result(benchmark_result)
         result = benchmark_result["rebuild_result"]
-        
+
         load_vector_store.cache_clear()
         gc.collect()
     except Exception as error:
@@ -262,7 +262,7 @@ def index_pending_document_updates(request: IndexUpdatesRequest) -> IndexUpdates
             "total_document_objects_loaded": update_result["total_document_objects_loaded"],
             "total_chunks_indexed": update_result["total_chunks_indexed"],
             "estimated_unchanged_chunks_avoided": max(
-                after_snapshot["chroma_vector_count"] - update_result["total_chunks_indexed"],
+                before_snapshot["chroma_vector_count"] - update_result["total_chunks_indexed"],
                 0,
             ),
             "after": after_snapshot,

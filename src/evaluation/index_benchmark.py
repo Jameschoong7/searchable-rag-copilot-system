@@ -164,8 +164,10 @@ def build_batch_update_benchmark(source_paths: list[str]) -> dict:
 
     after_snapshot = build_index_benchmark_snapshot()
 
+    before_active_vectors = before_snapshot["chroma_vector_count"]
+
     estimated_unchanged_chunks_avoided = max(
-        after_snapshot["chroma_vector_count"] - update_result["total_chunks_indexed"],
+        before_active_vectors - update_result["total_chunks_indexed"],
         0,
     )
 

@@ -67,5 +67,74 @@
       "chroma_db_size_bytes": 0,
       "chroma_db_size_mb": 0.0
     }
+  },
+  {
+    "benchmark_type": "full_rebuild",
+    "elapsed_seconds": 8.096,
+    "before": {
+      "active_metadata_records": 16,
+      "simulated_source_files": 17,
+      "chroma_vector_count": 84,
+      "chroma_db_size_bytes": 1564836,
+      "chroma_db_size_mb": 1.49
+    },
+    "rebuild_result": {
+      "documents_indexed": 16,
+      "document_objects_loaded": 22,
+      "chunks_indexed": 84,
+      "collection_name": "rag_documents",
+      "db_path": "./data/chroma_db"
+    },
+    "after": {
+      "active_metadata_records": 16,
+      "simulated_source_files": 17,
+      "chroma_vector_count": 84,
+      "chroma_db_size_bytes": 1564836,
+      "chroma_db_size_mb": 1.49
+    },
+    "delta": {
+      "chroma_vector_count": 0,
+      "chroma_db_size_bytes": 0,
+      "chroma_db_size_mb": 0.0
+    }
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 1,
+    "updated_sources": [
+      "data/simulated/IT_Policy_Password_v2.txt"
+    ],
+    "elapsed_seconds": 7.017,
+    "before": {
+      "active_metadata_records": 16,
+      "simulated_source_files": 17,
+      "chroma_vector_count": 84,
+      "chroma_db_size_bytes": 1564836,
+      "chroma_db_size_mb": 1.49
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/IT_Policy_Password_v2.txt",
+        "deleted_vector_count": 6,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 6
+      }
+    ],
+    "total_deleted_vectors": 6,
+    "total_document_objects_loaded": 1,
+    "total_chunks_indexed": 6,
+    "estimated_unchanged_chunks_avoided": 78,
+    "after": {
+      "active_metadata_records": 16,
+      "simulated_source_files": 17,
+      "chroma_vector_count": 84,
+      "chroma_db_size_bytes": 1564836,
+      "chroma_db_size_mb": 1.49
+    },
+    "delta": {
+      "chroma_vector_count": 0,
+      "chroma_db_size_bytes": 0,
+      "chroma_db_size_mb": 0.0
+    }
   }
 ]

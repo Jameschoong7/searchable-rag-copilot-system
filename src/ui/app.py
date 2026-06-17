@@ -344,13 +344,13 @@ def show_status_message(status: str) -> None:
     label = get_status_label(status)
 
     if status == "success":
-        st.success(label, icon="✅")
+        st.success(label)
     elif status == "permission_block":
-        st.warning(label, icon="⚠️")
+        st.warning(label)
     elif status == "not_found":
-        st.info(label, icon="ℹ️")
+        st.info(label)
     else:
-        st.error(label, icon="🚨")
+        st.error(label)
 
 
 def write_query_log(
@@ -559,7 +559,6 @@ def infer_title_from_uploaded_file(uploaded_file) -> str:
 
 st.set_page_config(
     page_title="Searchable RAG Copilot",
-    page_icon="🔍",
     layout="wide",
 )
 
@@ -836,6 +835,7 @@ if selected_page == "Performance":
             deleted_vectors = index_benchmark_results["total_deleted_vectors"]
             avoided_chunks = index_benchmark_results["estimated_unchanged_chunks_avoided"]
             elapsed_seconds = index_benchmark_results["elapsed_seconds"]
+            before_active_vectors = index_benchmark_results["before"]["chroma_vector_count"]
 
             document_label = (
                 "document"
@@ -879,26 +879,28 @@ if selected_page == "Performance":
                     f"{db_size_mb} MB",
                 )
 
-            if latest_full_rebuild_result:
-                full_rebuild_baseline_seconds = latest_full_rebuild_result["elapsed_seconds"]
-                full_rebuild_baseline_chunks = latest_full_rebuild_result["rebuild_result"]["chunks_indexed"]
-            else:
-                full_rebuild_baseline_seconds = None
-                full_rebuild_baseline_chunks = active_vectors
-            time_saved_seconds = max(
-                round(full_rebuild_baseline_seconds - elapsed_seconds, 3),
-                0,
-            )
             avoided_percent = (
-                avoided_chunks / full_rebuild_baseline_chunks * 100
-                if full_rebuild_baseline_chunks
+                avoided_chunks / before_active_vectors * 100
+                if before_active_vectors
                 else 0
             )
             refreshed_percent = (
-                chunks_refreshed / full_rebuild_baseline_chunks
-                if full_rebuild_baseline_chunks
+                chunks_refreshed / before_active_vectors
+                if before_active_vectors
                 else 0
             )
+
+            if latest_full_rebuild_result:
+                full_rebuild_baseline_seconds = latest_full_rebuild_result["elapsed_seconds"]
+                full_rebuild_baseline_chunks = latest_full_rebuild_result["rebuild_result"]["chunks_indexed"]
+                time_saved_seconds = max(
+                    round(full_rebuild_baseline_seconds - elapsed_seconds, 3),
+                    0,
+                )
+            else:
+                full_rebuild_baseline_seconds = None
+                full_rebuild_baseline_chunks = None
+                time_saved_seconds = None
 
             with st.expander("Update Efficiency Details", expanded=False):
                 efficiency_columns = st.columns(3)
@@ -911,17 +913,24 @@ if selected_page == "Performance":
                     )
 
                 with efficiency_columns[1]:
-                    st.metric(
-                        "Time Saved",
-                        f"{time_saved_seconds}s",
-                        f"vs {full_rebuild_baseline_seconds}s full rebuild",
-                    )
+                    if time_saved_seconds is None:
+                        st.metric(
+                            "Time Saved",
+                            "No baseline",
+                            "Run full rebuild first",
+                        )
+                    else:
+                        st.metric(
+                            "Time Saved",
+                            f"{time_saved_seconds}s",
+                            f"vs {full_rebuild_baseline_seconds}s full rebuild",
+                        )
 
                 with efficiency_columns[2]:
                     st.metric(
                         "Touched Index",
-                        f"{chunks_refreshed}/{full_rebuild_baseline_chunks}",
-                        "chunks refreshed",
+                        f"{chunks_refreshed}/{before_active_vectors}",
+                        "chunks refreshed vs before index",
                     )
 
                 st.progress(refreshed_percent)
@@ -931,26 +940,32 @@ if selected_page == "Performance":
                     f"left {avoided_chunks} unchanged chunks untouched."
                 )
 
-                st.dataframe(
-                    [
-                        {
-                            "Method": "Full Active Rebuild",
-                            "Scope": "All active documents",
-                            "Chunks Processed": full_rebuild_baseline_chunks,
-                            "Elapsed Time": f"{full_rebuild_baseline_seconds}s",
-                            "Use Case": "Clean full index reconstruction",
-                        },
-                        {
-                            "Method": "Incremental Update",
-                            "Scope": f"{changed_document_count} changed {document_label}",
-                            "Chunks Processed": chunks_refreshed,
-                            "Elapsed Time": f"{elapsed_seconds}s",
-                            "Use Case": "Normal document update/sync",
-                        },
-                    ],
-                    use_container_width=True,
-                    hide_index=True,
-                )
+                if latest_full_rebuild_result:
+                    st.dataframe(
+                        [
+                            {
+                                "Method": "Full Active Rebuild",
+                                "Scope": "All active documents",
+                                "Chunks Processed": full_rebuild_baseline_chunks,
+                                "Elapsed Time": f"{full_rebuild_baseline_seconds}s",
+                                "Use Case": "Clean full index reconstruction",
+                            },
+                            {
+                                "Method": "Incremental Update",
+                                "Scope": f"{changed_document_count} changed {document_label}",
+                                "Chunks Processed": chunks_refreshed,
+                                "Elapsed Time": f"{elapsed_seconds}s",
+                                "Use Case": "Normal document update/sync",
+                            },
+                        ],
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                else:
+                    st.info(
+                        "Run a full rebuild benchmark first to compare incremental update "
+                        "against a measured rebuild baseline."
+                    )
         elif benchmark_type == "full_rebuild":
             elapsed_seconds = index_benchmark_results["elapsed_seconds"]
             chunks_indexed = index_benchmark_results["rebuild_result"]["chunks_indexed"]
@@ -1678,7 +1693,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                     )
 
             if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
-                with st.expander("✏️ Edit Metadata & Access", expanded=False):
+                with st.expander("Edit Metadata & Access", expanded=False):
                     with st.form(f"metadata_edit_form_{selected_document['document_id']}"):
                         edit_col1, edit_col2 = st.columns(2)
                         
@@ -1809,7 +1824,7 @@ elif selected_page == "Chat":
 
     st.caption("Ask questions grounded in the enterprise knowledge base.")
 
-    with st.expander("⚙️ Search Scope & Filters", expanded=False):
+    with st.expander("Search Scope & Filters", expanded=False):
         filter_columns = st.columns([1, 1, 2])
         if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
             with filter_columns[0]:
