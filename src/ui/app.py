@@ -86,6 +86,7 @@ API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 
 UPLOAD_VALIDATE_URL = f"{API_BASE_URL}/admin/validate-upload"
 REINDEX_URL = f"{API_BASE_URL}/admin/reindex"
+INDEX_UPDATES_URL = f"{API_BASE_URL}/admin/index-updates"
 API_URL = f"{API_BASE_URL}/query"
 API_HEALTH_URL = f"{API_BASE_URL}/health"
 METADATA_UPDATE_VALIDATE_URL = f"{API_BASE_URL}/admin/validate-metadata-update"
@@ -98,6 +99,20 @@ def request_backend_reindex() -> dict:
     """Ask the FastAPI backend to rebuild the local vector index."""
     response = requests.post(
         REINDEX_URL,
+        json={
+            "role": st.session_state["role"],
+        },
+        timeout=300,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_pending_index_update() -> dict:
+    """Ask FastAPI to incrementally index pending document updates."""
+    response = requests.post(
+        INDEX_UPDATES_URL,
         json={
             "role": st.session_state["role"],
         },
@@ -1306,20 +1321,36 @@ elif selected_page in ["KB Management", "KB Status"]:
                 if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
                     st.markdown("**Local Vector Index**")
                     st.caption(
-                        "Rebuild after adding or changing simulated documents so ChromaDB "
-                        "can retrieve the latest content."
+                        "Use incremental update for pending document changes. Use full rebuild "
+                        "when you want to reconstruct the active index from scratch."
                     )
 
                 
-                    if st.button("Rebuild Local Vector Index"):
-                        with st.spinner("Rebuilding local ChromaDB index..."):
-                            try:
-                                rebuild_result = request_backend_reindex()
-                                rebuild_message = rebuild_result["message"]
-                            except Exception as error:
-                                st.error(f"Index rebuild failed: {error}")
-                            else:
-                                st.success(rebuild_message)
+                    index_action_columns = st.columns(2)
+
+                    with index_action_columns[0]:
+                        if st.button("Run Incremental Index Update", use_container_width=True):
+                            with st.spinner("Indexing pending document updates..."):
+                                try:
+                                    index_update_result = request_pending_index_update()
+                                except Exception as error:
+                                    st.error(f"Incremental index update failed: {error}")
+                                else:
+                                    if index_update_result["status"] == "no_pending_documents":
+                                        st.info(index_update_result["message"])
+                                    else:
+                                        st.success(index_update_result["message"])
+
+                    with index_action_columns[1]:
+                        if st.button("Rebuild Full Active Index", use_container_width=True):
+                            with st.spinner("Rebuilding local ChromaDB index..."):
+                                try:
+                                    rebuild_result = request_backend_reindex()
+                                    rebuild_message = rebuild_result["message"]
+                                except Exception as error:
+                                    st.error(f"Index rebuild failed: {error}")
+                                else:
+                                    st.success(rebuild_message)
 
             if st.session_state["upload_message"]:
                 st.warning(st.session_state["upload_message"])
