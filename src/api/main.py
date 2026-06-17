@@ -169,13 +169,18 @@ def reindex_knowledge_base(request: ReindexRequest) -> ReindexResponse:
     try:
         import gc
         from src.rag.engine import load_vector_store
-        from src.etl.pipeline import rebuild_vector_store
+        from src.evaluation.index_benchmark import (
+            build_full_rebuild_benchmark,
+            save_benchmark_result,
+        )
 
         load_vector_store.cache_clear()
         gc.collect()
 
-        result = rebuild_vector_store()
-
+        benchmark_result = build_full_rebuild_benchmark()
+        save_benchmark_result(benchmark_result)
+        result = benchmark_result["rebuild_result"]
+        
         load_vector_store.cache_clear()
         gc.collect()
     except Exception as error:

@@ -93,6 +93,7 @@ METADATA_UPDATE_VALIDATE_URL = f"{API_BASE_URL}/admin/validate-metadata-update"
 QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
 EVALUATION_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/retrieval_eval_results.json"
 INDEX_BENCHMARK_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_results.json"
+INDEX_BENCHMARK_HISTORY_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_history.json"
 
 
 def request_backend_reindex() -> dict:
@@ -266,6 +267,15 @@ def load_index_benchmark_results() -> dict | None:
 
     with INDEX_BENCHMARK_RESULTS_PATH.open("r", encoding="utf-8") as results_file:
         return json.load(results_file)
+
+
+def load_index_benchmark_history() -> list[dict]:
+    """Load benchmark history so dashboard comparisons use measured baselines."""
+    if not INDEX_BENCHMARK_HISTORY_PATH.exists():
+        return []
+
+    with INDEX_BENCHMARK_HISTORY_PATH.open("r", encoding="utf-8") as history_file:
+        return json.load(history_file)
 
 
 def initialise_query_log_database() -> None:
@@ -718,6 +728,14 @@ if selected_page == "Performance":
     query_log_summary = read_query_log_summary()
     evaluation_results = load_retrieval_evaluation_results()
     index_benchmark_results = load_index_benchmark_results()
+    index_benchmark_history = load_index_benchmark_history()
+    latest_full_rebuild_result = next(
+        (
+            result for result in reversed(index_benchmark_history)
+            if result.get("benchmark_type") == "full_rebuild"
+        ),
+        None,
+    )
 
     if evaluation_results:
         evaluation_summary = evaluation_results["summary"]["overall"]
@@ -861,8 +879,12 @@ if selected_page == "Performance":
                     f"{db_size_mb} MB",
                 )
 
-            full_rebuild_baseline_seconds = 10.678
-            full_rebuild_baseline_chunks = active_vectors
+            if latest_full_rebuild_result:
+                full_rebuild_baseline_seconds = latest_full_rebuild_result["elapsed_seconds"]
+                full_rebuild_baseline_chunks = latest_full_rebuild_result["rebuild_result"]["chunks_indexed"]
+            else:
+                full_rebuild_baseline_seconds = None
+                full_rebuild_baseline_chunks = active_vectors
             time_saved_seconds = max(
                 round(full_rebuild_baseline_seconds - elapsed_seconds, 3),
                 0,

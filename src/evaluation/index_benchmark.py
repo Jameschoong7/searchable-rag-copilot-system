@@ -17,6 +17,7 @@ SIMULATED_DATA_PATH = PROJECT_ROOT / "data/simulated"
 CHROMA_DB_PATH = PROJECT_ROOT / os.getenv("CHROMA_DB_PATH", "data/chroma_db")
 CHROMA_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME")
 BENCHMARK_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_results.json"
+BENCHMARK_HISTORY_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_history.json"
 
 def get_directory_size(path: Path) -> int:
     """Calculate total size in bytes for all files inside a directory."""
@@ -204,6 +205,28 @@ def save_benchmark_result(result: dict) -> None:
 
     with BENCHMARK_RESULTS_PATH.open("w", encoding="utf-8") as results_file:
         json.dump(result, results_file, indent=2)
+    
+    save_benchmark_history_entry(result)
+
+
+def load_benchmark_history() -> list[dict]:
+    """Load saved benchmark history for comparing rebuild and update runs."""
+    if not BENCHMARK_HISTORY_PATH.exists():
+        return []
+
+    with BENCHMARK_HISTORY_PATH.open("r", encoding="utf-8") as history_file:
+        return json.load(history_file)
+
+
+def save_benchmark_history_entry(result: dict) -> None:
+    """Append one benchmark result so dashboard comparisons are not hardcoded."""
+    BENCHMARK_HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    history = load_benchmark_history()
+    history.append(result)
+
+    with BENCHMARK_HISTORY_PATH.open("w", encoding="utf-8") as history_file:
+        json.dump(history, history_file, indent=2)
 
 
 if __name__ == "__main__":
