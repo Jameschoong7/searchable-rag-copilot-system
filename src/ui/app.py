@@ -733,6 +733,8 @@ if selected_page == "Performance":
         "from the latest labelled retrieval evaluation run."
     )
 
+    st.divider()
+
     st.subheader("Live Query Signals")
 
     live_metric_columns = st.columns(3)
@@ -755,6 +757,8 @@ if selected_page == "Performance":
             query_log_summary["unresolved_queries"],
         )
 
+    st.divider()
+
     st.subheader("Incremental Index Health")
 
     if index_benchmark_results:
@@ -764,86 +768,136 @@ if selected_page == "Performance":
         active_vectors = after_snapshot["chroma_vector_count"]
         active_records = after_snapshot["active_metadata_records"]
         physical_files = after_snapshot["simulated_source_files"]
+        db_size_mb = after_snapshot["chroma_db_size_mb"]
         archived_file_count = max(physical_files - active_records, 0)
 
-        if benchmark_type == "single_document_update":
-            changed_document_count = 1
-            chunks_indexed = index_benchmark_results["index_result"]["chunks_indexed"]
-            deleted_vectors = index_benchmark_results["deleted_vector_count"]
+        if benchmark_type == "batch_incremental_update":
+            changed_document_count = index_benchmark_results["changed_document_count"]
+            chunks_refreshed = index_benchmark_results["total_chunks_indexed"]
+            deleted_vectors = index_benchmark_results["total_deleted_vectors"]
+            avoided_chunks = index_benchmark_results["estimated_unchanged_chunks_avoided"]
             elapsed_seconds = index_benchmark_results["elapsed_seconds"]
-            avoided_chunks = max(active_vectors - chunks_indexed, 0)
-            avoided_percent = avoided_chunks / active_vectors * 100 if active_vectors else 0
+
+            document_label = (
+                "document"
+                if changed_document_count == 1
+                else "documents"
+            )
 
             st.success(
-                f"Latest incremental benchmark refreshed {changed_document_count} changed document "
-                f"in {elapsed_seconds}s. {chunks_indexed} chunks were re-indexed while "
-                f"{avoided_chunks} unchanged chunks were left untouched."
+                f"Latest incremental update refreshed {changed_document_count} changed "
+                f"{document_label} in {elapsed_seconds}s. {chunks_refreshed} chunks were "
+                f"re-indexed and {avoided_chunks} unchanged chunks were avoided."
             )
 
             metric_columns = st.columns(4)
 
             with metric_columns[0]:
-                st.metric("Changed Documents", changed_document_count, "Controlled benchmark case")
+                st.metric(
+                    "Changed Documents",
+                    changed_document_count,
+                    "Latest update run",
+                )
 
             with metric_columns[1]:
-                st.metric("Chunks Refreshed", chunks_indexed, f"{avoided_percent:.1f}% work avoided")
+                st.metric(
+                    "Chunks Refreshed",
+                    chunks_refreshed,
+                    f"{avoided_chunks} unchanged avoided",
+                )
 
             with metric_columns[2]:
-                st.metric("Vectors Replaced", deleted_vectors, "Old chunks removed first")
+                st.metric(
+                    "Vectors Replaced",
+                    deleted_vectors,
+                    "Removed before re-index",
+                )
 
             with metric_columns[3]:
-                st.metric("Active Index", f"{active_vectors} vectors", f"{after_snapshot['chroma_db_size_mb']} MB")
+                st.metric(
+                    "Active Index",
+                    f"{active_vectors} vectors",
+                    f"{db_size_mb} MB",
+                )
 
-            st.caption(
-                "This benchmark currently uses one changed document as a controlled test. "
-                "The same delete-and-reindex mechanism can later run as a batch update for "
-                "multiple changed SharePoint or OneNote items."
+        elif benchmark_type == "full_rebuild":
+            elapsed_seconds = index_benchmark_results["elapsed_seconds"]
+            chunks_indexed = index_benchmark_results["rebuild_result"]["chunks_indexed"]
+
+            st.info(
+                f"Latest benchmark was a full active-aware rebuild. "
+                f"{chunks_indexed} active chunks were rebuilt in {elapsed_seconds}s."
             )
 
+            metric_columns = st.columns(4)
+
+            with metric_columns[0]:
+                st.metric("Rebuild Time", f"{elapsed_seconds}s")
+
+            with metric_columns[1]:
+                st.metric("Chunks Rebuilt", chunks_indexed)
+
+            with metric_columns[2]:
+                st.metric("Active Records", active_records)
+
+            with metric_columns[3]:
+                st.metric("Active Index", f"{active_vectors} vectors", f"{db_size_mb} MB")
 
         else:
-            st.info(
-                "Latest benchmark is a vector index snapshot. Run a full rebuild or "
-                "single-document update benchmark to compare update performance."
-            )
+            st.info("Latest result is an index snapshot.")
 
             metric_columns = st.columns(3)
 
             with metric_columns[0]:
-                st.metric("Active Vectors", active_vectors)
+                st.metric("Active Records", active_records)
 
             with metric_columns[1]:
-                st.metric("Active Metadata Records", active_records)
+                st.metric("Active Index", f"{active_vectors} vectors")
 
             with metric_columns[2]:
-                st.metric("Chroma DB Size", f"{after_snapshot['chroma_db_size_mb']} MB")
+                st.metric("Vector DB Size", f"{db_size_mb} MB")
 
         if archived_file_count:
             st.warning(
-                f"{archived_file_count} archived source file(s) still exist on disk for audit, "
-                "but active-aware indexing excludes them from Chroma retrieval."
+                f"{archived_file_count} archived source file(s) remain on disk for audit, "
+                "but active-aware indexing excludes archived versions from Chroma."
             )
         else:
             st.caption("Physical source files and active metadata records are aligned.")
 
-        with st.expander("Technical benchmark details", expanded=False):
+        with st.expander("Technical index benchmark details", expanded=False):
             detail_rows = [
-                {"Metric": "Benchmark Type", "Value": "Incremental Update Benchmark"},
-                {"Metric": "Changed Documents", "Value": changed_document_count},
+                {"Metric": "Benchmark Type", "Value": benchmark_type},
                 {"Metric": "Active Metadata Records", "Value": active_records},
                 {"Metric": "Physical Source Files", "Value": physical_files},
                 {"Metric": "Archived Physical Files", "Value": archived_file_count},
                 {"Metric": "Chroma Vector Count", "Value": active_vectors},
-                {"Metric": "Chroma DB Size MB", "Value": after_snapshot["chroma_db_size_mb"]},
+                {"Metric": "Chroma DB Size MB", "Value": db_size_mb},
             ]
 
-            if benchmark_type == "single_document_update":
+            if benchmark_type == "batch_incremental_update":
                 detail_rows.extend(
                     [
-                        {"Metric": "Updated Source", "Value": index_benchmark_results["source"]},
-                        {"Metric": "Deleted Vectors", "Value": deleted_vectors},
-                        {"Metric": "Chunks Re-indexed", "Value": chunks_indexed},
-                        {"Metric": "Elapsed Seconds", "Value": elapsed_seconds},
+                        {
+                            "Metric": "Updated Sources",
+                            "Value": ", ".join(index_benchmark_results["updated_sources"]),
+                        },
+                        {
+                            "Metric": "Deleted Vectors",
+                            "Value": index_benchmark_results["total_deleted_vectors"],
+                        },
+                        {
+                            "Metric": "Chunks Re-indexed",
+                            "Value": index_benchmark_results["total_chunks_indexed"],
+                        },
+                        {
+                            "Metric": "Unchanged Chunks Avoided",
+                            "Value": index_benchmark_results["estimated_unchanged_chunks_avoided"],
+                        },
+                        {
+                            "Metric": "Elapsed Seconds",
+                            "Value": index_benchmark_results["elapsed_seconds"],
+                        },
                     ]
                 )
 
@@ -1236,7 +1290,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                                 "uploaded_by": st.session_state["user"],
                                 "uploaded_at": datetime.now().isoformat(timespec="minutes"),
                                 "page_number": None,
-                                "chunk_id": "pending",
+                                "chunk_id": "pending_index",
                                 "visual_extraction_status": get_visual_extraction_status(file_type),
                             }
 

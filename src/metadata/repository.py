@@ -347,6 +347,57 @@ def metadata_exists_for_filename(filename: str) -> bool:
     return row is not None
 
 
+def load_pending_index_documents() -> list[dict]:
+    """Load active documents that still need vector indexing."""
+    pending_values = {"pending", "pending_index"}
+
+    return [
+        document
+        for document in load_document_metadata()
+        if document.get("chunk_id") in pending_values
+    ]
+
+
+def mark_documents_indexed(document_ids: list[str]) -> None:
+    """Mark documents as indexed after their vectors are updated successfully."""
+    if not document_ids:
+        return
+
+    initialise_metadata_database()
+
+    placeholders = ", ".join("?" for _ in document_ids)
+
+    with sqlite3.connect(METADATA_DB_PATH) as connection:
+        connection.execute(
+            f"""
+            UPDATE document_metadata
+            SET chunk_id = 'indexed'
+            WHERE document_id IN ({placeholders})
+            """,
+            document_ids,
+        )
+
+
+def mark_documents_pending_index(document_ids: list[str]) -> None:
+    """Mark documents as needing vector indexing."""
+    if not document_ids:
+        return
+
+    initialise_metadata_database()
+
+    placeholders = ", ".join("?" for _ in document_ids)
+
+    with sqlite3.connect(METADATA_DB_PATH) as connection:
+        connection.execute(
+            f"""
+            UPDATE document_metadata
+            SET chunk_id = 'pending_index'
+            WHERE document_id IN ({placeholders})
+            """,
+            document_ids,
+        )
+
+
 def generate_document_id(documents: list[dict]) -> str:
     """Generate the next local upload document ID."""
     upload_count = sum(
@@ -355,3 +406,4 @@ def generate_document_id(documents: list[dict]) -> str:
     )
 
     return f"DOC-UPLOAD-{upload_count + 1:03d}"
+
