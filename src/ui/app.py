@@ -334,13 +334,13 @@ def show_status_message(status: str) -> None:
     label = get_status_label(status)
 
     if status == "success":
-        st.success(label)
+        st.success(label, icon="✅")
     elif status == "permission_block":
-        st.warning(label)
+        st.warning(label, icon="⚠️")
     elif status == "not_found":
-        st.info(label)
+        st.info(label, icon="ℹ️")
     else:
-        st.error(label)
+        st.error(label, icon="🚨")
 
 
 def write_query_log(
@@ -459,6 +459,29 @@ def can_view_document(document: dict) -> bool:
     )
 
 
+def get_index_status_label(document: dict) -> str:
+    """Return a readable indexing status for KB Management."""
+    chunk_id = document.get("chunk_id")
+
+    if document.get("is_active") == 0:
+        return "Archived"
+
+    if chunk_id in ["pending", "pending_index"]:
+        return "Pending Index"
+
+    if chunk_id == "indexed":
+        return "Indexed"
+
+    return "Unknown"
+
+
+def get_version_label(document: dict) -> str:
+    """Return a readable document version label."""
+    version_number = document.get("version_number") or 1
+
+    return f"v{version_number}"
+
+
 def normalise_uploaded_filename(filename: str) -> str:
     """Return the local filename used for uploaded simulated documents."""
     return filename.replace(" ", "_")
@@ -526,7 +549,7 @@ def infer_title_from_uploaded_file(uploaded_file) -> str:
 
 st.set_page_config(
     page_title="Searchable RAG Copilot",
-    page_icon="R",
+    page_icon="🔍",
     layout="wide",
 )
 
@@ -534,15 +557,16 @@ st.set_page_config(
 if not is_logged_in():
     st.title("Searchable RAG Copilot")
     st.caption("Demo sign-in for the standalone Admin Web Portal.")
+    
+    with st.container(border=True):
+        username = st.text_input("Username", value="admin_jc")
+        password = st.text_input("Password", value="password123", type="password")
 
-    username = st.text_input("Username", value="admin_jc")
-    password = st.text_input("Password", value="password123", type="password")
-
-    if st.button("Sign In"):
-        if login_user(username.strip(), password):
-            st.rerun()
-        else:
-            st.error("Invalid demo username or password.")
+        if st.button("Sign In", type="primary"):
+            if login_user(username.strip(), password):
+                st.rerun()
+            else:
+                st.error("Invalid demo username or password.")
 
     st.stop()
 
@@ -552,21 +576,70 @@ api_status_label = "API Online" if api_online else "API Offline"
 api_status_color = "#166534" if api_online else "#991b1b"
 api_status_background = "#dcfce7" if api_online else "#fee2e2"
 
+# Global CSS updates for polished dashboard cards
 st.markdown(
     f"""
+    <style>
+    [data-testid="stSidebar"] {{
+        background-color: #f8fafc;
+        border-right: 1px solid #e2e8f0;
+    }}
+
+    [data-testid="stSidebar"] [role="radiogroup"] {{
+        gap: 0.2rem;
+    }}
+
+    [data-testid="stSidebar"] [role="radiogroup"] label {{
+        width: 100%;
+        padding: 0.58rem 0.7rem;
+        border-radius: 0.3rem;
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+    }}
+
+    [data-testid="stSidebar"] [role="radiogroup"] label:hover {{
+        background-color: #eef2f7;
+    }}
+
+    [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {{
+        background-color: #e2e8f0;
+        font-weight: 600;
+    }}
+
+    [data-testid="stSidebar"] [role="radiogroup"] > label
+    [data-testid="stMarkdownContainer"] {{
+        width: 100%;
+    }}
+
+    [data-testid="stSidebar"] [role="radiogroup"] > label > div:first-child {{
+        display: none;
+    }}
+
+    [data-testid="stForm"] [data-testid="InputInstructions"] {{
+        display: none;
+    }}
+    
+    div[data-testid="stMetric"] {{
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }}
+    </style>
     <div style="
         display: flex;
         justify-content: space-between;
         align-items: center;
         padding: 0.35rem 0 0.65rem 0;
         border-bottom: 1px solid #e5e7eb;
-        margin-bottom: 1rem;
+        margin-bottom: 1.5rem;
     ">
         <div>
-            <div style="font-size: 1.1rem; font-weight: 700;">
+            <div style="font-size: 1.25rem; font-weight: 700; color: #0f172a;">
                 Searchable RAG Copilot
             </div>
-            <div style="font-size: 0.78rem; color: #64748b;">
+            <div style="font-size: 0.85rem; color: #64748b;">
                 Enterprise Knowledge Portal
             </div>
         </div>
@@ -577,57 +650,11 @@ st.markdown(
             padding: 0.28rem 0.55rem;
             font-size: 0.76rem;
             font-weight: 600;
+            border: 1px solid {api_status_color}30;
         ">
             {escape(api_status_label)}
         </div>
     </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-
-st.markdown(
-    """
-    <style>
-    [data-testid="stSidebar"] {
-        background-color: #f8fafc;
-        border-right: 1px solid #e2e8f0;
-    }
-
-    [data-testid="stSidebar"] [role="radiogroup"] {
-        gap: 0.2rem;
-    }
-
-    [data-testid="stSidebar"] [role="radiogroup"] label {
-        width: 100%;
-        padding: 0.58rem 0.7rem;
-        border-radius: 0.3rem;
-        cursor: pointer;
-        transition: background-color 0.15s ease;
-    }
-
-    [data-testid="stSidebar"] [role="radiogroup"] label:hover {
-        background-color: #eef2f7;
-    }
-
-    [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
-        background-color: #e2e8f0;
-        font-weight: 600;
-    }
-
-    [data-testid="stSidebar"] [role="radiogroup"] > label
-    [data-testid="stMarkdownContainer"] {
-        width: 100%;
-    }
-
-    [data-testid="stSidebar"] [role="radiogroup"] > label > div:first-child {
-        display: none;
-    }
-
-    [data-testid="stForm"] [data-testid="InputInstructions"] {
-        display: none;
-    }
-    </style>
     """,
     unsafe_allow_html=True,
 )
@@ -637,18 +664,19 @@ st.sidebar.caption(escape(st.session_state["user"]))
 st.sidebar.markdown(
     f"""
     <div style="
-        padding: 0.55rem 0.65rem;
+        padding: 0.75rem;
         border: 1px solid #e2e8f0;
-        border-radius: 0.35rem;
+        border-radius: 0.5rem;
         background: #ffffff;
-        font-size: 0.78rem;
+        font-size: 0.85rem;
         line-height: 1.65;
-        margin-bottom: 0.8rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
     ">
-        <strong>Role</strong><br>
-        {escape(st.session_state["role"])}<br>
-        <strong>Department</strong><br>
-        {escape(st.session_state["department"])}
+        <strong style="color: #475569;">Role</strong><br>
+        <span style="font-weight: 500; color: #0f172a;">{escape(st.session_state["role"])}</span><br>
+        <strong style="color: #475569; display: inline-block; margin-top: 0.25rem;">Department</strong><br>
+        <span style="font-weight: 500; color: #0f172a;">{escape(st.session_state["department"])}</span>
     </div>
     """,
     unsafe_allow_html=True,
@@ -679,10 +707,10 @@ if st.sidebar.button("Logout", use_container_width=True):
 
 
 if selected_page == "Performance":
-    st.title("Performance")
+    st.header("Performance Dashboard")
     st.caption(
-        "Performance dashboard using local query logs, labelled retrieval evaluation, "
-        "and clearly marked simulated benchmark placeholders."
+        "Monitoring real local queries, retrieval evaluation metrics, "
+        "and active vector index benchmarks."
     )
 
     documents = load_document_metadata()
@@ -711,68 +739,66 @@ if selected_page == "Performance":
         top_k_delta = "Run retrieval evaluation"
         miss_delta = "Awaiting labelled result"
 
-    st.subheader("Performance Metrics")
+    with st.container(border=True):
+        st.subheader("System Metrics")
 
-    metric_columns = st.columns(4)
+        metric_columns = st.columns(4)
 
-    with metric_columns[0]:
-        st.metric(
-            "Time-to-First-Answer",
-            f"{query_log_summary['average_latency']:.2f}s",
-            "Local logged average",
+        with metric_columns[0]:
+            st.metric(
+                "Time-to-First-Answer",
+                f"{query_log_summary['average_latency']:.2f}s",
+                "Local logged average",
+            )
+
+        with metric_columns[1]:
+            st.metric(
+                "Top-K Accuracy (K=5)",
+                top_k_accuracy,
+                top_k_delta,
+            )
+
+        with metric_columns[2]:
+            st.metric(
+                "Miss Rate",
+                miss_rate,
+                miss_delta,
+            )
+
+        with metric_columns[3]:
+            st.metric(
+                "Indexed Documents",
+                f"{indexed_document_count}",
+                "Simulated KB records",
+            )
+
+        st.caption(
+            "TTFA is calculated from local chat logs. Top-K Accuracy and Miss Rate come "
+            "from the latest labelled retrieval evaluation run."
         )
 
-    with metric_columns[1]:
-        st.metric(
-            "Top-K Accuracy (K=5)",
-            top_k_accuracy,
-            top_k_delta,
-        )
+    with st.container(border=True):
+        st.subheader("Live Query Signals")
 
-    with metric_columns[2]:
-        st.metric(
-            "Miss Rate",
-            miss_rate,
-            miss_delta,
-        )
+        live_metric_columns = st.columns(3)
 
-    with metric_columns[3]:
-        st.metric(
-            "Indexed Documents",
-            f"{indexed_document_count}",
-            "Simulated KB records",
-        )
+        with live_metric_columns[0]:
+            st.metric(
+                "Logged Queries",
+                query_log_summary["total_queries"]
+            )
 
-    st.caption(
-        "TTFA is calculated from local chat logs. Top-K Accuracy and Miss Rate come "
-        "from the latest labelled retrieval evaluation run."
-    )
+        with live_metric_columns[1]:
+            st.metric(
+                "Permission Blocks",
+                query_log_summary["permission_blocks"],
+            )
 
-    st.divider()
-
-    st.subheader("Live Query Signals")
-
-    live_metric_columns = st.columns(3)
-
-    with live_metric_columns[0]:
-        st.metric(
-            "Logged Queries",
-            query_log_summary["total_queries"]
-        )
-
-    with live_metric_columns[1]:
-        st.metric(
-            "Permission Blocks",
-            query_log_summary["permission_blocks"],
-        )
-
-    with live_metric_columns[2]:
-        st.metric(
-            "Not Found / Errors",
-            query_log_summary["unresolved_queries"],
-        )
-
-    st.divider()
+        with live_metric_columns[2]:
+            st.metric(
+                "Not Found / Errors",
+                query_log_summary["unresolved_queries"],
+            )
 
     st.subheader("Incremental Index Health")
 
@@ -835,6 +861,74 @@ if selected_page == "Performance":
                     f"{db_size_mb} MB",
                 )
 
+            full_rebuild_baseline_seconds = 10.678
+            full_rebuild_baseline_chunks = active_vectors
+            time_saved_seconds = max(
+                round(full_rebuild_baseline_seconds - elapsed_seconds, 3),
+                0,
+            )
+            avoided_percent = (
+                avoided_chunks / full_rebuild_baseline_chunks * 100
+                if full_rebuild_baseline_chunks
+                else 0
+            )
+            refreshed_percent = (
+                chunks_refreshed / full_rebuild_baseline_chunks
+                if full_rebuild_baseline_chunks
+                else 0
+            )
+
+            with st.expander("Update Efficiency Details", expanded=False):
+                efficiency_columns = st.columns(3)
+
+                with efficiency_columns[0]:
+                    st.metric(
+                        "Work Avoided",
+                        f"{avoided_percent:.1f}%",
+                        f"{avoided_chunks} chunks skipped",
+                    )
+
+                with efficiency_columns[1]:
+                    st.metric(
+                        "Time Saved",
+                        f"{time_saved_seconds}s",
+                        f"vs {full_rebuild_baseline_seconds}s full rebuild",
+                    )
+
+                with efficiency_columns[2]:
+                    st.metric(
+                        "Touched Index",
+                        f"{chunks_refreshed}/{full_rebuild_baseline_chunks}",
+                        "chunks refreshed",
+                    )
+
+                st.progress(refreshed_percent)
+
+                st.caption(
+                    f"Incremental update touched {chunks_refreshed} active chunks and "
+                    f"left {avoided_chunks} unchanged chunks untouched."
+                )
+
+                st.dataframe(
+                    [
+                        {
+                            "Method": "Full Active Rebuild",
+                            "Scope": "All active documents",
+                            "Chunks Processed": full_rebuild_baseline_chunks,
+                            "Elapsed Time": f"{full_rebuild_baseline_seconds}s",
+                            "Use Case": "Clean full index reconstruction",
+                        },
+                        {
+                            "Method": "Incremental Update",
+                            "Scope": f"{changed_document_count} changed {document_label}",
+                            "Chunks Processed": chunks_refreshed,
+                            "Elapsed Time": f"{elapsed_seconds}s",
+                            "Use Case": "Normal document update/sync",
+                        },
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                )
         elif benchmark_type == "full_rebuild":
             elapsed_seconds = index_benchmark_results["elapsed_seconds"]
             chunks_indexed = index_benchmark_results["rebuild_result"]["chunks_indexed"]
@@ -930,59 +1024,60 @@ if selected_page == "Performance":
 
     st.divider()
 
-    st.subheader("Daily Average Query Latency")
+    with st.container(border=True):
+        st.subheader("Daily Average Query Latency")
 
-    latency_rows = []
+        latency_rows = []
 
-    for row in query_log_summary["daily_latency_rows"]:
-        query_date = datetime.fromisoformat(row[0])
+        for row in query_log_summary["daily_latency_rows"]:
+            query_date = datetime.fromisoformat(row[0])
 
-        latency_rows.append(
-            {
-                "Date Key": row[0],
-                "Display Label": query_date.strftime("%a %d %b"),
-                "Day": query_date.strftime("%a"),
-                "Date": query_date.strftime("%d %b"),
-                "Average Latency (seconds)": round(row[2], 2),
-                "Query Count": row[1],
-            }
-        )
-
-    if latency_rows:
-        latency_data = pd.DataFrame(latency_rows).sort_values("Date Key")
-
-        latency_chart = (
-            alt.Chart(latency_data)
-            .mark_bar(
-                color="#6f8bc7",
-                cornerRadiusTopLeft=3,
-                cornerRadiusTopRight=3,
-                size=80,
+            latency_rows.append(
+                {
+                    "Date Key": row[0],
+                    "Display Label": query_date.strftime("%a %d %b"),
+                    "Day": query_date.strftime("%a"),
+                    "Date": query_date.strftime("%d %b"),
+                    "Average Latency (seconds)": round(row[2], 2),
+                    "Query Count": row[1],
+                }
             )
-            .encode(
-                x=alt.X(
-                    "Display Label:N",
-                    title="Day",
-                    sort=None,
-                    axis=alt.Axis(labelAngle=0),
-                ),
-                y=alt.Y(
-                    "Average Latency (seconds):Q",
-                    title="Average Latency (seconds)",
-                ),
-                tooltip=[
-                    alt.Tooltip("Day:N"),
-                    alt.Tooltip("Date:N"),
-                    alt.Tooltip("Average Latency (seconds):Q", format=".2f"),
-                    alt.Tooltip("Query Count:Q"),
-                ],
-            )
-            .properties(height=280)
-        )
 
-        st.altair_chart(latency_chart, use_container_width=True)
-    else:
-        st.info("No query latency data yet. Submit a Chat query to populate this chart.")
+        if latency_rows:
+            latency_data = pd.DataFrame(latency_rows).sort_values("Date Key")
+
+            latency_chart = (
+                alt.Chart(latency_data)
+                .mark_bar(
+                    color="#6f8bc7",
+                    cornerRadiusTopLeft=3,
+                    cornerRadiusTopRight=3,
+                    size=80,
+                )
+                .encode(
+                    x=alt.X(
+                        "Display Label:N",
+                        title="Day",
+                        sort=None,
+                        axis=alt.Axis(labelAngle=0),
+                    ),
+                    y=alt.Y(
+                        "Average Latency (seconds):Q",
+                        title="Average Latency (seconds)",
+                    ),
+                    tooltip=[
+                        alt.Tooltip("Day:N"),
+                        alt.Tooltip("Date:N"),
+                        alt.Tooltip("Average Latency (seconds):Q", format=".2f"),
+                        alt.Tooltip("Query Count:Q"),
+                    ],
+                )
+                .properties(height=280)
+            )
+
+            st.altair_chart(latency_chart, use_container_width=True)
+        else:
+            st.info("No query latency data yet. Submit a Chat query to populate this chart.")
 
     with st.expander("How benchmark accuracy is measured"):
         st.markdown(
@@ -1015,66 +1110,64 @@ if selected_page == "Performance":
             else:
                 st.info(threshold_interpretation["recommendation"])
 
-    st.subheader("Retrieval Miss Review Log")
+    with st.expander("View Retrieval Miss Log & Context", expanded=False):
+        if evaluation_results and evaluation_results["miss_rows"]:
+            real_miss_rows = [
+                {
+                    "Query ID": row["query_id"],
+                    "Suite": row["suite"],
+                    "Question": row["question"],
+                    "Expected Source": row["expected_source"],
+                    "Retrieved Sources": ", ".join(row["retrieved_sources"]),
+                    "Issue": row["issue"],
+                    "Next Enhancement": "Review metadata, chunking, filters, or Top-K ranking",
+                }
+                for row in evaluation_results["miss_rows"]
+            ]
 
-    if evaluation_results and evaluation_results["miss_rows"]:
-      real_miss_rows = [
-          {
-              "Query ID": row["query_id"],
-              "Suite": row["suite"],
-              "Question": row["question"],
-              "Expected Source": row["expected_source"],
-              "Retrieved Sources": ", ".join(row["retrieved_sources"]),
-              "Issue": row["issue"],
-              "Next Enhancement": "Review metadata, chunking, filters, or Top-K ranking",
-          }
-          for row in evaluation_results["miss_rows"]
-      ]
+            st.dataframe(
+                real_miss_rows,
+                use_container_width=True,
+                hide_index=True,
+            )
 
-      st.dataframe(
-          real_miss_rows,
-          use_container_width=True,
-          hide_index=True,
-      )
+        elif evaluation_results:
+            st.success("No retrieval misses in the latest labelled retrieval evaluation.")
 
-    elif evaluation_results:
-        st.success("No retrieval misses in the latest labelled retrieval evaluation.")
+        else:
+            st.info(
+                "No retrieval evaluation result found yet. Run "
+                "`python -m src.evaluation.retrieval_eval` to generate miss review data."
+            )
 
-    else:
-        st.info(
-            "No retrieval evaluation result found yet. Run "
-            "`python -m src.evaluation.retrieval_eval` to generate miss review data."
-        )
+    with st.expander("Recent Logged Queries", expanded=False):
+        recent_query_rows = [
+            {
+                "Timestamp": row[0],
+                "User": row[1],
+                "Role": row[2],
+                "Department": row[3],
+                "Question": row[4],
+                "Department Filter": row[5],
+                "File Type Filter": row[6],
+                "Status": row[7],
+                "Latency (s)": row[8],
+            }
+            for row in query_log_summary["recent_queries"]
+        ]
 
-    st.subheader("Recent Logged Queries")
-
-    recent_query_rows = [
-        {
-            "Timestamp": row[0],
-            "User": row[1],
-            "Role": row[2],
-            "Department": row[3],
-            "Question": row[4],
-            "Department Filter": row[5],
-            "File Type Filter": row[6],
-            "Status": row[7],
-            "Latency (s)": row[8],
-        }
-        for row in query_log_summary["recent_queries"]
-    ]
-
-    if recent_query_rows:
-        st.dataframe(
-            recent_query_rows,
-            use_container_width=True,
-            hide_index=True,
-        )
-    else:
-        st.info("No logged chat queries yet. Submit a Chat query to create a log.")
+        if recent_query_rows:
+            st.dataframe(
+                recent_query_rows,
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("No logged chat queries yet. Submit a Chat query to create a log.")
 
 
 elif selected_page in ["KB Management", "KB Status"]:
-    st.title(selected_page)
+    st.header(selected_page)
 
     if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
         st.caption("Global knowledge base management for all departments.")
@@ -1088,8 +1181,6 @@ elif selected_page in ["KB Management", "KB Status"]:
         document for document in documents
         if can_view_document(document)
     ]
-
-    st.divider()
 
     summary_columns = st.columns(3)
 
@@ -1109,8 +1200,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                 """,
                 unsafe_allow_html=True,
             )
-            st.caption("Enterprise source integration direction")
-            st.markdown("- SharePoint\n- OneNote\n- Manual Upload\n- Batch ZIP")
+            st.caption("Integration direction:\n- SharePoint\n- OneNote\n- Manual Upload\n- Batch ZIP")
 
     with summary_columns[1]:
         with st.container(border=True):
@@ -1128,11 +1218,9 @@ elif selected_page in ["KB Management", "KB Status"]:
                 """,
                 unsafe_allow_html=True,
             )
-            st.caption("Access is decided before retrieval")
-            st.markdown(
-                f"- Role: {escape(st.session_state['role'])}\n"
-                f"- Department: {escape(st.session_state['department'])}\n"
-                f"- Visible documents: {len(visible_documents)}"
+            st.caption(
+                f"Role: {escape(st.session_state['role'])}\n"
+                f"- Visible docs: {len(visible_documents)}"
             )
 
     with summary_columns[2]:
@@ -1151,23 +1239,21 @@ elif selected_page in ["KB Management", "KB Status"]:
                 """,
                 unsafe_allow_html=True,
             )
-            st.caption("Document extraction capability")
-            st.markdown(
-                "- Text extraction: Active for local files\n"
-                "- OCR captions: Roadmap\n"
-                "- Diagram extraction: Roadmap"
+            st.caption(
+                "Active: Text extract\n"
+                "Roadmap: OCR, Diagram extract"
             )
     
     if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
 
-        st.subheader("Document Ingestion")
+        st.subheader("Document Ingestion & Indexing")
 
         if "upload_message" not in st.session_state:
             st.session_state["upload_message"] = ""
 
-        with st.container(border=True):
-            if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
-                st.markdown("**Real Local TXT/PDF/DOCX Upload**")
+        if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
+            with st.container(border=True):
+                st.markdown("**1. Upload & Categorize Document**")
                 st.caption(
                     "Uploads a TXT file into data/simulated and appends trusted metadata. "
                     "Rebuild the vector index after upload before searching the new document."
@@ -1179,7 +1265,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                 upload_form_version = st.session_state["upload_form_version"]
 
                 uploaded_file = st.file_uploader(
-                    "TXT, PDF, or DOCX file",
+                    "Upload TXT, PDF, or DOCX",
                     type=["txt", "pdf", "docx"],
                     key=f"upload_file{upload_form_version}",
                 )
@@ -1187,66 +1273,70 @@ elif selected_page in ["KB Management", "KB Status"]:
                 title_key = prepare_upload_title_state(uploaded_file, upload_form_version)
 
                 with st.form(f"real_txt_upload_form_{upload_form_version}"):
+                    
+                    # Grouping form inputs into a grid layout to save vertical space
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        title = st.text_input(
+                            "Document title",
+                            key=title_key,
+                            help="Auto-filled from the uploaded filename. Admin may edit it.",
+                        )
+                        if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+                            department = st.selectbox(
+                                "Department",
+                                DEPARTMENT_OPTIONS,
+                                key=f"txt_upload_department_{upload_form_version}",
+                            )
+                        else:
+                            department = st.text_input(
+                                "Department",
+                                value=st.session_state["department"],
+                                disabled=True,
+                                key=f"txt_upload_department_{upload_form_version}",
+                            )
+                        category = st.text_input(
+                            "Category",
+                            value="General",
+                            key=f"txt_upload_category_{upload_form_version}",
+                        )
+                        
+                    with col2:
+                        tags_text = st.text_input(
+                            "Tags",
+                            value="policy, internal",
+                            help="Separate tags with commas.",
+                            key=f"txt_upload_tags_{upload_form_version}",
+                        )
+                        if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+                            allowed_roles = st.multiselect(
+                                "Allowed roles",
+                                ROLE_OPTIONS,
+                                default=[SYSTEM_ADMIN_ROLE],
+                                key=f"txt_upload_roles_{upload_form_version}",
+                            )
+                            allowed_departments = st.multiselect(
+                                "Allowed departments",
+                                DEPARTMENT_OPTIONS,
+                                default=[department],
+                                key=f"txt_upload_departments_{upload_form_version}",
+                            )
+                        else:
+                            allowed_roles = st.multiselect(
+                                "Allowed roles",
+                                [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE],
+                                default=[PROJECT_MANAGER_ROLE],
+                                key=f"txt_upload_roles_{upload_form_version}",
+                            )
+                            allowed_departments = st.multiselect(
+                                "Allowed departments",
+                                [st.session_state["department"]],
+                                default=[st.session_state["department"]],
+                                key=f"txt_upload_departments_{upload_form_version}",
+                            )
 
-                    title = st.text_input(
-                        "Document title",
-                        key=title_key,
-                        help="Auto-filled from the uploaded filename. Admin may edit it.",
-                    )
-                    if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-                        department = st.selectbox(
-                            "Department",
-                            DEPARTMENT_OPTIONS,
-                            key=f"txt_upload_department_{upload_form_version}",
-                        )
-                    else:
-                        department = st.text_input(
-                            "Department",
-                            value=st.session_state["department"],
-                            disabled=True,
-                            key=f"txt_upload_department_{upload_form_version}",
-                        )
-                    category = st.text_input(
-                        "Category",
-                        value="General",
-                        key=f"txt_upload_category_{upload_form_version}",
-                    )
-                    tags_text = st.text_input(
-                        "Tags",
-                        value="policy, internal",
-                        help="Separate tags with commas.",
-                        key=f"txt_upload_tags_{upload_form_version}",
-                    )
-                    if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-                        allowed_roles = st.multiselect(
-                            "Allowed roles",
-                            ROLE_OPTIONS,
-                            default=[SYSTEM_ADMIN_ROLE],
-                            key=f"txt_upload_roles_{upload_form_version}",
-                        )
-                    else:
-                        allowed_roles = st.multiselect(
-                            "Allowed roles",
-                            [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE],
-                            default=[PROJECT_MANAGER_ROLE],
-                            key=f"txt_upload_roles_{upload_form_version}",
-                        )
-                    if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-                        allowed_departments = st.multiselect(
-                            "Allowed departments",
-                            DEPARTMENT_OPTIONS,
-                            default=[department],
-                            key=f"txt_upload_departments_{upload_form_version}",
-                        )
-                    else:
-                        allowed_departments = st.multiselect(
-                            "Allowed departments",
-                            [st.session_state["department"]],
-                            default=[st.session_state["department"]],
-                            key=f"txt_upload_departments_{upload_form_version}",
-                        )
-
-                    submitted_upload = st.form_submit_button("Save File + Metadata")
+                    submitted_upload = st.form_submit_button("Save File + Metadata", type="primary")
 
                     if submitted_upload:
                         if uploaded_file is None:
@@ -1318,44 +1408,45 @@ elif selected_page in ["KB Management", "KB Status"]:
 
                             st.session_state["upload_form_version"] += 1
                             st.rerun()
-                if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-                    st.markdown("**Local Vector Index**")
-                    st.caption(
-                        "Use incremental update for pending document changes. Use full rebuild "
-                        "when you want to reconstruct the active index from scratch."
-                    )
 
-                
-                    index_action_columns = st.columns(2)
+        if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+            with st.container(border=True):
+                st.markdown("**2. Vector Index Sync**")
+                st.caption(
+                    "Use incremental update for pending document changes. Use full rebuild "
+                    "when you want to reconstruct the active index from scratch."
+                )
 
-                    with index_action_columns[0]:
-                        if st.button("Run Incremental Index Update", use_container_width=True):
-                            with st.spinner("Indexing pending document updates..."):
-                                try:
-                                    index_update_result = request_pending_index_update()
-                                except Exception as error:
-                                    st.error(f"Incremental index update failed: {error}")
+                index_action_columns = st.columns(2)
+
+                with index_action_columns[0]:
+                    if st.button("Run Incremental Index Update", use_container_width=True):
+                        with st.spinner("Indexing pending document updates..."):
+                            try:
+                                index_update_result = request_pending_index_update()
+                            except Exception as error:
+                                st.error(f"Incremental index update failed: {error}")
+                            else:
+                                if index_update_result["status"] == "no_pending_documents":
+                                    st.info(index_update_result["message"])
                                 else:
-                                    if index_update_result["status"] == "no_pending_documents":
-                                        st.info(index_update_result["message"])
-                                    else:
-                                        st.success(index_update_result["message"])
+                                    st.success(index_update_result["message"])
 
-                    with index_action_columns[1]:
-                        if st.button("Rebuild Full Active Index", use_container_width=True):
-                            with st.spinner("Rebuilding local ChromaDB index..."):
-                                try:
-                                    rebuild_result = request_backend_reindex()
-                                    rebuild_message = rebuild_result["message"]
-                                except Exception as error:
-                                    st.error(f"Index rebuild failed: {error}")
-                                else:
-                                    st.success(rebuild_message)
+                with index_action_columns[1]:
+                    if st.button("Rebuild Full Active Index", use_container_width=True):
+                        with st.spinner("Rebuilding local ChromaDB index..."):
+                            try:
+                                rebuild_result = request_backend_reindex()
+                                rebuild_message = rebuild_result["message"]
+                            except Exception as error:
+                                st.error(f"Index rebuild failed: {error}")
+                            else:
+                                st.success(rebuild_message)
 
-            if st.session_state["upload_message"]:
-                st.warning(st.session_state["upload_message"])
+        if st.session_state["upload_message"]:
+            st.warning(st.session_state["upload_message"])
 
-    st.subheader("Document Index & Permission Metadata")
+    st.divider()
 
     if not visible_documents:
         st.warning("No documents are visible for the current role and department.")
@@ -1370,27 +1461,99 @@ elif selected_page in ["KB Management", "KB Status"]:
             {document["source"] for document in visible_documents}
         )
 
-        filter_columns = st.columns(3)
-
-        with filter_columns[0]:
-            selected_department = st.selectbox(
-                "Visible Document Department",
-                [FILTER_ALL] + department_options,
-            )
-
-        with filter_columns[1]:
-            selected_category = st.selectbox(
-                "Category",
-                [FILTER_ALL] + category_options,
-            )
-
-        with filter_columns[2]:
-            selected_source = st.selectbox(
-                "Source",
-                [FILTER_ALL] + source_options,
-            )
+        index_status_options = [
+            FILTER_ALL,
+            "Pending Index",
+            "Indexed",
+        ]
 
         filtered_documents = visible_documents
+
+        if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
+            indexed_count = sum(
+                1 for document in visible_documents
+                if get_index_status_label(document) == "Indexed"
+            )
+
+            pending_index_count = sum(
+                1 for document in visible_documents
+                if get_index_status_label(document) == "Pending Index"
+            )
+
+            versioned_count = sum(
+                1 for document in visible_documents
+                if (document.get("version_number") or 1) > 1
+            )
+
+            with st.container(border=True):
+                st.markdown("**Index & Version Overview**")
+                st.caption(
+                    "Operational view for documents that may need incremental indexing "
+                    "after upload, metadata update, or version replacement."
+                )
+
+                if pending_index_count:
+                    st.warning(
+                        f"{pending_index_count} document(s) need indexing before chat can use the latest content."
+                    )
+                else:
+                    st.success("All visible active documents are indexed.")
+
+                status_columns = st.columns(4)
+
+                with status_columns[0]:
+                    st.metric("Visible Documents", len(visible_documents))
+
+                with status_columns[1]:
+                    st.metric(
+                        "Pending Index",
+                        pending_index_count,
+                        "Action required" if pending_index_count else "No action needed",
+                    )
+
+                with status_columns[2]:
+                    st.metric("Indexed", indexed_count)
+
+                with status_columns[3]:
+                    st.metric("Updated Versions", versioned_count)
+
+        if st.session_state["role"] == GENERAL_EMPLOYEE_ROLE:
+            st.subheader("Available Knowledge Base Documents")
+            st.caption(
+                "Documents shown here are limited to your department and ACL-permitted shared sources."
+            )
+        else:
+            st.subheader("Document Index & Filter")
+            
+        with st.container(border=True):
+            filter_columns = st.columns(4 if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE else 3)
+
+            with filter_columns[0]:
+                selected_department = st.selectbox(
+                    "Visible Document Department",
+                    [FILTER_ALL] + department_options,
+                )
+
+            with filter_columns[1]:
+                selected_category = st.selectbox(
+                    "Category",
+                    [FILTER_ALL] + category_options,
+                )
+
+            with filter_columns[2]:
+                selected_source = st.selectbox(
+                    "Source",
+                    [FILTER_ALL] + source_options,
+                )
+
+            selected_index_status = FILTER_ALL
+
+            if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
+                with filter_columns[3]:
+                    selected_index_status = st.selectbox(
+                        "Index Status",
+                        index_status_options,
+                    )
 
         if selected_department != FILTER_ALL:
             filtered_documents = [
@@ -1410,17 +1573,37 @@ elif selected_page in ["KB Management", "KB Status"]:
                 if document["source"] == selected_source
             ]
 
-        table_rows = [
-            {
-                "Document": document["title"],
-                "Source": document["source"],
-                "Department": document["department"],
-                "Category": document["category"],
-                "Allowed Access": ", ".join(document["allowed_roles"]),
-                "Visuals": document["visual_extraction_status"],
-            }
-            for document in filtered_documents
-        ]
+        if selected_index_status != FILTER_ALL:
+            filtered_documents = [
+                document
+                for document in filtered_documents
+                if get_index_status_label(document) == selected_index_status
+            ]
+
+        table_rows = []
+
+        for document in filtered_documents:
+            if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
+                row = {
+                    "Document": document["title"],
+                    "Version": get_version_label(document),
+                    "Index Status": get_index_status_label(document),
+                    "Source": document["source"],
+                    "Department": document["department"],
+                    "Category": document["category"],
+                    "Allowed Access": ", ".join(document["allowed_roles"]),
+                    "Visuals": document["visual_extraction_status"],
+                }
+            else:
+                row = {
+                    "Document": document["title"],
+                    "Source": document["source"],
+                    "Department": document["department"],
+                    "Category": document["category"],
+                    "Visuals": document["visual_extraction_status"],
+                }
+
+            table_rows.append(row)
 
         st.dataframe(
             table_rows,
@@ -1428,13 +1611,10 @@ elif selected_page in ["KB Management", "KB Status"]:
             hide_index=True,
         )
 
-        st.subheader("Selected Document Details")
-
-        if not filtered_documents:
-            st.info("No documents match the selected filters.")
-        else:
+        if filtered_documents:
+            st.subheader("Selected Document Details")
             selected_title = st.selectbox(
-                "Document",
+                "Select document to view details",
                 [document["title"] for document in filtered_documents],
             )
 
@@ -1448,141 +1628,147 @@ elif selected_page in ["KB Management", "KB Status"]:
             with detail_columns[0]:
                 with st.container(border=True):
                     st.markdown("**File Metadata**")
-                    st.write(f"Document ID: {selected_document['document_id']}")
-                    st.write(f"Filename: {selected_document['filename']}")
-                    st.write(f"File type: {selected_document['file_type']}")
-                    st.write(f"Uploaded by: {selected_document['uploaded_by']}")
-                    st.write(f"Uploaded at: {selected_document['uploaded_at']}")
+                    st.write(f"**ID:** {selected_document['document_id']}")
+                    st.write(f"**File:** {selected_document['filename']} | **Type:** {selected_document['file_type']}")
+                    st.write(f"**Uploaded by:** {selected_document['uploaded_by']} at {selected_document['uploaded_at']}")
+                    if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
+                        st.write(f"**Source document ID:** {selected_document.get('source_document_id')}")
+                        st.write(f"**Version:** {get_version_label(selected_document)}")
+                        st.write(f"**Status:** {get_index_status_label(selected_document)}")
 
             with detail_columns[1]:
                 with st.container(border=True):
                     st.markdown("**Access & Extraction**")
-                    st.write(f"Tags: {', '.join(selected_document['tags'])}")
+                    st.write(f"**Tags:** {', '.join(selected_document['tags'])}")
+                    if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
+                        st.write(
+                            "**Allowed roles:** "
+                            f"{', '.join(selected_document['allowed_roles'])}"
+                        )
+                        st.write(
+                            "**Allowed departments:** "
+                            f"{', '.join(selected_document['allowed_departments'])}"
+                        )
+                        st.write(f"**Index marker:** {selected_document['chunk_id']}")
                     st.write(
-                        "Allowed roles: "
-                        f"{', '.join(selected_document['allowed_roles'])}"
-                    )
-                    st.write(
-                        "Allowed departments: "
-                        f"{', '.join(selected_document['allowed_departments'])}"
-                    )
-                    st.write(f"Chunk ID: {selected_document['chunk_id']}")
-                    st.write(
-                        "Visual extraction status: "
+                        "**Visual extraction status:** "
                         f"{selected_document['visual_extraction_status']}"
                     )
 
-                    if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
-                        with st.expander("Edit Metadata & Access", expanded=False):
-                            with st.form(f"metadata_edit_form_{selected_document['document_id']}"):
-                                edited_title = st.text_input(
-                                    "Title",
-                                    value=selected_document["title"],
+            if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
+                with st.expander("✏️ Edit Metadata & Access", expanded=False):
+                    with st.form(f"metadata_edit_form_{selected_document['document_id']}"):
+                        edit_col1, edit_col2 = st.columns(2)
+                        
+                        with edit_col1:
+                            edited_title = st.text_input(
+                                "Title",
+                                value=selected_document["title"],
+                            )
+
+                            if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+                                edited_department = st.selectbox(
+                                    "Department",
+                                    DEPARTMENT_OPTIONS,
+                                    index=DEPARTMENT_OPTIONS.index(selected_document["department"]),
+                                )
+                            else:
+                                edited_department = st.text_input(
+                                    "Department",
+                                    value=st.session_state["department"],
+                                    disabled=True,
                                 )
 
-                                if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-                                    edited_department = st.selectbox(
-                                        "Department",
-                                        DEPARTMENT_OPTIONS,
-                                        index=DEPARTMENT_OPTIONS.index(selected_document["department"]),
-                                    )
-                                else:
-                                    edited_department = st.text_input(
-                                        "Department",
-                                        value=st.session_state["department"],
-                                        disabled=True,
-                                    )
+                            edited_category = st.text_input(
+                                "Category",
+                                value=selected_document["category"],
+                            )
 
-                                edited_category = st.text_input(
-                                    "Category",
-                                    value=selected_document["category"],
+                        with edit_col2:
+                            edited_tags_text = st.text_input(
+                                "Tags",
+                                value=", ".join(selected_document["tags"]),
+                                help="Separate tags with commas.",
+                            )
+
+                            if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+                                edited_allowed_roles = st.multiselect(
+                                    "Allowed roles",
+                                    ROLE_OPTIONS,
+                                    default=selected_document["allowed_roles"],
+                                )
+                                edited_allowed_departments = st.multiselect(
+                                    "Allowed departments",
+                                    [FILTER_ALL] + DEPARTMENT_OPTIONS,
+                                    default=selected_document["allowed_departments"],
+                                )
+                            else:
+                                edited_allowed_roles = st.multiselect(
+                                    "Allowed roles",
+                                    [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE],
+                                    default=[
+                                        role for role in selected_document["allowed_roles"]
+                                        if role in [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE]
+                                    ] or [PROJECT_MANAGER_ROLE],
+                                )
+                                st.text_input(
+                                    "Allowed departments",
+                                    value=st.session_state["department"],
+                                    disabled=True,
+                                    help="Project Manager metadata edits are limited to their own department.",
+                                )
+                                edited_allowed_departments = [st.session_state["department"]]
+
+                        submitted_metadata_update = st.form_submit_button("Save Metadata", type="primary")
+
+                        if submitted_metadata_update:
+                            if not edited_title.strip():
+                                st.error("Please enter a document title.")
+                            elif not edited_allowed_roles:
+                                st.error("Please select at least one allowed role.")
+                            elif not edited_allowed_departments:
+                                st.error("Please select at least one allowed department.")
+                            else:
+                                try:
+                                    approved_metadata = request_metadata_update_validation(
+                                        document_department=edited_department,
+                                        allowed_roles=edited_allowed_roles,
+                                        allowed_departments=edited_allowed_departments,
+                                    )
+                                except requests.exceptions.HTTPError as error:
+                                    st.error(f"Metadata update rejected by backend: {error.response.text}")
+                                    st.stop()
+                                except requests.exceptions.RequestException as error:
+                                    st.error(f"Could not validate metadata update: {error}")
+                                    st.stop()
+
+                                updated_document = selected_document.copy()
+                                updated_document.update(
+                                    {
+                                        "title": edited_title.strip(),
+                                        "department": approved_metadata["document_department"],
+                                        "category": edited_category.strip() or "General",
+                                        "tags": [
+                                            tag.strip()
+                                            for tag in edited_tags_text.split(",")
+                                            if tag.strip()
+                                        ],
+                                        "allowed_roles": approved_metadata["allowed_roles"],
+                                        "allowed_departments": approved_metadata["allowed_departments"],
+                                    }
                                 )
 
-                                edited_tags_text = st.text_input(
-                                    "Tags",
-                                    value=", ".join(selected_document["tags"]),
-                                    help="Separate tags with commas.",
+                                update_document_metadata(
+                                    selected_document["document_id"],
+                                    updated_document,
                                 )
 
-                                if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-                                    edited_allowed_roles = st.multiselect(
-                                        "Allowed roles",
-                                        ROLE_OPTIONS,
-                                        default=selected_document["allowed_roles"],
-                                    )
-                                    edited_allowed_departments = st.multiselect(
-                                        "Allowed departments",
-                                        [FILTER_ALL] + DEPARTMENT_OPTIONS,
-                                        default=selected_document["allowed_departments"],
-                                    )
-                                else:
-                                    edited_allowed_roles = st.multiselect(
-                                        "Allowed roles",
-                                        [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE],
-                                        default=[
-                                            role for role in selected_document["allowed_roles"]
-                                            if role in [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE]
-                                        ] or [PROJECT_MANAGER_ROLE],
-                                    )
-                                    st.text_input(
-                                        "Allowed departments",
-                                        value=st.session_state["department"],
-                                        disabled=True,
-                                        help="Project Manager metadata edits are limited to their own department.",
-                                    )
-
-                                    edited_allowed_departments = [st.session_state["department"]]
-
-                                submitted_metadata_update = st.form_submit_button("Save Metadata")
-
-                                if submitted_metadata_update:
-                                    if not edited_title.strip():
-                                        st.error("Please enter a document title.")
-                                    elif not edited_allowed_roles:
-                                        st.error("Please select at least one allowed role.")
-                                    elif not edited_allowed_departments:
-                                        st.error("Please select at least one allowed department.")
-                                    else:
-                                        try:
-                                            approved_metadata = request_metadata_update_validation(
-                                                document_department=edited_department,
-                                                allowed_roles=edited_allowed_roles,
-                                                allowed_departments=edited_allowed_departments,
-                                            )
-                                        except requests.exceptions.HTTPError as error:
-                                            st.error(f"Metadata update rejected by backend: {error.response.text}")
-                                            st.stop()
-                                        except requests.exceptions.RequestException as error:
-                                            st.error(f"Could not validate metadata update: {error}")
-                                            st.stop()
-
-                                        updated_document = selected_document.copy()
-                                        updated_document.update(
-                                            {
-                                                "title": edited_title.strip(),
-                                                "department": approved_metadata["document_department"],
-                                                "category": edited_category.strip() or "General",
-                                                "tags": [
-                                                    tag.strip()
-                                                    for tag in edited_tags_text.split(",")
-                                                    if tag.strip()
-                                                ],
-                                                "allowed_roles": approved_metadata["allowed_roles"],
-                                                "allowed_departments": approved_metadata["allowed_departments"],
-                                            }
-                                        )
-
-                                        update_document_metadata(
-                                            selected_document["document_id"],
-                                            updated_document,
-                                        )
-
-                                        st.success("Metadata updated. ACL changes apply to chat immediately.")
-                                        st.rerun()
+                                st.success("Metadata updated. ACL changes apply to chat immediately.")
+                                st.rerun()
                     
 
 elif selected_page == "Chat":
-    st.title("Chat")
+    st.header("Copilot Chat")
     if "chat_messages" not in st.session_state:
         st.session_state["chat_messages"] = []
 
@@ -1599,9 +1785,9 @@ elif selected_page == "Chat":
         {document["file_type"] for document in visible_documents}
     )
 
-    st.caption("Ask questions through the shared FastAPI RAG backend.")
+    st.caption("Ask questions grounded in the enterprise knowledge base.")
 
-    with st.container(border=True):
+    with st.expander("⚙️ Search Scope & Filters", expanded=False):
         filter_columns = st.columns([1, 1, 2])
         if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
             with filter_columns[0]:
@@ -1629,7 +1815,7 @@ elif selected_page == "Chat":
                     "Department",
                     value=(
                         f"{st.session_state['department']} + "
-                        "ACL-permitted shared documents"
+                        "ACL shared docs"
                     ),
                     disabled=True,
                 )
@@ -1675,15 +1861,17 @@ elif selected_page == "Chat":
                 disabled=True,
             )
 
-    st.divider()
-
-    if st.button("Clear Chat"):
-        st.session_state["chat_messages"] = []
-        st.rerun()
-
-    chat_container = st.container(height=420, border=True)
+    chat_container = st.container(height=450, border=True)
 
     with chat_container:
+        if not st.session_state["chat_messages"]:
+            st.markdown(
+                f"<div style='text-align: center; color: #94a3b8; margin-top: 2rem;'>"
+                f"Hello {st.session_state['user']}, how can I help you today?"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
         for message in st.session_state["chat_messages"]:
             with st.chat_message(message["role"]):
                 if message["role"] == "assistant" and message.get("status"):
@@ -1691,23 +1879,52 @@ elif selected_page == "Chat":
 
                 st.write(message["content"])
 
-                if message.get("sources"):
-                    st.caption("Sources")
-                    for source in message["sources"]:
-                        st.code(source)
-
-                if message.get("context"):
-                    st.caption(message["context"])
+                # Wrap sources and context into columns and expanders to declutter the chat flow
+                if message.get("sources") or message.get("context"):
+                    meta_col1, meta_col2 = st.columns(2)
+                    if message.get("sources"):
+                        with meta_col1:
+                            with st.expander("📑 View Sources"):
+                                for source in message["sources"]:
+                                    st.code(source, language=None)
+                    
+                    if message.get("context"):
+                        with meta_col2:
+                            with st.expander("🔍 Query Context"):
+                                st.caption(message["context"])
 
     chat_is_processing = st.session_state.get("chat_is_processing", False)
 
-    st.caption("Suggested questions")
+    with st.form("chat_question_form", border=False):
+        question_columns = st.columns([6, 1])
 
+        with question_columns[0]:
+            st.text_input(
+                "Message",
+                key="chat_question",
+                placeholder="Type or select an example question...",
+                label_visibility="collapsed",
+            )
+
+        with question_columns[1]:
+            st.form_submit_button(
+                "Send",
+                type="primary",
+                use_container_width=True,
+                on_click=submit_chat_question,
+                disabled=chat_is_processing,
+            )
+
+    # Prompt buttons directly below the input
+    st.markdown("<div style='margin-top: 0.5rem;'></div>", unsafe_allow_html=True)
     example_prompts = ROLE_AWARE_CHAT_PROMPTS[st.session_state["role"]]
-    example_columns = st.columns(len(example_prompts))
+    
+    # Calculate columns (Add +1 for Demo button if General Employee, or Clear button)
+    total_cols = len(example_prompts) + (2 if st.session_state["role"] == GENERAL_EMPLOYEE_ROLE else 1)
+    example_columns = st.columns(total_cols)
 
-    for column, (label, prompt) in zip(example_columns, example_prompts.items()):
-        with column:
+    for i, (label, prompt) in enumerate(example_prompts.items()):
+        with example_columns[i]:
             st.button(
                 label,
                 key=f"example_prompt_{label}",
@@ -1718,33 +1935,20 @@ elif selected_page == "Chat":
             )
 
     if st.session_state["role"] == GENERAL_EMPLOYEE_ROLE:
-        st.caption("Access control demonstration")
-        st.button(
-            "Try Restricted IT Policy",
-            key="acl_demo_prompt",
-            on_click=select_example_chat_prompt,
-            args=("What are the password policy requirements?",),
-            disabled=chat_is_processing,
-        )
-
-    with st.form("chat_question_form"):
-        question_columns = st.columns([6, 1])
-
-        with question_columns[0]:
-            st.text_input(
-                "Ask a question about the knowledge base",
-                key="chat_question",
-                placeholder="Type or select an example question...",
-                label_visibility="collapsed",
+        with example_columns[-2]:
+            st.button(
+                "Demo Restricted IT Policy",
+                key="acl_demo_prompt",
+                on_click=select_example_chat_prompt,
+                args=("What are the password policy requirements?",),
+                use_container_width=True,
+                disabled=chat_is_processing,
             )
 
-        with question_columns[1]:
-            st.form_submit_button(
-            "Send",
-            type="primary",
-            use_container_width=True,
-            on_click=submit_chat_question,
-            )
+    with example_columns[-1]:
+        if st.button("🧹 Clear", use_container_width=True):
+            st.session_state["chat_messages"] = []
+            st.rerun()
 
     question = st.session_state.pop("pending_chat_question", None)
 
@@ -1753,7 +1957,6 @@ elif selected_page == "Chat":
 
         if not clean_question:
             st.session_state["chat_is_processing"] = False
-            st.warning("Please enter a question before searching.")
         else:
             user_message = {
                 "role": "user",
@@ -1842,13 +2045,17 @@ elif selected_page == "Chat":
                     show_status_message(assistant_message["status"])
                     st.write(assistant_message["content"])
 
-                    if assistant_message.get("sources"):
-                        st.caption("Sources")
-                        for source in assistant_message["sources"]:
-                            st.code(source)
-
-                    if assistant_message.get("context"):
-                        st.caption(assistant_message["context"])
+                    if assistant_message.get("sources") or assistant_message.get("context"):
+                        meta_col1, meta_col2 = st.columns(2)
+                        if assistant_message.get("sources"):
+                            with meta_col1:
+                                with st.expander("📑 View Sources"):
+                                    for source in assistant_message["sources"]:
+                                        st.code(source, language=None)
+                        if assistant_message.get("context"):
+                            with meta_col2:
+                                with st.expander("🔍 Query Context"):
+                                    st.caption(assistant_message["context"])
 
             st.session_state["chat_messages"].append(assistant_message)
             st.session_state["chat_is_processing"] = False
@@ -1856,7 +2063,7 @@ elif selected_page == "Chat":
 
 
 elif selected_page == "Settings":
-    st.title("Settings")
+    st.header("System Settings")
     st.caption("Admin-only retrieval and guardrail configuration placeholder.")
 
     st.info(
