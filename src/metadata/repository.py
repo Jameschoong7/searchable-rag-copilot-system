@@ -406,4 +406,3 @@ def generate_document_id(documents: list[dict]) -> str:
     )
 
     return f"DOC-UPLOAD-{upload_count + 1:03d}"
-
