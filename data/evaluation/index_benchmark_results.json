@@ -4,7 +4,7 @@
   "updated_sources": [
     "data/simulated/IT_Policy_Password_v2.txt"
   ],
-  "elapsed_seconds": 7.282,
+  "elapsed_seconds": 6.838,
   "before": {
     "active_metadata_records": 16,
     "simulated_source_files": 17,

@@ -288,6 +288,45 @@ def index_single_document(
     }
 
 
+def index_changed_documents(source_paths: list[str]) -> dict:
+    """Delete and re-index vectors for one or more changed source files."""
+    unique_source_paths = list(dict.fromkeys(source_paths))
+
+    if not unique_source_paths:
+        raise ValueError("At least one source path is required.")
+
+    update_results = []
+    total_deleted_vectors = 0
+    total_chunks_indexed = 0
+    total_document_objects_loaded = 0
+
+    for source_path in unique_source_paths:
+        deleted_vector_count = delete_vectors_for_source(source_path)
+        index_result = index_single_document(source_path)
+
+        total_deleted_vectors += deleted_vector_count
+        total_chunks_indexed += index_result["chunks_indexed"]
+        total_document_objects_loaded += index_result["document_objects_loaded"]
+
+        update_results.append(
+            {
+                "source": source_path,
+                "deleted_vector_count": deleted_vector_count,
+                "document_objects_loaded": index_result["document_objects_loaded"],
+                "chunks_indexed": index_result["chunks_indexed"],
+            }
+        )
+
+    return {
+        "changed_document_count": len(unique_source_paths),
+        "updated_sources": unique_source_paths,
+        "update_results": update_results,
+        "total_deleted_vectors": total_deleted_vectors,
+        "total_document_objects_loaded": total_document_objects_loaded,
+        "total_chunks_indexed": total_chunks_indexed,
+    }
+
+
 def rebuild_vector_store(
     docs_path: str | None = None,
     db_path: str | None = None,

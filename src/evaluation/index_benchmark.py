@@ -153,58 +153,31 @@ def build_single_document_update_benchmark(source_path: str) -> dict:
 
 def build_batch_update_benchmark(source_paths: list[str]) -> dict:
     """Measure the cost of updating multiple changed source documents."""
-    from src.etl.pipeline import delete_vectors_for_source, index_single_document
-
-    unique_source_paths = list(dict.fromkeys(source_paths))
-
-    if not unique_source_paths:
-        raise ValueError("At least one source path is required for batch update benchmark.")
+    from src.etl.pipeline import index_changed_documents
 
     before_snapshot = build_index_benchmark_snapshot()
 
     start_time = time.perf_counter()
-
-    update_results = []
-    total_deleted_vectors = 0
-    total_chunks_indexed = 0
-    total_document_objects_loaded = 0
-
-    for source_path in unique_source_paths:
-        deleted_vector_count = delete_vectors_for_source(source_path)
-        index_result = index_single_document(source_path)
-
-        total_deleted_vectors += deleted_vector_count
-        total_chunks_indexed += index_result["chunks_indexed"]
-        total_document_objects_loaded += index_result["document_objects_loaded"]
-
-        update_results.append(
-            {
-                "source": source_path,
-                "deleted_vector_count": deleted_vector_count,
-                "document_objects_loaded": index_result["document_objects_loaded"],
-                "chunks_indexed": index_result["chunks_indexed"],
-            }
-        )
-
+    update_result = index_changed_documents(source_paths)
     elapsed_seconds = round(time.perf_counter() - start_time, 3)
 
     after_snapshot = build_index_benchmark_snapshot()
 
     estimated_unchanged_chunks_avoided = max(
-        after_snapshot["chroma_vector_count"] - total_chunks_indexed,
+        after_snapshot["chroma_vector_count"] - update_result["total_chunks_indexed"],
         0,
     )
 
     return {
         "benchmark_type": "batch_incremental_update",
-        "changed_document_count": len(unique_source_paths),
-        "updated_sources": unique_source_paths,
+        "changed_document_count": update_result["changed_document_count"],
+        "updated_sources": update_result["updated_sources"],
         "elapsed_seconds": elapsed_seconds,
         "before": before_snapshot,
-        "update_results": update_results,
-        "total_deleted_vectors": total_deleted_vectors,
-        "total_document_objects_loaded": total_document_objects_loaded,
-        "total_chunks_indexed": total_chunks_indexed,
+        "update_results": update_result["update_results"],
+        "total_deleted_vectors": update_result["total_deleted_vectors"],
+        "total_document_objects_loaded": update_result["total_document_objects_loaded"],
+        "total_chunks_indexed": update_result["total_chunks_indexed"],
         "estimated_unchanged_chunks_avoided": estimated_unchanged_chunks_avoided,
         "after": after_snapshot,
         "delta": {
