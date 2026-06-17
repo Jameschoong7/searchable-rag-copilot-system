@@ -66,6 +66,24 @@ class ReindexResponse(BaseModel):
     message: str
 
 
+class IndexUpdatesRequest(BaseModel):
+    """Represent an admin request to index pending document updates."""
+
+    role: str
+
+
+class IndexUpdatesResponse(BaseModel):
+    """Represent the result of indexing pending document updates."""
+
+    status: str
+    pending_document_count: int
+    updated_sources: list[str]
+    total_deleted_vectors: int
+    total_chunks_indexed: int
+    elapsed_seconds: float
+    message: str
+
+
 class UploadValidationRequest(BaseModel):
     """Represent metadata proposed for a local simulated document upload."""
 
@@ -175,6 +193,117 @@ def reindex_knowledge_base(request: ReindexRequest) -> ReindexResponse:
             f"Rebuilt ChromaDB with {result['documents_indexed']} file(s), "
             f"{result['document_objects_loaded']} document object(s), "
             f"and {result['chunks_indexed']} chunk(s)."
+        ),
+    )
+
+
+@app.post("/admin/index-updates", response_model=IndexUpdatesResponse)
+def index_pending_document_updates(request: IndexUpdatesRequest) -> IndexUpdatesResponse:
+    """Run incremental indexing for active documents marked as pending index."""
+    if request.role != SYSTEM_ADMIN_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="Only System Admin can index pending document updates.",
+        )
+
+    try:
+        import time
+        from pathlib import Path
+
+        from src.etl.pipeline import index_changed_documents
+        from src.evaluation.index_benchmark import (
+            build_index_benchmark_snapshot,
+            save_benchmark_result,
+        )
+        from src.metadata.repository import (
+            load_pending_index_documents,
+            mark_documents_indexed,
+        )
+
+        pending_documents = load_pending_index_documents()
+
+        if not pending_documents:
+            return IndexUpdatesResponse(
+                status="no_pending_documents",
+                pending_document_count=0,
+                updated_sources=[],
+                total_deleted_vectors=0,
+                total_chunks_indexed=0,
+                elapsed_seconds=0,
+                message="No pending document updates require indexing.",
+            )
+
+        source_paths = [
+            str(Path("data/simulated") / document["filename"])
+            for document in pending_documents
+        ]
+
+        before_snapshot = build_index_benchmark_snapshot()
+
+        start_time = time.perf_counter()
+        update_result = index_changed_documents(source_paths)
+        elapsed_seconds = round(time.perf_counter() - start_time, 3)
+
+        after_snapshot = build_index_benchmark_snapshot()
+
+        benchmark_result = {
+            "benchmark_type": "batch_incremental_update",
+            "changed_document_count": update_result["changed_document_count"],
+            "updated_sources": update_result["updated_sources"],
+            "elapsed_seconds": elapsed_seconds,
+            "before": before_snapshot,
+            "update_results": update_result["update_results"],
+            "total_deleted_vectors": update_result["total_deleted_vectors"],
+            "total_document_objects_loaded": update_result["total_document_objects_loaded"],
+            "total_chunks_indexed": update_result["total_chunks_indexed"],
+            "estimated_unchanged_chunks_avoided": max(
+                after_snapshot["chroma_vector_count"] - update_result["total_chunks_indexed"],
+                0,
+            ),
+            "after": after_snapshot,
+            "delta": {
+                "chroma_vector_count": (
+                    after_snapshot["chroma_vector_count"]
+                    - before_snapshot["chroma_vector_count"]
+                ),
+                "chroma_db_size_bytes": (
+                    after_snapshot["chroma_db_size_bytes"]
+                    - before_snapshot["chroma_db_size_bytes"]
+                ),
+                "chroma_db_size_mb": round(
+                    after_snapshot["chroma_db_size_mb"]
+                    - before_snapshot["chroma_db_size_mb"],
+                    2,
+                ),
+            },
+        }
+
+        save_benchmark_result(benchmark_result)
+
+        mark_documents_indexed(
+            [
+                document["document_id"]
+                for document in pending_documents
+            ]
+        )
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Pending index update failed: {error}",
+        ) from error
+
+    return IndexUpdatesResponse(
+        status="success",
+        pending_document_count=len(pending_documents),
+        updated_sources=update_result["updated_sources"],
+        total_deleted_vectors=update_result["total_deleted_vectors"],
+        total_chunks_indexed=update_result["total_chunks_indexed"],
+        elapsed_seconds=elapsed_seconds,
+        message=(
+            f"Indexed {len(pending_documents)} pending document(s), refreshed "
+            f"{update_result['total_chunks_indexed']} chunk(s), and replaced "
+            f"{update_result['total_deleted_vectors']} old vector(s)."
         ),
     )
 
