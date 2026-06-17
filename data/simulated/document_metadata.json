@@ -1,16 +1,29 @@
 [
   {
-    "document_id": "DOC-IT-001",
-    "title": "IT Password Policy",
-    "filename": "IT_Policy_Password.txt",
+    "document_id": "DOC-ENG-001",
+    "title": "Software Development Workflow",
+    "filename": "Engineering_Development_Workflow.txt",
     "file_type": "TXT",
-    "source": "Manual Upload",
-    "department": "IT",
-    "category": "Security Policy",
+    "source": "SharePoint Auto Sync",
+    "department": "Engineering",
+    "category": "Engineering Workflow",
+    "uploaded_by": "Engineering Lead",
+    "uploaded_at": "2026-03-05 09:00",
+    "page_number": null,
+    "chunk_id": "indexed",
+    "visual_extraction_status": "Text only",
+    "source_document_id": "DOC-ENG-001",
+    "version_number": 1,
+    "is_active": 1,
+    "content_hash": null,
+    "archived_at": null,
+    "replaced_by_document_id": null,
     "tags": [
-      "password",
-      "account",
-      "MFA"
+      "branch",
+      "pull request",
+      "review",
+      "testing",
+      "release"
     ],
     "allowed_roles": [
       "System Admin",
@@ -18,41 +31,43 @@
       "General Employee"
     ],
     "allowed_departments": [
-      "IT",
       "Engineering"
-    ],
-    "uploaded_by": "System Admin",
-    "uploaded_at": "2026-01-18 09:30",
-    "page_number": null,
-    "chunk_id": "pending",
-    "visual_extraction_status": "Text only"
+    ]
   },
   {
-    "document_id": "DOC-IT-002",
-    "title": "Approved Software Policy",
-    "filename": "IT_Policy_Software.txt",
+    "document_id": "DOC-ENG-002",
+    "title": "Python Coding Standards",
+    "filename": "Engineering_Coding_Standards.txt",
     "file_type": "TXT",
-    "source": "SharePoint Auto Sync",
-    "department": "IT",
-    "category": "Approved Software",
+    "source": "OneNote Sync",
+    "department": "Engineering",
+    "category": "Coding Standards",
+    "uploaded_by": "Engineering Lead",
+    "uploaded_at": "2026-03-12 13:45",
+    "page_number": null,
+    "chunk_id": "indexed",
+    "visual_extraction_status": "Text only",
+    "source_document_id": "DOC-ENG-002",
+    "version_number": 1,
+    "is_active": 1,
+    "content_hash": null,
+    "archived_at": null,
+    "replaced_by_document_id": null,
     "tags": [
-      "software",
-      "engineering",
-      "onboarding"
+      "python",
+      "coding standard",
+      "error handling",
+      "testing",
+      "review"
     ],
     "allowed_roles": [
       "System Admin",
-      "Project Manager"
+      "Project Manager",
+      "General Employee"
     ],
     "allowed_departments": [
-      "IT",
       "Engineering"
-    ],
-    "uploaded_by": "System Sync",
-    "uploaded_at": "2026-01-20 14:10",
-    "page_number": null,
-    "chunk_id": "pending",
-    "visual_extraction_status": "Text only"
+    ]
   },
   {
     "document_id": "DOC-HR-001",
@@ -62,6 +77,17 @@
     "source": "OneNote Sync",
     "department": "HR",
     "category": "Onboarding",
+    "uploaded_by": "HR Admin",
+    "uploaded_at": "2026-02-03 11:00",
+    "page_number": null,
+    "chunk_id": "indexed",
+    "visual_extraction_status": "Text only",
+    "source_document_id": "DOC-HR-001",
+    "version_number": 1,
+    "is_active": 1,
+    "content_hash": null,
+    "archived_at": null,
+    "replaced_by_document_id": null,
     "tags": [
       "onboarding",
       "new hire",
@@ -73,43 +99,10 @@
       "General Employee"
     ],
     "allowed_departments": [
-      "HR",
       "IT",
-      "Engineering"
-    ],
-    "uploaded_by": "HR Admin",
-    "uploaded_at": "2026-02-03 11:00",
-    "page_number": null,
-    "chunk_id": "pending",
-    "visual_extraction_status": "Text only"
-  },
-  {
-    "document_id": "DOC-IT-003",
-    "title": "VPN Setup Guide",
-    "filename": "VPN_Setup_Guide.txt",
-    "file_type": "TXT",
-    "source": "Manual Upload",
-    "department": "IT",
-    "category": "IT Support",
-    "tags": [
-      "VPN",
-      "remote access",
-      "setup"
-    ],
-    "allowed_roles": [
-      "System Admin",
-      "Project Manager",
-      "General Employee"
-    ],
-    "allowed_departments": [
-      "IT",
-      "Engineering"
-    ],
-    "uploaded_by": "IT Support",
-    "uploaded_at": "2026-02-10 16:45",
-    "page_number": null,
-    "chunk_id": "pending",
-    "visual_extraction_status": "Text only"
+      "Engineering",
+      "HR"
+    ]
   },
   {
     "document_id": "DOC-HR-002",
@@ -119,6 +112,17 @@
     "source": "SharePoint Auto Sync",
     "department": "HR",
     "category": "Leave Policy",
+    "uploaded_by": "HR System Sync",
+    "uploaded_at": "2026-03-01 08:15",
+    "page_number": null,
+    "chunk_id": "indexed",
+    "visual_extraction_status": "Text only",
+    "source_document_id": "DOC-HR-002",
+    "version_number": 1,
+    "is_active": 1,
+    "content_hash": null,
+    "archived_at": null,
+    "replaced_by_document_id": null,
     "tags": [
       "annual leave",
       "medical leave",
@@ -136,12 +140,7 @@
       "Engineering",
       "Security",
       "Operations"
-    ],
-    "uploaded_by": "HR System Sync",
-    "uploaded_at": "2026-03-01 08:15",
-    "page_number": null,
-    "chunk_id": "pending",
-    "visual_extraction_status": "Text only"
+    ]
   },
   {
     "document_id": "DOC-HR-003",
@@ -151,6 +150,17 @@
     "source": "OneNote Sync",
     "department": "HR",
     "category": "Expense Claims",
+    "uploaded_by": "HR Admin",
+    "uploaded_at": "2026-03-02 10:30",
+    "page_number": null,
+    "chunk_id": "indexed",
+    "visual_extraction_status": "Text only",
+    "source_document_id": "DOC-HR-003",
+    "version_number": 1,
+    "is_active": 1,
+    "content_hash": null,
+    "archived_at": null,
+    "replaced_by_document_id": null,
     "tags": [
       "expense",
       "claim",
@@ -169,56 +179,132 @@
       "Engineering",
       "Security",
       "Operations"
-    ],
-    "uploaded_by": "HR Admin",
-    "uploaded_at": "2026-03-02 10:30",
-    "page_number": null,
-    "chunk_id": "pending",
-    "visual_extraction_status": "Text only"
+    ]
   },
   {
-    "document_id": "DOC-ENG-001",
-    "title": "Software Development Workflow",
-    "filename": "Engineering_Development_Workflow.txt",
+    "document_id": "DOC-IT-001",
+    "title": "IT Password Policy",
+    "filename": "IT_Policy_Password.txt",
+    "file_type": "TXT",
+    "source": "Manual Upload",
+    "department": "IT",
+    "category": "Security Policy",
+    "uploaded_by": "System Admin",
+    "uploaded_at": "2026-01-18 09:30",
+    "page_number": null,
+    "chunk_id": "pending",
+    "visual_extraction_status": "Text only",
+    "source_document_id": "DOC-IT-001",
+    "version_number": 1,
+    "is_active": 0,
+    "content_hash": null,
+    "archived_at": "2026-06-15T20:37:56",
+    "replaced_by_document_id": "DOC-IT-001-V2",
+    "tags": [
+      "password",
+      "account",
+      "MFA"
+    ],
+    "allowed_roles": [
+      "System Admin",
+      "Project Manager",
+      "General Employee"
+    ],
+    "allowed_departments": [
+      "IT",
+      "Engineering"
+    ]
+  },
+  {
+    "document_id": "DOC-IT-001-V2",
+    "title": "IT Password Policy",
+    "filename": "IT_Policy_Password_v2.txt",
+    "file_type": "TXT",
+    "source": "Manual Upload",
+    "department": "IT",
+    "category": "Security Policy",
+    "uploaded_by": "System Admin",
+    "uploaded_at": "2026-06-15T20:37:56",
+    "page_number": null,
+    "chunk_id": "indexed",
+    "visual_extraction_status": "Text only",
+    "source_document_id": "DOC-IT-001",
+    "version_number": 2,
+    "is_active": 1,
+    "content_hash": "e21b65ea3dd6b6a70adf7953472f60fc7d9b514f55bd90c25eab60d97b7a4131",
+    "archived_at": null,
+    "replaced_by_document_id": null,
+    "tags": [
+      "password",
+      "account",
+      "MFA"
+    ],
+    "allowed_roles": [
+      "System Admin",
+      "Project Manager",
+      "General Employee"
+    ],
+    "allowed_departments": [
+      "IT",
+      "Engineering"
+    ]
+  },
+  {
+    "document_id": "DOC-IT-002",
+    "title": "Approved Software Policy",
+    "filename": "IT_Policy_Software.txt",
     "file_type": "TXT",
     "source": "SharePoint Auto Sync",
-    "department": "Engineering",
-    "category": "Engineering Workflow",
+    "department": "IT",
+    "category": "Approved Software",
+    "uploaded_by": "System Sync",
+    "uploaded_at": "2026-01-20 14:10",
+    "page_number": null,
+    "chunk_id": "indexed",
+    "visual_extraction_status": "Text only",
+    "source_document_id": "DOC-IT-002",
+    "version_number": 1,
+    "is_active": 1,
+    "content_hash": null,
+    "archived_at": null,
+    "replaced_by_document_id": null,
     "tags": [
-      "branch",
-      "pull request",
-      "review",
-      "testing",
-      "release"
+      "software",
+      "engineering",
+      "onboarding"
     ],
     "allowed_roles": [
       "System Admin",
-      "Project Manager",
-      "General Employee"
+      "Project Manager"
     ],
     "allowed_departments": [
+      "IT",
       "Engineering"
-    ],
-    "uploaded_by": "Engineering Lead",
-    "uploaded_at": "2026-03-05 09:00",
-    "page_number": null,
-    "chunk_id": "pending",
-    "visual_extraction_status": "Text only"
+    ]
   },
   {
-    "document_id": "DOC-ENG-002",
-    "title": "Python Coding Standards",
-    "filename": "Engineering_Coding_Standards.txt",
+    "document_id": "DOC-IT-003",
+    "title": "VPN Setup Guide",
+    "filename": "VPN_Setup_Guide.txt",
     "file_type": "TXT",
-    "source": "OneNote Sync",
-    "department": "Engineering",
-    "category": "Coding Standards",
+    "source": "Manual Upload",
+    "department": "IT",
+    "category": "IT Support",
+    "uploaded_by": "IT Support",
+    "uploaded_at": "2026-02-10 16:45",
+    "page_number": null,
+    "chunk_id": "indexed",
+    "visual_extraction_status": "Text only",
+    "source_document_id": "DOC-IT-003",
+    "version_number": 1,
+    "is_active": 1,
+    "content_hash": null,
+    "archived_at": null,
+    "replaced_by_document_id": null,
     "tags": [
-      "python",
-      "coding standard",
-      "error handling",
-      "testing",
-      "review"
+      "VPN",
+      "remote access",
+      "setup"
     ],
     "allowed_roles": [
       "System Admin",
@@ -226,13 +312,80 @@
       "General Employee"
     ],
     "allowed_departments": [
+      "IT",
       "Engineering"
-    ],
-    "uploaded_by": "Engineering Lead",
-    "uploaded_at": "2026-03-12 13:45",
+    ]
+  },
+  {
+    "document_id": "DOC-IT-004",
+    "title": "Company Laptop First-Day Setup Guide",
+    "filename": "IT_Device_Setup_Guide.txt",
+    "file_type": "TXT",
+    "source": "Manual Upload",
+    "department": "IT",
+    "category": "Device Setup",
+    "uploaded_by": "IT Helpdesk",
+    "uploaded_at": "2026-03-20 09:40",
     "page_number": null,
-    "chunk_id": "pending",
-    "visual_extraction_status": "Text only"
+    "chunk_id": "indexed",
+    "visual_extraction_status": "Text only",
+    "source_document_id": "DOC-IT-004",
+    "version_number": 1,
+    "is_active": 1,
+    "content_hash": null,
+    "archived_at": null,
+    "replaced_by_document_id": null,
+    "tags": [
+      "laptop",
+      "device",
+      "first day",
+      "software",
+      "authenticator"
+    ],
+    "allowed_roles": [
+      "System Admin",
+      "Project Manager",
+      "General Employee"
+    ],
+    "allowed_departments": [
+      "IT",
+      "Engineering"
+    ]
+  },
+  {
+    "document_id": "DOC-OPS-001",
+    "title": "Internal Service Escalation Procedure",
+    "filename": "Operations_Service_Escalation_SOP.txt",
+    "file_type": "TXT",
+    "source": "OneNote Sync",
+    "department": "Operations",
+    "category": "Operations SOP",
+    "uploaded_by": "Operations Duty Manager",
+    "uploaded_at": "2026-03-18 17:00",
+    "page_number": null,
+    "chunk_id": "indexed",
+    "visual_extraction_status": "Text only",
+    "source_document_id": "DOC-OPS-001",
+    "version_number": 1,
+    "is_active": 1,
+    "content_hash": null,
+    "archived_at": null,
+    "replaced_by_document_id": null,
+    "tags": [
+      "service",
+      "incident",
+      "severity",
+      "escalation",
+      "status update"
+    ],
+    "allowed_roles": [
+      "System Admin",
+      "Project Manager"
+    ],
+    "allowed_departments": [
+      "Operations",
+      "IT"
+    ]
   },
   {
     "document_id": "DOC-SEC-001",
@@ -242,6 +395,17 @@
     "source": "SharePoint Auto Sync",
     "department": "Security",
     "category": "Access Control",
+    "uploaded_by": "Security Admin",
+    "uploaded_at": "2026-03-15 15:20",
+    "page_number": null,
+    "chunk_id": "indexed",
+    "visual_extraction_status": "Text only",
+    "source_document_id": "DOC-SEC-001",
+    "version_number": 1,
+    "is_active": 1,
+    "content_hash": null,
+    "archived_at": null,
+    "replaced_by_document_id": null,
     "tags": [
       "access request",
       "role assignment",
@@ -255,12 +419,7 @@
     "allowed_departments": [
       "Security",
       "IT"
-    ],
-    "uploaded_by": "Security Admin",
-    "uploaded_at": "2026-03-15 15:20",
-    "page_number": null,
-    "chunk_id": "pending",
-    "visual_extraction_status": "Text only"
+    ]
   },
   {
     "document_id": "DOC-SEC-002",
@@ -270,6 +429,17 @@
     "source": "SharePoint Auto Sync",
     "department": "Security",
     "category": "Incident Response",
+    "uploaded_by": "Security Operations",
+    "uploaded_at": "2026-03-16 11:10",
+    "page_number": null,
+    "chunk_id": "indexed",
+    "visual_extraction_status": "Text only",
+    "source_document_id": "DOC-SEC-002",
+    "version_number": 1,
+    "is_active": 1,
+    "content_hash": null,
+    "archived_at": null,
+    "replaced_by_document_id": null,
     "tags": [
       "incident",
       "phishing",
@@ -288,71 +458,7 @@
       "Engineering",
       "Security",
       "Operations"
-    ],
-    "uploaded_by": "Security Operations",
-    "uploaded_at": "2026-03-16 11:10",
-    "page_number": null,
-    "chunk_id": "pending",
-    "visual_extraction_status": "Text only"
-  },
-  {
-    "document_id": "DOC-OPS-001",
-    "title": "Internal Service Escalation Procedure",
-    "filename": "Operations_Service_Escalation_SOP.txt",
-    "file_type": "TXT",
-    "source": "OneNote Sync",
-    "department": "Operations",
-    "category": "Operations SOP",
-    "tags": [
-      "service",
-      "incident",
-      "severity",
-      "escalation",
-      "status update"
-    ],
-    "allowed_roles": [
-      "System Admin",
-      "Project Manager"
-    ],
-    "allowed_departments": [
-      "Operations",
-      "IT"
-    ],
-    "uploaded_by": "Operations Duty Manager",
-    "uploaded_at": "2026-03-18 17:00",
-    "page_number": null,
-    "chunk_id": "pending",
-    "visual_extraction_status": "Text only"
-  },
-  {
-    "document_id": "DOC-IT-004",
-    "title": "Company Laptop First-Day Setup Guide",
-    "filename": "IT_Device_Setup_Guide.txt",
-    "file_type": "TXT",
-    "source": "Manual Upload",
-    "department": "IT",
-    "category": "Device Setup",
-    "tags": [
-      "laptop",
-      "device",
-      "first day",
-      "software",
-      "authenticator"
-    ],
-    "allowed_roles": [
-      "System Admin",
-      "Project Manager",
-      "General Employee"
-    ],
-    "allowed_departments": [
-      "IT",
-      "Engineering"
-    ],
-    "uploaded_by": "IT Helpdesk",
-    "uploaded_at": "2026-03-20 09:40",
-    "page_number": null,
-    "chunk_id": "pending",
-    "visual_extraction_status": "Text only"
+    ]
   },
   {
     "document_id": "DOC-UPLOAD-001",
@@ -362,6 +468,17 @@
     "source": "Manual Upload",
     "department": "IT",
     "category": "General",
+    "uploaded_by": "admin_jc",
+    "uploaded_at": "2026-06-06T14:38",
+    "page_number": null,
+    "chunk_id": "indexed",
+    "visual_extraction_status": "Text only",
+    "source_document_id": "DOC-UPLOAD-001",
+    "version_number": 1,
+    "is_active": 1,
+    "content_hash": null,
+    "archived_at": null,
+    "replaced_by_document_id": null,
     "tags": [
       "policy",
       "internal"
@@ -371,12 +488,7 @@
     ],
     "allowed_departments": [
       "IT"
-    ],
-    "uploaded_by": "admin_jc",
-    "uploaded_at": "2026-06-06T14:38",
-    "page_number": null,
-    "chunk_id": "pending",
-    "visual_extraction_status": "Text only"
+    ]
   },
   {
     "document_id": "DOC-UPLOAD-002",
@@ -386,6 +498,17 @@
     "source": "Manual Upload",
     "department": "IT",
     "category": "General",
+    "uploaded_by": "admin_jc",
+    "uploaded_at": "2026-06-08T15:21",
+    "page_number": null,
+    "chunk_id": "indexed",
+    "visual_extraction_status": "Text only",
+    "source_document_id": "DOC-UPLOAD-002",
+    "version_number": 1,
+    "is_active": 1,
+    "content_hash": null,
+    "archived_at": null,
+    "replaced_by_document_id": null,
     "tags": [
       "policy",
       "internal"
@@ -396,12 +519,7 @@
     ],
     "allowed_departments": [
       "IT"
-    ],
-    "uploaded_by": "admin_jc",
-    "uploaded_at": "2026-06-08T15:21",
-    "page_number": null,
-    "chunk_id": "pending",
-    "visual_extraction_status": "Text only"
+    ]
   },
   {
     "document_id": "DOC-UPLOAD-003",
@@ -411,6 +529,17 @@
     "source": "Manual Upload",
     "department": "IT",
     "category": "General",
+    "uploaded_by": "admin_jc",
+    "uploaded_at": "2026-06-13T10:11",
+    "page_number": null,
+    "chunk_id": "indexed",
+    "visual_extraction_status": "PDF text extraction",
+    "source_document_id": "DOC-UPLOAD-003",
+    "version_number": 1,
+    "is_active": 1,
+    "content_hash": null,
+    "archived_at": null,
+    "replaced_by_document_id": null,
     "tags": [
       "policy",
       "internal"
@@ -424,21 +553,27 @@
       "IT",
       "Engineering",
       "Operations"
-    ],
-    "uploaded_by": "admin_jc",
-    "uploaded_at": "2026-06-13T10:11",
-    "page_number": null,
-    "chunk_id": "pending",
-    "visual_extraction_status": "PDF text extraction"
+    ]
   },
   {
     "document_id": "DOC-UPLOAD-004",
-    "title": "Ai Tools Usage Policy",
+    "title": "AI Tools Usage Policy",
     "filename": "AI_Tools_Usage_Policy.docx",
     "file_type": "DOCX",
     "source": "Manual Upload",
     "department": "IT",
-    "category": "General",
+    "category": "AI Governence",
+    "uploaded_by": "admin_jc",
+    "uploaded_at": "2026-06-13T10:12",
+    "page_number": null,
+    "chunk_id": "indexed",
+    "visual_extraction_status": "Word text extraction",
+    "source_document_id": "DOC-UPLOAD-004",
+    "version_number": 1,
+    "is_active": 1,
+    "content_hash": null,
+    "archived_at": null,
+    "replaced_by_document_id": null,
     "tags": [
       "policy",
       "internal"
@@ -451,11 +586,6 @@
     "allowed_departments": [
       "IT",
       "Security"
-    ],
-    "uploaded_by": "admin_jc",
-    "uploaded_at": "2026-06-13T10:12",
-    "page_number": null,
-    "chunk_id": "pending",
-    "visual_extraction_status": "Word text extraction"
+    ]
   }
 ]
