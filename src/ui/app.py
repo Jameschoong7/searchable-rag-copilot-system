@@ -24,6 +24,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.metadata.repository import (
     append_document_metadata,
+    create_new_document_version,
     generate_document_id,
     load_document_metadata,
     metadata_exists_for_filename,
@@ -497,6 +498,42 @@ def normalise_uploaded_filename(filename: str) -> str:
     return filename.replace(" ", "_")
 
 
+def generate_version_document_id(previous_document: dict, next_version_number: int) -> str:
+    """Generate a readable document ID for a new version of an existing document."""
+    source_document_id = previous_document.get(
+        "source_document_id",
+        previous_document["document_id"],
+    )
+
+    return f"{source_document_id}-V{next_version_number}"
+
+
+def build_versioned_filename(
+    previous_document: dict,
+    uploaded_filename: str,
+    next_version_number: int,
+) -> str:
+    """Build a unique stored filename for a replacement document version."""
+    source_document_id = previous_document.get(
+        "source_document_id",
+        previous_document["document_id"],
+    )
+
+    safe_uploaded_filename = normalise_uploaded_filename(uploaded_filename)
+
+    return f"{source_document_id}_v{next_version_number}_{safe_uploaded_filename}"
+
+
+def save_uploaded_file_as(uploaded_file, stored_filename: str) -> str:
+    """Save an uploaded file using a caller-provided unique stored filename."""
+    filename = normalise_uploaded_filename(stored_filename)
+    file_path = Path("data/simulated") / filename
+
+    file_path.write_bytes(uploaded_file.getvalue())
+
+    return filename
+
+
 def get_uploaded_file_type(filename: str) -> str:
     """Return the metadata file type for a supported uploaded file."""
     suffix = Path(filename).suffix.lower()
@@ -889,7 +926,6 @@ if selected_page == "Performance":
                 if before_active_vectors
                 else 0
             )
-
             if latest_full_rebuild_result:
                 full_rebuild_baseline_seconds = latest_full_rebuild_result["elapsed_seconds"]
                 full_rebuild_baseline_chunks = latest_full_rebuild_result["rebuild_result"]["chunks_indexed"]
@@ -903,7 +939,7 @@ if selected_page == "Performance":
                 time_saved_seconds = None
 
             with st.expander("Update Efficiency Details", expanded=False):
-                efficiency_columns = st.columns(3)
+                efficiency_columns = st.columns(2)
 
                 with efficiency_columns[0]:
                     st.metric(
@@ -926,20 +962,13 @@ if selected_page == "Performance":
                             f"vs {full_rebuild_baseline_seconds}s full rebuild",
                         )
 
-                with efficiency_columns[2]:
-                    st.metric(
-                        "Touched Index",
-                        f"{chunks_refreshed}/{before_active_vectors}",
-                        "chunks refreshed vs before index",
-                    )
-
                 st.progress(refreshed_percent)
 
                 st.caption(
-                    f"Incremental update touched {chunks_refreshed} active chunks and "
-                    f"left {avoided_chunks} unchanged chunks untouched."
+                    f"Incremental update avoided re-embedding {avoided_chunks} of "
+                    f"{before_active_vectors} previous active chunks. "
+                    f"{chunks_refreshed} new chunks were embedded for the changed document(s)."
                 )
-
                 if latest_full_rebuild_result:
                     st.dataframe(
                         [
@@ -1290,161 +1319,273 @@ elif selected_page in ["KB Management", "KB Status"]:
 
         if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
             with st.container(border=True):
-                st.markdown("**1. Upload & Categorize Document**")
-                st.caption(
-                    "Uploads a TXT file into data/simulated and appends trusted metadata. "
-                    "Rebuild the vector index after upload before searching the new document."
+                new_document_tab, new_version_tab = st.tabs(
+                    ["Upload New Document", "Upload New Version"]
                 )
+                with new_document_tab:
+                    st.markdown("**1. Upload & Categorize Document**")
+                    st.caption(
+                        "Uploads a TXT file into data/simulated and appends trusted metadata. "
+                        "Rebuild the vector index after upload before searching the new document."
+                    )
 
-                if "upload_form_version" not in st.session_state:
-                    st.session_state["upload_form_version"] = 0
+                    if "upload_form_version" not in st.session_state:
+                        st.session_state["upload_form_version"] = 0
 
-                upload_form_version = st.session_state["upload_form_version"]
+                    upload_form_version = st.session_state["upload_form_version"]
 
-                uploaded_file = st.file_uploader(
-                    "Upload TXT, PDF, or DOCX",
-                    type=["txt", "pdf", "docx"],
-                    key=f"upload_file{upload_form_version}",
-                )
+                    uploaded_file = st.file_uploader(
+                        "Upload TXT, PDF, or DOCX",
+                        type=["txt", "pdf", "docx"],
+                        key=f"upload_file{upload_form_version}",
+                    )
 
-                title_key = prepare_upload_title_state(uploaded_file, upload_form_version)
+                    title_key = prepare_upload_title_state(uploaded_file, upload_form_version)
 
-                with st.form(f"real_txt_upload_form_{upload_form_version}"):
-                    
-                    # Grouping form inputs into a grid layout to save vertical space
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        title = st.text_input(
-                            "Document title",
-                            key=title_key,
-                            help="Auto-filled from the uploaded filename. Admin may edit it.",
-                        )
-                        if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-                            department = st.selectbox(
-                                "Department",
-                                DEPARTMENT_OPTIONS,
-                                key=f"txt_upload_department_{upload_form_version}",
-                            )
-                        else:
-                            department = st.text_input(
-                                "Department",
-                                value=st.session_state["department"],
-                                disabled=True,
-                                key=f"txt_upload_department_{upload_form_version}",
-                            )
-                        category = st.text_input(
-                            "Category",
-                            value="General",
-                            key=f"txt_upload_category_{upload_form_version}",
-                        )
+                    with st.form(f"real_txt_upload_form_{upload_form_version}"):
                         
-                    with col2:
-                        tags_text = st.text_input(
-                            "Tags",
-                            value="policy, internal",
-                            help="Separate tags with commas.",
-                            key=f"txt_upload_tags_{upload_form_version}",
+                        # Grouping form inputs into a grid layout to save vertical space
+                        col1, col2 = st.columns(2)
+
+                        with col1:
+                            title = st.text_input(
+                                "Document title",
+                                key=title_key,
+                                help="Auto-filled from the uploaded filename. Admin may edit it.",
+                            )
+                            if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+                                department = st.selectbox(
+                                    "Department",
+                                    DEPARTMENT_OPTIONS,
+                                    key=f"txt_upload_department_{upload_form_version}",
+                                )
+                            else:
+                                department = st.text_input(
+                                    "Department",
+                                    value=st.session_state["department"],
+                                    disabled=True,
+                                    key=f"txt_upload_department_{upload_form_version}",
+                                )
+                            category = st.text_input(
+                                "Category",
+                                value="General",
+                                key=f"txt_upload_category_{upload_form_version}",
+                            )
+
+                        with col2:
+                            tags_text = st.text_input(
+                                "Tags",
+                                value="policy, internal",
+                                help="Separate tags with commas.",
+                                key=f"txt_upload_tags_{upload_form_version}",
+                            )
+                            if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+                                allowed_roles = st.multiselect(
+                                    "Allowed roles",
+                                    ROLE_OPTIONS,
+                                    default=[SYSTEM_ADMIN_ROLE],
+                                    key=f"txt_upload_roles_{upload_form_version}",
+                                )
+                                allowed_departments = st.multiselect(
+                                    "Allowed departments",
+                                    DEPARTMENT_OPTIONS,
+                                    default=[department],
+                                    key=f"txt_upload_departments_{upload_form_version}",
+                                )
+                            else:
+                                allowed_roles = st.multiselect(
+                                    "Allowed roles",
+                                    [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE],
+                                    default=[PROJECT_MANAGER_ROLE],
+                                    key=f"txt_upload_roles_{upload_form_version}",
+                                )
+                                allowed_departments = st.multiselect(
+                                    "Allowed departments",
+                                    [st.session_state["department"]],
+                                    default=[st.session_state["department"]],
+                                    key=f"txt_upload_departments_{upload_form_version}",
+                                )
+
+                        submitted_upload = st.form_submit_button("Save File + Metadata", type="primary")
+
+                        if submitted_upload:
+                            if uploaded_file is None:
+                                st.error("Please choose a supported file before saving.")
+                            elif not title.strip():
+                                st.error("Please enter a document title.")
+                            elif not allowed_roles:
+                                st.error("Please select at least one allowed role.")
+                            elif not allowed_departments:
+                                st.error("Please select at least one allowed department.")
+                            else:
+                                documents = load_document_metadata()
+                                filename = normalise_uploaded_filename(uploaded_file.name)
+                                file_type = get_uploaded_file_type(filename)
+
+                                if file_type == "UNKNOWN":
+                                    st.error("Only TXT, PDF, and DOCX uploads are supported in the current local prototype.")
+                                    st.stop()
+
+                                if metadata_exists_for_filename(filename):
+                                    st.error(
+                                        "Metadata already exists for this filename. Rename the file or remove the existing metadata record first."
+                                    )
+                                    st.stop()
+
+                                try:
+                                    approved_metadata = request_upload_validation(
+                                        document_department=department,
+                                        allowed_roles=allowed_roles,
+                                        allowed_departments=allowed_departments,
+                                    )
+                                except requests.exceptions.HTTPError as error:
+                                    st.error(f"Upload rejected by backend: {error.response.text}")
+                                    st.stop()
+                                except requests.exceptions.RequestException as error:
+                                    st.error(f"Could not validate upload metadata: {error}")
+                                    st.stop()
+
+                                filename = save_uploaded_file(uploaded_file)
+
+                                new_document = {
+                                    "document_id": generate_document_id(documents),
+                                    "title": title.strip(),
+                                    "filename": filename,
+                                    "file_type": file_type,
+                                    "source": "Manual Upload",
+                                    "department": approved_metadata["document_department"],
+                                    "category": category.strip() or "General",
+                                    "tags": [
+                                        tag.strip()
+                                        for tag in tags_text.split(",")
+                                        if tag.strip()
+                                    ],
+                                    "allowed_roles": approved_metadata["allowed_roles"],
+                                    "allowed_departments": approved_metadata["allowed_departments"],
+                                    "uploaded_by": st.session_state["user"],
+                                    "uploaded_at": datetime.now().isoformat(timespec="minutes"),
+                                    "page_number": None,
+                                    "chunk_id": "pending_index",
+                                    "visual_extraction_status": get_visual_extraction_status(file_type),
+                                }
+
+                                append_document_metadata(new_document)
+
+                                st.session_state["upload_message"] = (
+                                    f"Saved {filename} and appended metadata record "
+                                    f"{new_document['document_id']}. Rebuild ChromaDB before searching it."
+                                )
+
+                                st.session_state["upload_form_version"] += 1
+                                st.rerun()
+
+                with new_version_tab:
+                    st.markdown("**Upload Replacement As New Version**")
+                    st.caption(
+                        "Select an existing active document, then upload its replacement. "
+                        "The previous metadata record will be archived and the new version will be marked pending index."
+                    )
+
+                    manageable_documents = [
+                        document for document in visible_documents
+                        if (
+                            st.session_state["role"] == SYSTEM_ADMIN_ROLE
+                            or document["department"] == st.session_state["department"]
                         )
-                        if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-                            allowed_roles = st.multiselect(
-                                "Allowed roles",
-                                ROLE_OPTIONS,
-                                default=[SYSTEM_ADMIN_ROLE],
-                                key=f"txt_upload_roles_{upload_form_version}",
-                            )
-                            allowed_departments = st.multiselect(
-                                "Allowed departments",
-                                DEPARTMENT_OPTIONS,
-                                default=[department],
-                                key=f"txt_upload_departments_{upload_form_version}",
-                            )
-                        else:
-                            allowed_roles = st.multiselect(
-                                "Allowed roles",
-                                [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE],
-                                default=[PROJECT_MANAGER_ROLE],
-                                key=f"txt_upload_roles_{upload_form_version}",
-                            )
-                            allowed_departments = st.multiselect(
-                                "Allowed departments",
-                                [st.session_state["department"]],
-                                default=[st.session_state["department"]],
-                                key=f"txt_upload_departments_{upload_form_version}",
-                            )
+                    ]
 
-                    submitted_upload = st.form_submit_button("Save File + Metadata", type="primary")
+                    if not manageable_documents:
+                        st.info("No manageable documents are available for version replacement.")
+                    else:
+                        document_options = {
+                            f"{document['title']} ({document['document_id']}, v{document.get('version_number') or 1})": document
+                            for document in manageable_documents
+                        }
 
-                    if submitted_upload:
-                        if uploaded_file is None:
-                            st.error("Please choose a supported file before saving.")
-                        elif not title.strip():
-                            st.error("Please enter a document title.")
-                        elif not allowed_roles:
-                            st.error("Please select at least one allowed role.")
-                        elif not allowed_departments:
-                            st.error("Please select at least one allowed department.")
-                        else:
-                            documents = load_document_metadata()
-                            filename = normalise_uploaded_filename(uploaded_file.name)
-                            file_type = get_uploaded_file_type(filename)
-                            
-                            if file_type == "UNKNOWN":
-                                st.error("Only TXT, PDF, and DOCX uploads are supported in the current local prototype.")
-                                st.stop()
+                        selected_version_label = st.selectbox(
+                            "Existing document",
+                            list(document_options.keys()),
+                            key=f"version_replace_document_{upload_form_version}",
+                        )
 
-                            if metadata_exists_for_filename(filename):
-                                st.error(
-                                    "Metadata already exists for this filename. Rename the file or remove the existing metadata record first."
-                                )
-                                st.stop()
+                        selected_version_document = document_options[selected_version_label]
+                        previous_version_number = selected_version_document.get("version_number") or 1
+                        next_version_number = previous_version_number + 1
 
-                            try:
-                                approved_metadata = request_upload_validation(
-                                    document_department=department,
-                                    allowed_roles=allowed_roles,
-                                    allowed_departments=allowed_departments,
-                                )
-                            except requests.exceptions.HTTPError as error:
-                                st.error(f"Upload rejected by backend: {error.response.text}")
-                                st.stop()
-                            except requests.exceptions.RequestException as error:
-                                st.error(f"Could not validate upload metadata: {error}")
-                                st.stop()
+                        st.caption(
+                            f"Current version: v{previous_version_number} -> New version: v{next_version_number}"
+                        )
 
-                            filename = save_uploaded_file(uploaded_file)
+                        uploaded_version_file = st.file_uploader(
+                            "Upload replacement TXT, PDF, or DOCX",
+                            type=["txt", "pdf", "docx"],
+                            key=f"version_upload_file_{upload_form_version}",
+                        )
 
-                            new_document = {
-                                "document_id": generate_document_id(documents),
-                                "title": title.strip(),
-                                "filename": filename,
-                                "file_type": file_type,
-                                "source": "Manual Upload",
-                                "department": approved_metadata["document_department"],
-                                "category": category.strip() or "General",
-                                "tags": [
-                                    tag.strip()
-                                    for tag in tags_text.split(",")
-                                    if tag.strip()
-                                ],
-                                "allowed_roles": approved_metadata["allowed_roles"],
-                                "allowed_departments": approved_metadata["allowed_departments"],
-                                "uploaded_by": st.session_state["user"],
-                                "uploaded_at": datetime.now().isoformat(timespec="minutes"),
-                                "page_number": None,
-                                "chunk_id": "pending_index",
-                                "visual_extraction_status": get_visual_extraction_status(file_type),
-                            }
-
-                            append_document_metadata(new_document)
-
-                            st.session_state["upload_message"] = (
-                                f"Saved {filename} and appended metadata record "
-                                f"{new_document['document_id']}. Rebuild ChromaDB before searching it."
+                        with st.form(f"version_upload_form_{upload_form_version}"):
+                            submitted_version_upload = st.form_submit_button(
+                                "Create New Version",
+                                type="primary",
                             )
 
-                            st.session_state["upload_form_version"] += 1
-                            st.rerun()
+                            if submitted_version_upload:
+                                if uploaded_version_file is None:
+                                    st.error("Please choose a replacement file before saving.")
+                                else:
+                                    stored_filename = build_versioned_filename(
+                                        selected_version_document,
+                                        uploaded_version_file.name,
+                                        next_version_number,
+                                    )
+
+                                    file_type = get_uploaded_file_type(stored_filename)
+
+                                    if file_type == "UNKNOWN":
+                                        st.error("Only TXT, PDF, and DOCX uploads are supported.")
+                                        st.stop()
+
+                                    if metadata_exists_for_filename(stored_filename):
+                                        st.error(
+                                            "A stored file for this version already exists. "
+                                            "Please choose a different replacement file or check existing metadata."
+                                        )
+                                        st.stop()
+
+                                    saved_filename = save_uploaded_file_as(
+                                        uploaded_version_file,
+                                        stored_filename,
+                                    )
+
+                                    new_version_document = selected_version_document.copy()
+                                    new_version_document.update(
+                                        {
+                                            "document_id": generate_version_document_id(
+                                                selected_version_document,
+                                                next_version_number,
+                                            ),
+                                            "filename": saved_filename,
+                                            "file_type": file_type,
+                                            "uploaded_by": st.session_state["user"],
+                                            "uploaded_at": datetime.now().isoformat(timespec="minutes"),
+                                            "page_number": None,
+                                            "chunk_id": "pending_index",
+                                            "visual_extraction_status": get_visual_extraction_status(file_type),
+                                            "content_hash": None,
+                                        }
+                                    )
+
+                                    create_new_document_version(
+                                        previous_document_id=selected_version_document["document_id"],
+                                        new_document=new_version_document,
+                                        archived_at=datetime.now().isoformat(timespec="minutes"),
+                                    )
+
+                                    st.session_state["upload_message"] = (
+                                        f"Created {selected_version_document['title']} "
+                                        f"v{next_version_number}. Run Incremental Index Update "
+                                        "to remove old vectors and index the new version."
+                                    )
+                                    st.rerun()
 
         if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
             with st.container(border=True):
