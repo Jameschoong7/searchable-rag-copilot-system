@@ -272,6 +272,7 @@ def archive_document_version(
             UPDATE document_metadata
             SET
                 is_active = 0,
+                chunk_id = 'archived',
                 archived_at = ?,
                 replaced_by_document_id = ?
             WHERE document_id = ?
