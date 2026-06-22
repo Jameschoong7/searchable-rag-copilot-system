@@ -91,6 +91,7 @@ INDEX_UPDATES_URL = f"{API_BASE_URL}/admin/index-updates"
 API_URL = f"{API_BASE_URL}/query"
 API_HEALTH_URL = f"{API_BASE_URL}/health"
 METADATA_UPDATE_VALIDATE_URL = f"{API_BASE_URL}/admin/validate-metadata-update"
+ARCHIVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/archive-document"
 QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
 EVALUATION_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/retrieval_eval_results.json"
 INDEX_BENCHMARK_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_results.json"
@@ -119,6 +120,22 @@ def request_pending_index_update() -> dict:
             "role": st.session_state["role"],
         },
         timeout=300,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_document_archive(document_id: str) -> dict:
+    """Ask FastAPI to archive one document and remove its vectors."""
+    response = requests.post(
+        ARCHIVE_DOCUMENT_URL,
+        json={
+            "role": st.session_state["role"],
+            "user_department": st.session_state["department"],
+            "document_id": document_id,
+        },
+        timeout=120,
     )
 
     response.raise_for_status()
@@ -1614,6 +1631,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                                     st.info(index_update_result["message"])
                                 else:
                                     st.success(index_update_result["message"])
+                                    st.rerun()
 
                 with index_action_columns[1]:
                     if st.button("Rebuild Full Active Index", use_container_width=True):
@@ -1625,6 +1643,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                                 st.error(f"Index rebuild failed: {error}")
                             else:
                                 st.success(rebuild_message)
+                                st.rerun()
 
         if st.session_state["upload_message"]:
             st.warning(st.session_state["upload_message"])
@@ -1839,6 +1858,41 @@ elif selected_page in ["KB Management", "KB Status"]:
                     )
 
             if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
+                with st.expander("Archive Document", expanded=False):
+                    st.warning(
+                        "Archiving removes this document from active retrieval and deletes its vectors from ChromaDB. "
+                        "Use this for retired, duplicate, or outdated documents without a replacement."
+                    )
+
+                    can_archive_selected_document = (
+                        st.session_state["role"] == SYSTEM_ADMIN_ROLE
+                        or selected_document["department"] == st.session_state["department"]
+                    )
+
+                    if not can_archive_selected_document:
+                        st.info("Project Manager can only archive own-department documents.")
+                    else:
+                        confirm_archive = st.checkbox(
+                            f"I understand this will archive {selected_document['title']}.",
+                            key=f"confirm_archive_{selected_document['document_id']}",
+                        )
+
+                        if st.button(
+                            "Archive Selected Document",
+                            key=f"archive_document_{selected_document['document_id']}",
+                            disabled=not confirm_archive,
+                        ):
+                            try:
+                                archive_result = request_document_archive(
+                                    selected_document["document_id"]
+                                )
+                            except requests.exceptions.HTTPError as error:
+                                st.error(f"Archive rejected by backend: {error.response.text}")
+                            except requests.exceptions.RequestException as error:
+                                st.error(f"Could not archive document: {error}")
+                            else:
+                                st.success(archive_result["message"])
+                                st.rerun()
                 with st.expander("Edit Metadata & Access", expanded=False):
                     with st.form(f"metadata_edit_form_{selected_document['document_id']}"):
                         edit_col1, edit_col2 = st.columns(2)

@@ -84,6 +84,23 @@ class IndexUpdatesResponse(BaseModel):
     message: str
 
 
+class ArchiveDocumentRequest(BaseModel):
+    """Represent an admin request to archive one active document."""
+
+    role: str
+    user_department: str
+    document_id: str
+
+
+class ArchiveDocumentResponse(BaseModel):
+    """Represent the result of archiving one document and deleting its vectors."""
+
+    status: str
+    document_id: str
+    deleted_vector_count: int
+    message: str
+
+
 class UploadValidationRequest(BaseModel):
     """Represent metadata proposed for a local simulated document upload."""
 
@@ -383,6 +400,86 @@ def validate_upload_metadata(
         status_code=403,
         detail="Unknown role cannot upload knowledge base documents.",
       )
+
+
+@app.post("/admin/archive-document", response_model=ArchiveDocumentResponse)
+def archive_document(request: ArchiveDocumentRequest) -> ArchiveDocumentResponse:
+    """Archive one document and remove its vectors from the active index."""
+    if request.role == GENERAL_EMPLOYEE_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="General Employee cannot archive knowledge base documents.",
+        )
+
+    try:
+        from datetime import datetime
+        from pathlib import Path
+
+        from src.etl.pipeline import delete_vectors_for_source
+        from src.metadata.repository import (
+            archive_document_version,
+            load_document_metadata,
+        )
+
+        all_documents = load_document_metadata(include_inactive=True)
+
+        target_document = next(
+            (
+                document
+                for document in all_documents
+                if document["document_id"] == request.document_id
+            ),
+            None,
+        )
+
+        if target_document is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Document not found.",
+            )
+
+        if target_document.get("is_active") == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Document is already archived.",
+            )
+
+        if (
+            request.role == PROJECT_MANAGER_ROLE
+            and target_document["department"] != request.user_department
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="Project Manager can only archive own-department documents.",
+            )
+
+        source_path = str(Path("data/simulated") / target_document["filename"])
+
+        archive_document_version(
+            document_id=target_document["document_id"],
+            replaced_by_document_id=None,
+            archived_at=datetime.now().isoformat(timespec="minutes"),
+        )
+
+        deleted_vector_count = delete_vectors_for_source(source_path)
+
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Document archive failed: {error}",
+        ) from error
+
+    return ArchiveDocumentResponse(
+        status="success",
+        document_id=request.document_id,
+        deleted_vector_count=deleted_vector_count,
+        message=(
+            f"Archived {target_document['title']} and removed "
+            f"{deleted_vector_count} vector(s) from ChromaDB."
+        ),
+    )
 
 
 @app.post("/admin/validate-metadata-update", response_model=MetadataUpdateValidationResponse)
