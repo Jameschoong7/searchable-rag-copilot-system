@@ -327,6 +327,68 @@ def index_changed_documents(source_paths: list[str]) -> dict:
     }
 
 
+def index_changed_documents_with_cleanup(
+    index_source_paths: list[str],
+    cleanup_source_paths: list[str],
+) -> dict:
+    """Delete old/current vectors, then index only active changed source files."""
+    unique_index_paths = list(dict.fromkeys(index_source_paths))
+    unique_cleanup_paths = list(dict.fromkeys(cleanup_source_paths))
+
+    if not unique_index_paths:
+        raise ValueError("At least one source path is required for indexing.")
+
+    update_results = []
+    cleanup_results = []
+    total_deleted_vectors = 0
+    total_chunks_indexed = 0
+    total_document_objects_loaded = 0
+
+    for source_path in unique_cleanup_paths:
+        deleted_vector_count = delete_vectors_for_source(source_path)
+        total_deleted_vectors += deleted_vector_count
+
+        cleanup_results.append(
+            {
+                "source": source_path,
+                "deleted_vector_count": deleted_vector_count,
+            }
+        )
+
+    for source_path in unique_index_paths:
+        index_result = index_single_document(source_path)
+
+        total_chunks_indexed += index_result["chunks_indexed"]
+        total_document_objects_loaded += index_result["document_objects_loaded"]
+
+        update_results.append(
+            {
+                "source": source_path,
+                "deleted_vector_count": next(
+                    (
+                        cleanup_result["deleted_vector_count"]
+                        for cleanup_result in cleanup_results
+                        if cleanup_result["source"] == source_path
+                    ),
+                    0,
+                ),
+                "document_objects_loaded": index_result["document_objects_loaded"],
+                "chunks_indexed": index_result["chunks_indexed"],
+            }
+        )
+
+    return {
+        "changed_document_count": len(unique_index_paths),
+        "updated_sources": unique_index_paths,
+        "cleanup_sources": unique_cleanup_paths,
+        "cleanup_results": cleanup_results,
+        "update_results": update_results,
+        "total_deleted_vectors": total_deleted_vectors,
+        "total_document_objects_loaded": total_document_objects_loaded,
+        "total_chunks_indexed": total_chunks_indexed,
+    }
+
+
 def rebuild_vector_store(
     docs_path: str | None = None,
     db_path: str | None = None,

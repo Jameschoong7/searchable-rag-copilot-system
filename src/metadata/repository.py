@@ -358,6 +358,24 @@ def load_pending_index_documents() -> list[dict]:
     ]
 
 
+def load_replaced_documents_for_new_versions(new_document_ids: list[str]) -> list[dict]:
+    """Load archived document versions that were replaced by the given new document IDs."""
+    if not new_document_ids:
+        return []
+
+    all_documents = load_document_metadata(include_inactive=True)
+    new_document_id_set = set(new_document_ids)
+
+    return [
+        document
+        for document in all_documents
+        if (
+            document.get("is_active") == 0
+            and document.get("replaced_by_document_id") in new_document_id_set
+        )
+    ]
+
+
 def mark_documents_indexed(document_ids: list[str]) -> None:
     """Mark documents as indexed after their vectors are updated successfully."""
     if not document_ids:

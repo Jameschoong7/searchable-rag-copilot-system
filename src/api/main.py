@@ -215,13 +215,14 @@ def index_pending_document_updates(request: IndexUpdatesRequest) -> IndexUpdates
         import time
         from pathlib import Path
 
-        from src.etl.pipeline import index_changed_documents
+        from src.etl.pipeline import index_changed_documents_with_cleanup
         from src.evaluation.index_benchmark import (
             build_index_benchmark_snapshot,
             save_benchmark_result,
         )
         from src.metadata.repository import (
             load_pending_index_documents,
+            load_replaced_documents_for_new_versions,
             mark_documents_indexed,
         )
 
@@ -238,15 +239,34 @@ def index_pending_document_updates(request: IndexUpdatesRequest) -> IndexUpdates
                 message="No pending document updates require indexing.",
             )
 
-        source_paths = [
+        pending_document_ids = [
+            document["document_id"]
+            for document in pending_documents
+        ]
+
+        replaced_documents = load_replaced_documents_for_new_versions(
+            pending_document_ids
+        )
+
+        index_source_paths = [
             str(Path("data/simulated") / document["filename"])
             for document in pending_documents
         ]
 
+        replaced_source_paths = [
+            str(Path("data/simulated") / document["filename"])
+            for document in replaced_documents
+        ]
+
+        cleanup_source_paths = replaced_source_paths + index_source_paths
+
         before_snapshot = build_index_benchmark_snapshot()
 
         start_time = time.perf_counter()
-        update_result = index_changed_documents(source_paths)
+        update_result = index_changed_documents_with_cleanup(
+            index_source_paths=index_source_paths,
+            cleanup_source_paths=cleanup_source_paths,
+        )
         elapsed_seconds = round(time.perf_counter() - start_time, 3)
 
         after_snapshot = build_index_benchmark_snapshot()
@@ -255,9 +275,11 @@ def index_pending_document_updates(request: IndexUpdatesRequest) -> IndexUpdates
             "benchmark_type": "batch_incremental_update",
             "changed_document_count": update_result["changed_document_count"],
             "updated_sources": update_result["updated_sources"],
+            "cleanup_sources": update_result["cleanup_sources"],
             "elapsed_seconds": elapsed_seconds,
             "before": before_snapshot,
             "update_results": update_result["update_results"],
+            "cleanup_results": update_result["cleanup_results"],
             "total_deleted_vectors": update_result["total_deleted_vectors"],
             "total_document_objects_loaded": update_result["total_document_objects_loaded"],
             "total_chunks_indexed": update_result["total_chunks_indexed"],
