@@ -929,14 +929,14 @@ if selected_page == "Performance":
             if latest_full_rebuild_result:
                 full_rebuild_baseline_seconds = latest_full_rebuild_result["elapsed_seconds"]
                 full_rebuild_baseline_chunks = latest_full_rebuild_result["rebuild_result"]["chunks_indexed"]
-                time_saved_seconds = max(
-                    round(full_rebuild_baseline_seconds - elapsed_seconds, 3),
-                    0,
+                time_difference_seconds = round(
+                    full_rebuild_baseline_seconds - elapsed_seconds,
+                    3,
                 )
             else:
                 full_rebuild_baseline_seconds = None
                 full_rebuild_baseline_chunks = None
-                time_saved_seconds = None
+                time_difference_seconds = None
 
             with st.expander("Update Efficiency Details", expanded=False):
                 efficiency_columns = st.columns(2)
@@ -949,19 +949,24 @@ if selected_page == "Performance":
                     )
 
                 with efficiency_columns[1]:
-                    if time_saved_seconds is None:
+                    if time_difference_seconds is None:
                         st.metric(
-                            "Time Saved",
+                            "Runtime Difference",
                             "No baseline",
                             "Run full rebuild first",
                         )
-                    else:
+                    elif time_difference_seconds >= 0:
                         st.metric(
-                            "Time Saved",
-                            f"{time_saved_seconds}s",
+                            "Runtime Difference",
+                            f"{time_difference_seconds}s faster",
                             f"vs {full_rebuild_baseline_seconds}s full rebuild",
                         )
-
+                    else:
+                        st.metric(
+                            "Runtime Difference",
+                            f"{abs(time_difference_seconds)}s slower",
+                            f"vs {full_rebuild_baseline_seconds}s full rebuild",
+                        )
                 st.progress(refreshed_percent)
 
                 st.caption(

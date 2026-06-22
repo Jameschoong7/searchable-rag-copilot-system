@@ -2,22 +2,36 @@
   "benchmark_type": "batch_incremental_update",
   "changed_document_count": 1,
   "updated_sources": [
-    "data/simulated/IT_Policy_Password_v2.txt"
+    "data/simulated/DOC-IT-001_v3_IT_Policy_Password.txt"
   ],
-  "elapsed_seconds": 7.017,
+  "cleanup_sources": [
+    "data/simulated/IT_Policy_Password_v2.txt",
+    "data/simulated/DOC-IT-001_v3_IT_Policy_Password.txt"
+  ],
+  "elapsed_seconds": 12.752,
   "before": {
     "active_metadata_records": 16,
-    "simulated_source_files": 17,
+    "simulated_source_files": 18,
     "chroma_vector_count": 84,
     "chroma_db_size_bytes": 1564836,
     "chroma_db_size_mb": 1.49
   },
   "update_results": [
     {
-      "source": "data/simulated/IT_Policy_Password_v2.txt",
-      "deleted_vector_count": 6,
+      "source": "data/simulated/DOC-IT-001_v3_IT_Policy_Password.txt",
+      "deleted_vector_count": 0,
       "document_objects_loaded": 1,
       "chunks_indexed": 6
+    }
+  ],
+  "cleanup_results": [
+    {
+      "source": "data/simulated/IT_Policy_Password_v2.txt",
+      "deleted_vector_count": 6
+    },
+    {
+      "source": "data/simulated/DOC-IT-001_v3_IT_Policy_Password.txt",
+      "deleted_vector_count": 0
     }
   ],
   "total_deleted_vectors": 6,
@@ -26,7 +40,7 @@
   "estimated_unchanged_chunks_avoided": 78,
   "after": {
     "active_metadata_records": 16,
-    "simulated_source_files": 17,
+    "simulated_source_files": 18,
     "chroma_vector_count": 84,
     "chroma_db_size_bytes": 1564836,
     "chroma_db_size_mb": 1.49
