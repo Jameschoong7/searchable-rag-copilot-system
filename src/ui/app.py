@@ -545,14 +545,12 @@ def build_versioned_filename(
     return f"{source_document_id}_v{next_version_number}_{safe_uploaded_filename}"
 
 
-def save_uploaded_file_as(uploaded_file, stored_filename: str) -> str:
+def save_uploaded_file_as(uploaded_file, stored_filename: str):
     """Save an uploaded file using the configured document storage backend."""
-    saved_document = save_document_bytes(
+    return save_document_bytes(
         stored_filename,
         uploaded_file.getvalue(),
     )
-
-    return saved_document.filename
 
 
 def get_uploaded_file_type(filename: str) -> str:
@@ -600,14 +598,12 @@ def prepare_upload_title_state(uploaded_file, upload_form_version: int) -> str:
     return title_key
 
 
-def save_uploaded_file(uploaded_file) -> str:
+def save_uploaded_file(uploaded_file):
     """Save an uploaded file using the configured document storage backend."""
-    saved_document = save_document_bytes(
+    return save_document_bytes(
         uploaded_file.name,
         uploaded_file.getvalue(),
     )
-
-    return saved_document.filename
 
 
 def infer_title_from_uploaded_file(uploaded_file) -> str:
@@ -1471,12 +1467,15 @@ elif selected_page in ["KB Management", "KB Status"]:
                                     st.error(f"Could not validate upload metadata: {error}")
                                     st.stop()
 
-                                filename = save_uploaded_file(uploaded_file)
+                                stored_document = save_uploaded_file(uploaded_file)
+                                filename = stored_document.filename
 
                                 new_document = {
                                     "document_id": generate_document_id(documents),
                                     "title": title.strip(),
                                     "filename": filename,
+                                    "storage_backend": stored_document.storage_backend,
+                                    "storage_uri": stored_document.storage_uri,
                                     "file_type": file_type,
                                     "source": "Manual Upload",
                                     "department": approved_metadata["document_department"],
@@ -1577,7 +1576,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                                         )
                                         st.stop()
 
-                                    saved_filename = save_uploaded_file_as(
+                                    stored_version_document = save_uploaded_file_as(
                                         uploaded_version_file,
                                         stored_filename,
                                     )
@@ -1589,7 +1588,9 @@ elif selected_page in ["KB Management", "KB Status"]:
                                                 selected_version_document,
                                                 next_version_number,
                                             ),
-                                            "filename": saved_filename,
+                                            "filename": stored_version_document.filename,
+                                            "storage_backend": stored_version_document.storage_backend,
+                                            "storage_uri": stored_version_document.storage_uri,
                                             "file_type": file_type,
                                             "uploaded_by": st.session_state["user"],
                                             "uploaded_at": datetime.now().isoformat(timespec="minutes"),
@@ -1795,6 +1796,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                     "Version": get_version_label(document),
                     "Index Status": get_index_status_label(document),
                     "Source": document["source"],
+                    "Storage": document.get("storage_backend", "local"),
                     "Department": document["department"],
                     "Category": document["category"],
                     "Allowed Access": ", ".join(document["allowed_roles"]),
@@ -1804,6 +1806,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                 row = {
                     "Document": document["title"],
                     "Source": document["source"],
+                    "Storage": document.get("storage_backend", "local"),
                     "Department": document["department"],
                     "Category": document["category"],
                     "Visuals": document["visual_extraction_status"],
@@ -1836,6 +1839,8 @@ elif selected_page in ["KB Management", "KB Status"]:
                     st.markdown("**File Metadata**")
                     st.write(f"**ID:** {selected_document['document_id']}")
                     st.write(f"**File:** {selected_document['filename']} | **Type:** {selected_document['file_type']}")
+                    st.write(f"**Storage backend:** {selected_document.get('storage_backend', 'local')}")
+                    st.code(selected_document.get("storage_uri", f"data/simulated/{selected_document['filename']}"), language=None)
                     st.write(f"**Uploaded by:** {selected_document['uploaded_by']} at {selected_document['uploaded_at']}")
                     if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
                         st.write(f"**Source document ID:** {selected_document.get('source_document_id')}")

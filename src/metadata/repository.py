@@ -11,6 +11,8 @@ DOCUMENT_COLUMNS = [
     "document_id",
     "title",
     "filename",
+    "storage_backend",
+    "storage_uri",
     "file_type",
     "source",
     "department",
@@ -43,6 +45,8 @@ def initialise_metadata_database() -> None:
                 document_id TEXT PRIMARY KEY,
                 title TEXT NOT NULL,
                 filename TEXT NOT NULL UNIQUE,
+                storage_backend TEXT DEFAULT 'local',
+                storage_uri TEXT,
                 file_type TEXT NOT NULL,
                 source TEXT NOT NULL,
                 department TEXT NOT NULL,
@@ -65,6 +69,7 @@ def initialise_metadata_database() -> None:
             """
         )
     ensure_versioning_columns()
+    ensure_storage_columns()
 
 
 def ensure_versioning_columns() -> None:
@@ -99,6 +104,42 @@ def ensure_versioning_columns() -> None:
         )
 
 
+def ensure_storage_columns() -> None:
+    """Add storage location columns to existing local SQLite metadata stores."""
+    storage_columns = {
+        "storage_backend": "TEXT DEFAULT 'local'",
+        "storage_uri": "TEXT",
+    }
+
+    with sqlite3.connect(METADATA_DB_PATH) as connection:
+        existing_columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(document_metadata)")
+        }
+
+        for column_name, column_type in storage_columns.items():
+            if column_name not in existing_columns:
+                connection.execute(
+                    f"ALTER TABLE document_metadata ADD COLUMN {column_name} {column_type}"
+                )
+
+        connection.execute(
+            """
+            UPDATE document_metadata
+            SET storage_backend = 'local'
+            WHERE storage_backend IS NULL
+            """
+        )
+
+        connection.execute(
+            """
+            UPDATE document_metadata
+            SET storage_uri = 'data/simulated/' || filename
+            WHERE storage_uri IS NULL
+            """
+        )
+
+
 def encode_document_for_sqlite(document: dict) -> dict:
     """Convert list fields into JSON strings before storing a metadata row."""
     encoded_document = document.copy()
@@ -116,6 +157,11 @@ def encode_document_for_sqlite(document: dict) -> dict:
     encoded_document["content_hash"] = document.get("content_hash")
     encoded_document["archived_at"] = document.get("archived_at")
     encoded_document["replaced_by_document_id"] = document.get("replaced_by_document_id")
+    encoded_document["storage_backend"] = document.get("storage_backend", "local")
+    encoded_document["storage_uri"] = document.get(
+        "storage_uri",
+        f"data/simulated/{document.get('filename')}",
+    )
 
     encoded_document.pop("tags", None)
     encoded_document.pop("allowed_roles", None)
@@ -172,6 +218,8 @@ def load_document_metadata(include_inactive: bool = False) -> list[dict]:
                 document_id,
                 title,
                 filename,
+                storage_backend,
+                storage_uri,
                 file_type,
                 source,
                 department,
