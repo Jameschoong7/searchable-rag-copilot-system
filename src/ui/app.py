@@ -41,6 +41,10 @@ from src.core.constants import (
     SYSTEM_ADMIN_ROLE,
 )
 
+from src.core.config import read_app_config
+
+from src.storage.document_storage import save_document_bytes
+
 ROLE_AWARE_CHAT_PROMPTS = {
     SYSTEM_ADMIN_ROLE: {
         "Password Policy": "What are the password policy requirements?",
@@ -542,13 +546,13 @@ def build_versioned_filename(
 
 
 def save_uploaded_file_as(uploaded_file, stored_filename: str) -> str:
-    """Save an uploaded file using a caller-provided unique stored filename."""
-    filename = normalise_uploaded_filename(stored_filename)
-    file_path = Path("data/simulated") / filename
+    """Save an uploaded file using the configured document storage backend."""
+    saved_document = save_document_bytes(
+        stored_filename,
+        uploaded_file.getvalue(),
+    )
 
-    file_path.write_bytes(uploaded_file.getvalue())
-
-    return filename
+    return saved_document.filename
 
 
 def get_uploaded_file_type(filename: str) -> str:
@@ -597,13 +601,13 @@ def prepare_upload_title_state(uploaded_file, upload_form_version: int) -> str:
 
 
 def save_uploaded_file(uploaded_file) -> str:
-    """Save an uploaded TXT file into the simulated data folder."""
-    filename = normalise_uploaded_filename(uploaded_file.name)
-    file_path = Path("data/simulated") / filename
+    """Save an uploaded file using the configured document storage backend."""
+    saved_document = save_document_bytes(
+        uploaded_file.name,
+        uploaded_file.getvalue(),
+    )
 
-    file_path.write_bytes(uploaded_file.getvalue())
-
-    return filename
+    return saved_document.filename
 
 
 def infer_title_from_uploaded_file(uploaded_file) -> str:
@@ -2301,9 +2305,40 @@ elif selected_page == "Chat":
 
 elif selected_page == "Settings":
     st.header("System Settings")
-    st.caption("Admin-only retrieval and guardrail configuration placeholder.")
+    st.caption("Admin-only backend mode, retrieval, and guardrail configuration.")
 
-    st.info(
-        "Later this page will include model selection, Top-K settings, "
-        "ACL enforcement mode, visual extraction settings, and prompt guardrails."
+    app_config = read_app_config()
+
+    st.subheader("Migration Mode")
+
+    mode_columns = st.columns(5)
+
+    with mode_columns[0]:
+        st.metric("Storage", app_config.storage_backend)
+
+    with mode_columns[1]:
+        st.metric("Vector", app_config.vector_backend)
+
+    with mode_columns[2]:
+        st.metric("LLM", app_config.llm_backend)
+
+    with mode_columns[3]:
+        graph_status = "Enabled" if app_config.graph_connector_enabled else "Disabled"
+        st.metric("Graph", graph_status)
+
+    with mode_columns[4]:
+        st.metric("SharePoint", app_config.sharepoint_mode)
+
+    st.caption(
+        "These values are read from environment configuration. Local fallback remains "
+        "available when Azure or Graph services are unavailable."
     )
+
+    with st.expander("Backend mode rules"):
+        st.write(
+            "- SQLite remains the source of truth for metadata, ACL/RBAC, versioning, logs, and audit.\n"
+            "- Azure AI Search stores searchable chunks only; it does not replace SQLite governance.\n"
+            "- Azure Blob Storage can replace local document storage when configured.\n"
+            "- Azure OpenAI is used only after deployment, endpoint, and API key are confirmed.\n"
+            "- SharePoint remains simulated until enterprise Microsoft 365 tenant access is available."
+        )
