@@ -189,5 +189,53 @@
       "chroma_db_size_bytes": 0,
       "chroma_db_size_mb": 0.0
     }
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 1,
+    "updated_sources": [
+      "data/simulated/Incident_Response_Policy.docx"
+    ],
+    "cleanup_sources": [
+      "data/simulated/Incident_Response_Policy.docx"
+    ],
+    "elapsed_seconds": 6.68,
+    "before": {
+      "active_metadata_records": 17,
+      "simulated_source_files": 19,
+      "chroma_vector_count": 84,
+      "chroma_db_size_bytes": 1564836,
+      "chroma_db_size_mb": 1.49
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/Incident_Response_Policy.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 14
+      }
+    ],
+    "cleanup_results": [
+      {
+        "source": "data/simulated/Incident_Response_Policy.docx",
+        "deleted_vector_count": 0
+      }
+    ],
+    "total_deleted_vectors": 0,
+    "total_document_objects_loaded": 1,
+    "total_chunks_indexed": 14,
+    "estimated_unchanged_chunks_avoided": 70,
+    "after": {
+      "active_metadata_records": 17,
+      "simulated_source_files": 19,
+      "chroma_vector_count": 98,
+      "chroma_db_size_bytes": 1683620,
+      "chroma_db_size_mb": 1.61
+    },
+    "delta": {
+      "chroma_vector_count": 14,
+      "chroma_db_size_bytes": 118784,
+      "chroma_db_size_mb": 0.12
+    }
   }
 ]
