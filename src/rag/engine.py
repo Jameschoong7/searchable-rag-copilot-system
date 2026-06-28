@@ -1,5 +1,5 @@
 #REQ_F004: Retrieve relevant documents chunks and generate cited answers
-
+import os
 import re
 from pathlib import Path
 
