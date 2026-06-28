@@ -307,5 +307,29 @@
       "chroma_db_size_bytes": 249856,
       "chroma_db_size_mb": 0.23
     }
+  },
+  {
+    "vector_backend": "azure_search",
+    "active_metadata_records": 17,
+    "simulated_source_files": 24,
+    "indexed_chunk_count": 98,
+    "index_size_bytes": null,
+    "index_size_mb": null,
+    "index_size_available": false,
+    "chroma_vector_count": null,
+    "chroma_db_size_bytes": null,
+    "chroma_db_size_mb": null
+  },
+  {
+    "vector_backend": "azure_search",
+    "active_metadata_records": 17,
+    "simulated_source_files": 24,
+    "indexed_chunk_count": 98,
+    "index_size_bytes": null,
+    "index_size_mb": null,
+    "index_size_available": false,
+    "chroma_vector_count": null,
+    "chroma_db_size_bytes": null,
+    "chroma_db_size_mb": null
   }
 ]

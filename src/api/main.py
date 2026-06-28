@@ -212,7 +212,7 @@ def reindex_knowledge_base(request: ReindexRequest) -> ReindexResponse:
         document_objects_loaded=result["document_objects_loaded"],
         chunks_indexed=result["chunks_indexed"],
         message=(
-            f"Rebuilt ChromaDB with {result['documents_indexed']} file(s), "
+            f"Rebuilt search index with {result['documents_indexed']} file(s), "
             f"{result['document_objects_loaded']} document object(s), "
             f"and {result['chunks_indexed']} chunk(s)."
         ),
@@ -235,6 +235,7 @@ def index_pending_document_updates(request: IndexUpdatesRequest) -> IndexUpdates
         from src.etl.pipeline import index_changed_documents_with_cleanup
         from src.evaluation.index_benchmark import (
             build_index_benchmark_snapshot,
+            calculate_index_delta,
             save_benchmark_result,
         )
         from src.metadata.repository import (
@@ -301,25 +302,11 @@ def index_pending_document_updates(request: IndexUpdatesRequest) -> IndexUpdates
             "total_document_objects_loaded": update_result["total_document_objects_loaded"],
             "total_chunks_indexed": update_result["total_chunks_indexed"],
             "estimated_unchanged_chunks_avoided": max(
-                before_snapshot["chroma_vector_count"] - update_result["total_chunks_indexed"],
+                before_snapshot["indexed_chunk_count"] - update_result["total_chunks_indexed"],
                 0,
             ),
             "after": after_snapshot,
-            "delta": {
-                "chroma_vector_count": (
-                    after_snapshot["chroma_vector_count"]
-                    - before_snapshot["chroma_vector_count"]
-                ),
-                "chroma_db_size_bytes": (
-                    after_snapshot["chroma_db_size_bytes"]
-                    - before_snapshot["chroma_db_size_bytes"]
-                ),
-                "chroma_db_size_mb": round(
-                    after_snapshot["chroma_db_size_mb"]
-                    - before_snapshot["chroma_db_size_mb"],
-                    2,
-                ),
-            },
+            "delta": calculate_index_delta(after_snapshot, before_snapshot),
         }
 
         save_benchmark_result(benchmark_result)
@@ -477,7 +464,7 @@ def archive_document(request: ArchiveDocumentRequest) -> ArchiveDocumentResponse
         deleted_vector_count=deleted_vector_count,
         message=(
             f"Archived {target_document['title']} and removed "
-            f"{deleted_vector_count} vector(s) from ChromaDB."
+            f"{deleted_vector_count} vector/index record(s) from the configured backend."
         ),
     )
 

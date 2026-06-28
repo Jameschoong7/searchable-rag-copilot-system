@@ -877,10 +877,11 @@ if selected_page == "Performance":
         after_snapshot = index_benchmark_results.get("after", index_benchmark_results)
         benchmark_type = index_benchmark_results.get("benchmark_type", "snapshot")
 
-        active_vectors = after_snapshot["chroma_vector_count"]
+        active_vectors = after_snapshot.get("indexed_chunk_count", after_snapshot.get("chroma_vector_count", 0))
         active_records = after_snapshot["active_metadata_records"]
         physical_files = after_snapshot["simulated_source_files"]
-        db_size_mb = after_snapshot["chroma_db_size_mb"]
+        db_size_mb = after_snapshot.get("index_size_mb", after_snapshot.get("chroma_db_size_mb"))
+        vector_backend = after_snapshot.get("vector_backend", "chroma")
         archived_file_count = max(physical_files - active_records, 0)
 
         if benchmark_type == "batch_incremental_update":
@@ -889,7 +890,11 @@ if selected_page == "Performance":
             deleted_vectors = index_benchmark_results["total_deleted_vectors"]
             avoided_chunks = index_benchmark_results["estimated_unchanged_chunks_avoided"]
             elapsed_seconds = index_benchmark_results["elapsed_seconds"]
-            before_active_vectors = index_benchmark_results["before"]["chroma_vector_count"]
+            before_snapshot = index_benchmark_results["before"]
+            before_active_vectors = before_snapshot.get(
+                "indexed_chunk_count",
+                before_snapshot.get("chroma_vector_count", 0),
+            )
 
             document_label = (
                 "document"
@@ -927,11 +932,17 @@ if selected_page == "Performance":
                 )
 
             with metric_columns[3]:
-                st.metric(
-                    "Active Index",
-                    f"{active_vectors} vectors",
-                    f"{db_size_mb} MB",
-                )
+                 active_index_delta = (
+                "Portal only"
+                if db_size_mb is None
+                else f"{db_size_mb} MB"
+            )
+
+            st.metric(
+                "Active Index",
+                f"{active_vectors} vectors",
+                active_index_delta,
+            )
 
             avoided_percent = (
                 avoided_chunks / before_active_vectors * 100
@@ -1038,7 +1049,17 @@ if selected_page == "Performance":
                 st.metric("Active Records", active_records)
 
             with metric_columns[3]:
-                st.metric("Active Index", f"{active_vectors} vectors", f"{db_size_mb} MB")
+                 active_index_delta = (
+                "Portal only"
+                if db_size_mb is None
+                else f"{db_size_mb} MB"
+            )
+
+            st.metric(
+                "Active Index",
+                f"{active_vectors} vectors",
+                active_index_delta,
+            )
 
         else:
             st.info("Latest result is an index snapshot.")
@@ -1052,12 +1073,15 @@ if selected_page == "Performance":
                 st.metric("Active Index", f"{active_vectors} vectors")
 
             with metric_columns[2]:
-                st.metric("Vector DB Size", f"{db_size_mb} MB")
+                if db_size_mb is None:
+                    st.metric("Index Size", "Portal only")
+                else:
+                    st.metric("Index Size", f"{db_size_mb} MB")
 
         if archived_file_count:
             st.warning(
                 f"{archived_file_count} archived source file(s) remain on disk for audit, "
-                "but active-aware indexing excludes archived versions from Chroma."
+                "but active-aware indexing excludes archived versions from the configured search index."
             )
         else:
             st.caption("Physical source files and active metadata records are aligned.")
@@ -1068,8 +1092,9 @@ if selected_page == "Performance":
                 {"Metric": "Active Metadata Records", "Value": active_records},
                 {"Metric": "Physical Source Files", "Value": physical_files},
                 {"Metric": "Archived Physical Files", "Value": archived_file_count},
-                {"Metric": "Chroma Vector Count", "Value": active_vectors},
-                {"Metric": "Chroma DB Size MB", "Value": db_size_mb},
+                {"Metric": "Vector Backend", "Value": vector_backend},
+                {"Metric": "Indexed Chunks", "Value": active_vectors},
+                {"Metric": "Index Size MB", "Value": "Portal only" if db_size_mb is None else db_size_mb},
             ]
 
             if benchmark_type == "batch_incremental_update":

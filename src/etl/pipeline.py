@@ -188,7 +188,7 @@ def delete_vectors_for_source(
     db_path: str | None = None,
     collection_name: str | None = None,
 ) -> int:
-    """Delete existing Chroma vectors that came from one source file."""
+    """Delete existing vectors/index records that came from one source file."""
     db_path = db_path or os.getenv("CHROMA_DB_PATH")
     collection_name = collection_name or os.getenv("CHROMA_COLLECTION_NAME")
 
@@ -209,7 +209,7 @@ def index_single_document(
     db_path: str | None = None,
     collection_name: str | None = None,
 ) -> dict:
-    """Chunk, embed, and append one source file into the existing Chroma vector store."""
+    """Chunk, embed, and append one source file into the configured vector backend."""
     db_path = db_path or os.getenv("CHROMA_DB_PATH")
     collection_name = collection_name or os.getenv("CHROMA_COLLECTION_NAME")
 
@@ -348,18 +348,16 @@ def rebuild_vector_store(
     db_path: str | None = None,
     collection_name: str | None = None,
 ) -> dict:
-    """Rebuild the local ChromaDB vector store from the simulated documents folder."""
+    """Rebuild the configured search index from active local working documents."""
     docs_path = docs_path or os.getenv("DOCUMENTS_PATH")
     db_path = db_path or os.getenv("CHROMA_DB_PATH")
     collection_name = collection_name or os.getenv("CHROMA_COLLECTION_NAME")
 
     if docs_path is None or db_path is None or collection_name is None:
-        raise ValueError("DOCUMENTS_PATH, CHROMA_DB_PATH, and CHROMA_COLLECTION_NAME are required.")
+        raise ValueError("DOCUMENTS_PATH and vector backend index settings are required.")
 
-    chroma_directory = Path(db_path)
-
-    if chroma_directory.exists():
-        shutil.rmtree(chroma_directory)
+    vector_backend = get_vector_backend()
+    vector_backend.reset_index(db_path, collection_name)
 
     active_filenames = get_active_metadata_filenames()
     documents, source_file_count = load_documents(docs_path, active_filenames)
@@ -378,7 +376,7 @@ def rebuild_vector_store(
 #main entry point
 if __name__ =="__main__":
     #orchestrates full ETL pipeline when run directly
-    #reads config from .env, processes all documents, stores to ChromaDB
+    # Reads config from .env, processes all active documents, and stores them in the configured vector backend.
 
     #read config from .env
     docs_path = os.getenv("DOCUMENTS_PATH")
@@ -397,4 +395,4 @@ if __name__ =="__main__":
     #step 3: Load
     embed_and_store(chunks, db_path, collection_name)
 
-    print("ETL pipeline complete. ChromaDB is ready")
+    print("ETL pipeline complete. Search index is ready")

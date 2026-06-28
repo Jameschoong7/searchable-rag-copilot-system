@@ -4,7 +4,8 @@ from pathlib import Path
 import sys
 import time
 
-import chromadb
+from src.core.config import read_app_config
+from src.vector.factory import get_vector_backend
 from dotenv import load_dotenv
 
 from src.metadata.repository import load_document_metadata
@@ -14,21 +15,15 @@ load_dotenv()
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SIMULATED_DATA_PATH = PROJECT_ROOT / "data/simulated"
-CHROMA_DB_PATH = PROJECT_ROOT / os.getenv("CHROMA_DB_PATH", "data/chroma_db")
-CHROMA_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME")
 BENCHMARK_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_results.json"
 BENCHMARK_HISTORY_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_history.json"
 
-def get_directory_size(path: Path) -> int:
-    """Calculate total size in bytes for all files inside a directory."""
-    if not path.exists():
-        return 0
+def calculate_optional_delta(after_value, before_value):
+    """Return a numeric delta only when both values are measurable."""
+    if after_value is None or before_value is None:
+        return None
 
-    return sum(
-        file_path.stat().st_size
-        for file_path in path.rglob("*")
-        if file_path.is_file()
-    )
+    return after_value - before_value
 
 
 def count_simulated_source_files(path: Path) -> int:
@@ -42,36 +37,51 @@ def count_simulated_source_files(path: Path) -> int:
     )
 
 
-def get_chroma_vector_count() -> int:
-    """Count vectors currently stored in the local Chroma collection."""
-    if CHROMA_COLLECTION_NAME is None:
-        return 0
-
-    if not CHROMA_DB_PATH.exists():
-        return 0
-
-    client = chromadb.PersistentClient(path=str(CHROMA_DB_PATH))
-
-    try:
-        collection = client.get_collection(CHROMA_COLLECTION_NAME)
-    except Exception:
-        return 0
-
-    return collection.count()
+def calculate_index_delta(after_snapshot: dict, before_snapshot: dict) -> dict:
+    """Calculate backend-neutral index count and size changes."""
+    return {
+        "indexed_chunk_count": (
+            after_snapshot["indexed_chunk_count"]
+            - before_snapshot["indexed_chunk_count"]
+        ),
+        "index_size_bytes": calculate_optional_delta(
+            after_snapshot["index_size_bytes"],
+            before_snapshot["index_size_bytes"],
+        ),
+        "index_size_mb": calculate_optional_delta(
+            after_snapshot["index_size_mb"],
+            before_snapshot["index_size_mb"],
+        ),
+    }
 
 
 def build_index_benchmark_snapshot() -> dict:
-    """Create one benchmark snapshot for metadata, source files, and ChromaDB."""
+    """Create one benchmark snapshot for metadata, source files, and the configured index."""
     active_documents = load_document_metadata()
+    config = read_app_config()
+    vector_backend = get_vector_backend()
 
-    chroma_db_size_bytes = get_directory_size(CHROMA_DB_PATH)
+    index_record_count = vector_backend.get_index_record_count()
+    index_size_bytes = vector_backend.get_index_size_bytes()
+    index_size_mb = (
+        round(index_size_bytes / (1024 * 1024), 2)
+        if index_size_bytes is not None
+        else None
+    )
 
     return {
+        "vector_backend": config.vector_backend,
         "active_metadata_records": len(active_documents),
         "simulated_source_files": count_simulated_source_files(SIMULATED_DATA_PATH),
-        "chroma_vector_count": get_chroma_vector_count(),
-        "chroma_db_size_bytes": chroma_db_size_bytes,
-        "chroma_db_size_mb": round(chroma_db_size_bytes / (1024 * 1024), 2),
+        "indexed_chunk_count": index_record_count,
+        "index_size_bytes": index_size_bytes,
+        "index_size_mb": index_size_mb,
+        "index_size_available": index_size_bytes is not None,
+
+        # Backward-compatible Chroma fields for older dashboard/history rows.
+        "chroma_vector_count": index_record_count if config.vector_backend == "chroma" else None,
+        "chroma_db_size_bytes": index_size_bytes if config.vector_backend == "chroma" else None,
+        "chroma_db_size_mb": index_size_mb if config.vector_backend == "chroma" else None,
     }
 
 
@@ -93,21 +103,7 @@ def build_full_rebuild_benchmark() -> dict:
         "before": before_snapshot,
         "rebuild_result": rebuild_result,
         "after": after_snapshot,
-        "delta": {
-            "chroma_vector_count": (
-                after_snapshot["chroma_vector_count"]
-                - before_snapshot["chroma_vector_count"]
-            ),
-            "chroma_db_size_bytes": (
-                after_snapshot["chroma_db_size_bytes"]
-                - before_snapshot["chroma_db_size_bytes"]
-            ),
-            "chroma_db_size_mb": round(
-                after_snapshot["chroma_db_size_mb"]
-                - before_snapshot["chroma_db_size_mb"],
-                2,
-            ),
-        },
+        "delta": calculate_index_delta(after_snapshot, before_snapshot),
     }
 
 
@@ -134,21 +130,7 @@ def build_single_document_update_benchmark(source_path: str) -> dict:
         "deleted_vector_count": deleted_vector_count,
         "index_result": index_result,
         "after": after_snapshot,
-        "delta": {
-            "chroma_vector_count": (
-                after_snapshot["chroma_vector_count"]
-                - before_snapshot["chroma_vector_count"]
-            ),
-            "chroma_db_size_bytes": (
-                after_snapshot["chroma_db_size_bytes"]
-                - before_snapshot["chroma_db_size_bytes"]
-            ),
-            "chroma_db_size_mb": round(
-                after_snapshot["chroma_db_size_mb"]
-                - before_snapshot["chroma_db_size_mb"],
-                2,
-            ),
-        },
+        "delta": calculate_index_delta(after_snapshot, before_snapshot),
     }
 
 
@@ -164,7 +146,7 @@ def build_batch_update_benchmark(source_paths: list[str]) -> dict:
 
     after_snapshot = build_index_benchmark_snapshot()
 
-    before_active_vectors = before_snapshot["chroma_vector_count"]
+    before_active_vectors = before_snapshot["indexed_chunk_count"]
 
     estimated_unchanged_chunks_avoided = max(
         before_active_vectors - update_result["total_chunks_indexed"],
@@ -183,21 +165,7 @@ def build_batch_update_benchmark(source_paths: list[str]) -> dict:
         "total_chunks_indexed": update_result["total_chunks_indexed"],
         "estimated_unchanged_chunks_avoided": estimated_unchanged_chunks_avoided,
         "after": after_snapshot,
-        "delta": {
-            "chroma_vector_count": (
-                after_snapshot["chroma_vector_count"]
-                - before_snapshot["chroma_vector_count"]
-            ),
-            "chroma_db_size_bytes": (
-                after_snapshot["chroma_db_size_bytes"]
-                - before_snapshot["chroma_db_size_bytes"]
-            ),
-            "chroma_db_size_mb": round(
-                after_snapshot["chroma_db_size_mb"]
-                - before_snapshot["chroma_db_size_mb"],
-                2,
-            ),
-        },
+        "delta": calculate_index_delta(after_snapshot, before_snapshot),
     }
 
 
