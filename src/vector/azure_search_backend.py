@@ -275,7 +275,37 @@ def add_chunks(chunks: list, db_path: str, collection_name: str) -> None:
 
 
 def delete_vectors_for_source(source_path: str, db_path: str, collection_name: str) -> int:
-    raise NotImplementedError("Azure AI Search vector deletion is not implemented yet.")
+    """Delete Azure AI Search chunks that came from one source file."""
+    search_client = get_search_client()
+    escaped_source = escape_odata_string(source_path)
+
+    results = search_client.search(
+        search_text="*",
+        filter=f"source eq '{escaped_source}'",
+        select=["id"],
+        top=1000,
+    )
+
+    documents_to_delete = [
+        {"id": result["id"]}
+        for result in results
+    ]
+
+    if not documents_to_delete:
+        return 0
+
+    delete_results = search_client.delete_documents(documents_to_delete)
+
+    failed = [
+        item
+        for item in delete_results
+        if not item.succeeded
+    ]
+
+    if failed:
+        raise RuntimeError(f"Azure AI Search failed to delete {len(failed)} chunk(s).")
+
+    return len(documents_to_delete)
 
 
 def escape_odata_string(value: str) -> str:
