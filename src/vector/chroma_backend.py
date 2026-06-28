@@ -4,6 +4,8 @@ from functools import lru_cache
 import chromadb
 from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
+import shutil
+from pathlib import Path
 
 
 def load_embedding_model() -> HuggingFaceEmbeddings:
@@ -87,3 +89,53 @@ def delete_vectors_for_source(
         collection.delete(ids=existing["ids"])
 
     return deleted_count
+
+
+def reset_index(db_path: str, collection_name: str) -> None:
+    """Delete the local Chroma index directory before a full rebuild."""
+    clear_vector_store_cache()
+
+    chroma_directory = Path(db_path)
+
+    if chroma_directory.exists():
+        shutil.rmtree(chroma_directory)
+
+
+def get_index_record_count() -> int:
+    """Count vectors currently stored in the local Chroma collection."""
+    db_path = os.getenv("CHROMA_DB_PATH")
+    collection_name = os.getenv("CHROMA_COLLECTION_NAME")
+
+    if db_path is None or collection_name is None:
+        return 0
+
+    if not Path(db_path).exists():
+        return 0
+
+    client = chromadb.PersistentClient(path=db_path)
+
+    try:
+        collection = client.get_collection(collection_name)
+    except Exception:
+        return 0
+
+    return collection.count()
+
+
+def get_index_size_bytes() -> int | None:
+    """Calculate local Chroma index folder size in bytes."""
+    db_path = os.getenv("CHROMA_DB_PATH")
+
+    if db_path is None:
+        return 0
+
+    path = Path(db_path)
+
+    if not path.exists():
+        return 0
+
+    return sum(
+        file_path.stat().st_size
+        for file_path in path.rglob("*")
+        if file_path.is_file()
+    )

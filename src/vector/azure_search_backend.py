@@ -323,3 +323,29 @@ def build_allowed_sources_filter(allowed_sources: list[str]) -> str:
     source_list = ",".join(escaped_sources)
 
     return f"is_active eq true and search.in(source, '{source_list}', ',')"
+
+
+def reset_index(db_path: str, collection_name: str) -> None:
+    """Reset the Azure AI Search index before a full rebuild."""
+    config = get_azure_search_config()
+    validate_azure_search_config(config)
+
+    index_client = get_index_client()
+
+    try:
+        index_client.delete_index(config["index_name"])
+    except Exception:
+        pass
+
+    create_or_update_index()
+
+
+def get_index_record_count() -> int:
+    """Count chunk records stored in the Azure AI Search index."""
+    search_client = get_search_client()
+    return search_client.get_document_count()
+
+
+def get_index_size_bytes() -> int | None:
+    """Azure Search index size is not exposed by the data-plane SearchClient."""
+    return None
