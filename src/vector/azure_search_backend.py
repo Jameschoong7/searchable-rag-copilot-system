@@ -1,4 +1,10 @@
 import os
+import hashlib
+from pathlib import Path
+
+from azure.search.documents import SearchClient
+
+from src.metadata.repository import load_document_metadata
 
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents.indexes import SearchIndexClient
@@ -12,6 +18,9 @@ from azure.search.documents.indexes.models import (
     VectorSearch,
     VectorSearchProfile,
 )
+from src.vector.chroma_backend import load_embedding_model
+from azure.search.documents.models import VectorizedQuery
+from langchain_core.documents import Document
 
 # Import shared config so direct module tests also load .env once.
 from src.core.config import PROJECT_ROOT
@@ -112,22 +121,175 @@ def create_or_update_index() -> str:
     return config["index_name"]
 
 
+def get_search_client() -> SearchClient:
+    """Create an Azure AI Search document upload/query client."""
+    config = get_azure_search_config()
+    validate_azure_search_config(config)
+
+    return SearchClient(
+        endpoint=config["endpoint"],
+        index_name=config["index_name"],
+        credential=AzureKeyCredential(config["admin_key"]),
+    )
+
+
+def load_metadata_by_filename() -> dict[str, dict]:
+    """Map filenames to active SQLite metadata rows for Azure chunk enrichment."""
+    return {
+        document["filename"]: document
+        for document in load_document_metadata()
+    }
+
+
+def build_chunk_id(source_path: str, chunk_index: int) -> str:
+    """Create a stable Azure Search key for one source chunk."""
+    raw_id = f"{source_path}:{chunk_index}"
+    return hashlib.sha256(raw_id.encode("utf-8")).hexdigest()
+
+
+def normalize_bool(value) -> bool:
+    """Convert SQLite-style active flags into real JSON booleans."""
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+
+    return bool(value)
+
+
+def build_search_document(chunk, chunk_index: int, metadata_by_filename: dict[str, dict]) -> dict:
+    """Convert one LangChain chunk into an Azure AI Search document."""
+    source_path = chunk.metadata.get("source", "")
+    filename = Path(source_path).name
+    metadata = metadata_by_filename.get(filename, {})
+
+    return {
+        "id": build_chunk_id(source_path, chunk_index),
+        "content": chunk.page_content,
+        "embedding": load_embedding_model().embed_query(chunk.page_content),
+        "source": source_path,
+        "filename": filename,
+        "source_document_id": metadata.get("source_document_id"),
+        "document_id": metadata.get("document_id"),
+        "department": metadata.get("department"),
+        "file_type": metadata.get("file_type"),
+        "source_type": metadata.get("source_type"),
+        "is_active": normalize_bool(metadata.get("is_active", True)),
+        "version_number": int(metadata.get("version_number") or 1),
+    }
+
+
 def clear_vector_store_cache() -> None:
     """Azure Search client is stateless for this phase, so no local cache is cleared."""
     return None
 
 
 def similarity_search_with_scores(question: str, allowed_sources: list[str], top_k: int) -> list[tuple]:
-    raise NotImplementedError("Azure AI Search retrieval is not implemented yet.")
+    """Run Azure AI Search vector retrieval inside the authorized source scope."""
+    if not allowed_sources:
+        return []
+
+    query_vector = load_embedding_model().embed_query(question)
+
+    vector_query = VectorizedQuery(
+        vector=query_vector,
+        k_nearest_neighbors=top_k,
+        fields="embedding",
+    )
+
+    search_client = get_search_client()
+    results = search_client.search(
+        search_text=None,
+        vector_queries=[vector_query],
+        filter=build_allowed_sources_filter(allowed_sources),
+        select=[
+            "content",
+            "source",
+            "filename",
+            "source_document_id",
+            "document_id",
+            "department",
+            "file_type",
+            "source_type",
+            "version_number",
+        ],
+        top=top_k,
+    )
+
+    scored_documents = []
+
+    for result in results:
+        metadata = {
+            "source": result.get("source"),
+            "filename": result.get("filename"),
+            "source_document_id": result.get("source_document_id"),
+            "document_id": result.get("document_id"),
+            "department": result.get("department"),
+            "file_type": result.get("file_type"),
+            "source_type": result.get("source_type"),
+            "version_number": result.get("version_number"),
+        }
+
+        document = Document(
+            page_content=result["content"],
+            metadata=metadata,
+        )
+
+        score = float(result.get("@search.score", 0))
+        scored_documents.append((document, score))
+
+    return scored_documents
 
 
 def store_chunks(chunks: list, db_path: str, collection_name: str):
-    raise NotImplementedError("Azure AI Search full indexing is not implemented yet.")
+    """Create/update index and upload chunks into Azure AI Search."""
+    add_chunks(chunks, db_path, collection_name)
+    print(f"Uploaded {len(chunks)} chunks to Azure AI Search")
+    return None
 
 
 def add_chunks(chunks: list, db_path: str, collection_name: str) -> None:
-    raise NotImplementedError("Azure AI Search incremental indexing is not implemented yet.")
+    """Upload chunked documents into Azure AI Search."""
+    if not chunks:
+        return None
+
+    create_or_update_index()
+
+    metadata_by_filename = load_metadata_by_filename()
+    documents = [
+        build_search_document(chunk, chunk_index, metadata_by_filename)
+        for chunk_index, chunk in enumerate(chunks)
+    ]
+
+    search_client = get_search_client()
+    result = search_client.upload_documents(documents)
+
+    failed = [
+        item
+        for item in result
+        if not item.succeeded
+    ]
+
+    if failed:
+        raise RuntimeError(f"Azure AI Search failed to upload {len(failed)} chunk(s).")
+
+    return None
 
 
 def delete_vectors_for_source(source_path: str, db_path: str, collection_name: str) -> int:
     raise NotImplementedError("Azure AI Search vector deletion is not implemented yet.")
+
+
+def escape_odata_string(value: str) -> str:
+    """Escape single quotes for Azure Search OData filter strings."""
+    return value.replace("'", "''")
+
+
+def build_allowed_sources_filter(allowed_sources: list[str]) -> str:
+    """Build an Azure Search filter from backend-approved source paths."""
+    escaped_sources = [
+        escape_odata_string(source)
+        for source in allowed_sources
+    ]
+
+    source_list = ",".join(escaped_sources)
+
+    return f"is_active eq true and search.in(source, '{source_list}', ',')"
