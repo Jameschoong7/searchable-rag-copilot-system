@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from src.rag.engine import generate_answer, retrieve_relevant_chunks_with_scores
+from src.metadata.repository import load_document_metadata
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -43,6 +44,30 @@ def get_unique_sources(retrieved_chunks: list[dict]) -> list[str]:
             for retrieved_chunk in retrieved_chunks
         )
     )
+
+
+def load_source_document_id_by_filename() -> dict[str, str]:
+    """Map stored filenames to stable logical source document IDs."""
+    documents = load_document_metadata(include_inactive=True)
+
+    return {
+        document["filename"]: document.get("source_document_id") or document.get("document_id")
+        for document in documents
+    }
+
+
+def get_unique_source_document_ids(
+    retrieved_sources: list[str],
+    source_document_id_by_filename: dict[str, str],
+) -> list[str]:
+    """Return stable logical document IDs for retrieved source filenames."""
+    source_document_ids = [
+        source_document_id_by_filename[source]
+        for source in retrieved_sources
+        if source in source_document_id_by_filename
+    ]
+
+    return list(dict.fromkeys(source_document_ids))
 
 
 def evaluate_permission_block_case(test_case: dict) -> dict:
@@ -92,12 +117,21 @@ def evaluate_retrieval_case(
     ]
 
     retrieved_sources = get_unique_sources(retrieved_chunks)
+    source_document_id_by_filename = load_source_document_id_by_filename()
+    retrieved_source_document_ids = get_unique_source_document_ids(
+        retrieved_sources,
+        source_document_id_by_filename,
+    )
     expected_behavior = test_case.get("expected_behavior", "hit")
     expected_source = test_case.get("expected_source")
+    expected_source_document_id = test_case.get("expected_source_document_id")
 
     if expected_behavior == "miss":
         hit = not retrieved_sources
         issue = "" if hit else "Expected no accepted retrieval, but chunks passed the threshold."
+    elif expected_source_document_id:
+        hit = expected_source_document_id in retrieved_source_document_ids
+        issue = "" if hit else "Expected source document ID was not found in retrieved top-K chunks."
     else:
         hit = expected_source in retrieved_sources
         issue = "" if hit else "Expected source was not found in retrieved top-K chunks."
@@ -109,6 +143,8 @@ def evaluate_retrieval_case(
         "expected_behavior": expected_behavior,
         "expected_source": expected_source,
         "retrieved_sources": retrieved_sources,
+        "expected_source_document_id": expected_source_document_id,
+        "retrieved_source_document_ids": retrieved_source_document_ids,
         "retrieved_chunks": retrieved_chunks,
         "minimum_relevance_threshold": minimum_relevance_threshold,
         "hit": hit,

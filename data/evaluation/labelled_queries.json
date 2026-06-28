@@ -8,7 +8,8 @@
         "department_filter": "All",
         "file_type_filter": "TXT",
         "expected_behavior": "hit",
-        "expected_source": "DOC-IT-001_v4_IT_Policy_Password.txt"
+        "expected_source": null,
+        "expected_source_document_id": "DOC-IT-001"
     },
     {
         "query_id": "Q-002",
