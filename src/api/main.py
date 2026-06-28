@@ -177,7 +177,7 @@ def query_knowledge_base(request: QueryRequest) -> QueryResponse:
 
 @app.post("/admin/reindex", response_model=ReindexResponse)
 def reindex_knowledge_base(request: ReindexRequest) -> ReindexResponse:
-    """Rebuild the local vector index through the shared backend API."""
+    """Rebuild the configured search index through the shared backend API."""
     if request.role != SYSTEM_ADMIN_ROLE:
         raise HTTPException(
             status_code=403,

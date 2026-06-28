@@ -18,5 +18,5 @@ def get_vector_backend():
 
     raise ValueError(
         f"Unsupported VECTOR_BACKEND={config.vector_backend}. "
-        "Only 'chroma' is implemented in this phase."
+        "Supported values are 'chroma' and 'azure_search'."
     )

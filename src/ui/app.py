@@ -103,7 +103,7 @@ INDEX_BENCHMARK_HISTORY_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_h
 
 
 def request_backend_reindex() -> dict:
-    """Ask the FastAPI backend to rebuild the local vector index."""
+    """Ask the FastAPI backend to rebuild the configured search index."""
     response = requests.post(
         REINDEX_URL,
         json={
@@ -1523,7 +1523,7 @@ elif selected_page in ["KB Management", "KB Status"]:
 
                                 st.session_state["upload_message"] = (
                                     f"Saved {filename} and appended metadata record "
-                                    f"{new_document['document_id']}. Rebuild ChromaDB before searching it."
+                                    f"{new_document['document_id']}. Rebuild the search index before searching it."
                                 )
 
                                 st.session_state["upload_form_version"] += 1
@@ -1665,7 +1665,7 @@ elif selected_page in ["KB Management", "KB Status"]:
 
                 with index_action_columns[1]:
                     if st.button("Rebuild Full Active Index", use_container_width=True):
-                        with st.spinner("Rebuilding local ChromaDB index..."):
+                        with st.spinner("Rebuilding configured search index..."):
                             try:
                                 rebuild_result = request_backend_reindex()
                                 rebuild_message = rebuild_result["message"]
@@ -1894,7 +1894,7 @@ elif selected_page in ["KB Management", "KB Status"]:
             if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
                 with st.expander("Archive Document", expanded=False):
                     st.warning(
-                        "Archiving removes this document from active retrieval and deletes its vectors from ChromaDB. "
+                        "Archiving removes this document from active retrieval and deletes its vector/index records from the configured backend. "
                         "Use this for retired, duplicate, or outdated documents without a replacement."
                     )
 
