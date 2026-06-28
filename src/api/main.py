@@ -185,20 +185,20 @@ def reindex_knowledge_base(request: ReindexRequest) -> ReindexResponse:
         )
     try:
         import gc
-        from src.rag.engine import load_vector_store
+        from src.vector.factory import get_vector_backend
         from src.evaluation.index_benchmark import (
             build_full_rebuild_benchmark,
             save_benchmark_result,
         )
 
-        load_vector_store.cache_clear()
+        get_vector_backend().clear_vector_store_cache()
         gc.collect()
 
         benchmark_result = build_full_rebuild_benchmark()
         save_benchmark_result(benchmark_result)
         result = benchmark_result["rebuild_result"]
 
-        load_vector_store.cache_clear()
+        get_vector_backend().clear_vector_store_cache()
         gc.collect()
     except Exception as error:
         raise HTTPException(

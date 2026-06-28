@@ -237,5 +237,75 @@
       "chroma_db_size_bytes": 118784,
       "chroma_db_size_mb": 0.12
     }
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 2,
+    "updated_sources": [
+      "data/simulated/DOC-IT-001_v4_IT_Policy_Password.txt",
+      "data/simulated/DOC-UPLOAD-005_v5_Incident_Response_Policy.docx"
+    ],
+    "cleanup_sources": [
+      "data/simulated/DOC-IT-001_v3_IT_Policy_Password.txt",
+      "data/simulated/DOC-UPLOAD-005_v4_Incident_Response_Policy.docx",
+      "data/simulated/DOC-IT-001_v4_IT_Policy_Password.txt",
+      "data/simulated/DOC-UPLOAD-005_v5_Incident_Response_Policy.docx"
+    ],
+    "elapsed_seconds": 10.728,
+    "before": {
+      "active_metadata_records": 17,
+      "simulated_source_files": 24,
+      "chroma_vector_count": 98,
+      "chroma_db_size_bytes": 1683620,
+      "chroma_db_size_mb": 1.61
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/DOC-IT-001_v4_IT_Policy_Password.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 6
+      },
+      {
+        "source": "data/simulated/DOC-UPLOAD-005_v5_Incident_Response_Policy.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 14
+      }
+    ],
+    "cleanup_results": [
+      {
+        "source": "data/simulated/DOC-IT-001_v3_IT_Policy_Password.txt",
+        "deleted_vector_count": 6
+      },
+      {
+        "source": "data/simulated/DOC-UPLOAD-005_v4_Incident_Response_Policy.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/DOC-IT-001_v4_IT_Policy_Password.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/DOC-UPLOAD-005_v5_Incident_Response_Policy.docx",
+        "deleted_vector_count": 0
+      }
+    ],
+    "total_deleted_vectors": 6,
+    "total_document_objects_loaded": 2,
+    "total_chunks_indexed": 20,
+    "estimated_unchanged_chunks_avoided": 78,
+    "after": {
+      "active_metadata_records": 17,
+      "simulated_source_files": 24,
+      "chroma_vector_count": 112,
+      "chroma_db_size_bytes": 1933476,
+      "chroma_db_size_mb": 1.84
+    },
+    "delta": {
+      "chroma_vector_count": 14,
+      "chroma_db_size_bytes": 249856,
+      "chroma_db_size_mb": 0.23
+    }
   }
 ]

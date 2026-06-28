@@ -1,7 +1,6 @@
 # REQ_F001: ETL pipeline — Extract, Transform, Load for local documents
 # REQ_F002: Chunking and embedding for vector search
 
-import chromadb
 import shutil
 import os
 from pathlib import Path
@@ -18,12 +17,7 @@ from docx import Document as DocxDocument
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 #split long documents into smaller overlapping chunks
 
-from langchain_community.vectorstores import Chroma
-#ChromaDB wrapper - handles storing and searching embeddings
-
-from langchain_huggingface import HuggingFaceEmbeddings
-# loads local sentence-transformer model for embeddings
-
+from src.vector.factory import get_vector_backend
 # ── AZURE SWAP ──
 # Replace HuggingFaceEmbeddings with:
 #   from langchain_openai import AzureOpenAIEmbeddings
@@ -177,43 +171,16 @@ def chunk_documents(documents: list) -> list:
     print(f"Split into {len(chunks)} chunk(s)")
     return chunks
 
-#function to handle second half of T and the L in ETL
-def embed_and_store(chunks: list, db_path: str, collection_name: str) -> Chroma:
-    #Transform + Load step (REQ_F002): embeds each chunk into a vector
-    #persists all vectors to ChromaDB for later retrieval
 
-    embedding_model = HuggingFaceEmbeddings(
-        #read model from .env
-        model_name = os.getenv("EMBEDDING_MODEL"),
+def embed_and_store(chunks: list, db_path: str, collection_name: str) -> None:
+    """Persist chunked documents through the configured vector backend."""
+    vector_backend = get_vector_backend()
 
-        # ── AZURE SWAP ──
-        # Replace HuggingFaceEmbeddings(...) with:
-        #   AzureOpenAIEmbeddings(
-        #       azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
-        #       azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-        #       api_key=os.getenv("AZURE_OPENAI_API_KEY")
-        #   )
-        # ── END AZURE SWAP ──
-    )
-
-    #embed all chunks and write to ChromaDB in one step
-    vector_store = Chroma.from_documents(
-        #list of chunked Document objects
-        documents=chunks,
-
-        #model that converts text to vectors
-        embedding=embedding_model,
-
-        #logical name for this set of documents
+    vector_backend.store_chunks(
+        chunks=chunks,
+        db_path=db_path,
         collection_name=collection_name,
-        
-        #folder where ChromaDB save its file
-        persist_directory=db_path
-
     )
-
-    print(f"Stored {len(chunks)} chunks to ChromaDB at {db_path}")
-    return vector_store
 
 
 def delete_vectors_for_source(
@@ -228,22 +195,13 @@ def delete_vectors_for_source(
     if db_path is None or collection_name is None:
         raise ValueError("CHROMA_DB_PATH and CHROMA_COLLECTION_NAME are required.")
 
-    client = chromadb.PersistentClient(path=db_path)
-    collection = client.get_collection(collection_name)
+    vector_backend = get_vector_backend()
 
-    existing = collection.get(
-        where={"source": source_path},
-        include=[],
+    return vector_backend.delete_vectors_for_source(
+        source_path=source_path,
+        db_path=db_path,
+        collection_name=collection_name,
     )
-
-    deleted_count = len(existing["ids"])
-
-    if deleted_count:
-        collection.delete(
-            ids=existing["ids"],
-        )
-
-    return deleted_count
 
 
 def index_single_document(
@@ -269,17 +227,13 @@ def index_single_document(
             "chunks_indexed": 0,
         }
 
-    embedding_model = HuggingFaceEmbeddings(
-        model_name=os.getenv("EMBEDDING_MODEL")
-    )
+    vector_backend = get_vector_backend()
 
-    vector_store = Chroma(
-        persist_directory=db_path,
-        embedding_function=embedding_model,
+    vector_backend.add_chunks(
+        chunks=chunks,
+        db_path=db_path,
         collection_name=collection_name,
     )
-
-    vector_store.add_documents(chunks)
 
     return {
         "source": str(source_file),

@@ -2,17 +2,10 @@
 
 import re
 from pathlib import Path
-import os
-from dotenv import load_dotenv
-from functools import lru_cache
 
 
 from src.metadata.repository import load_document_metadata
-
-from langchain_community.vectorstores import Chroma
-
-#same embedding model as ETL so query vectors match stored documents vectors
-from langchain_huggingface import HuggingFaceEmbeddings 
+from src.vector.factory import get_vector_backend
 
 
 from langchain_community.llms import Ollama
@@ -23,36 +16,8 @@ from langchain_community.llms import Ollama
   # Requires: AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_DEPLOYMENT
   # ── END AZURE SWAP ──
 
-#load .env file values
-load_dotenv()
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-#function to load ChromaDB knowledge base data
-@lru_cache(maxsize=1)
-def load_vector_store() -> Chroma:
-
-    embedding_model = HuggingFaceEmbeddings(
-        model_name=os.getenv("EMBEDDING_MODEL") #same embedding model as ETL
-
-        #--Azure swap--
-        #HuggingFaceEmbeddings function later replace with:
-        #AzureOpenAIEmbeddings(
-        #       azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
-        #       azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-        #       api_key=os.getenv("AZURE_OPENAI_API_KEY")
-        #   )
-        # Requires: AZURE_* values in .env
-        # ── END AZURE SWAP ──
-    )
-
-    vector_store = Chroma(
-        persist_directory=os.getenv("CHROMA_DB_PATH"), #folder where ChromaDB saved
-        embedding_function=embedding_model, #embed incoming queries
-        collection_name=os.getenv("CHROMA_COLLECTION_NAME")
-    )
-
-    return vector_store
 
 
 def can_access_document(document: dict, role: str, department: str) -> bool:
@@ -171,8 +136,6 @@ def retrieve_relevant_chunks_with_scores(
     minimum_relevance_score: float = 0.25,
 ) -> list[tuple]:
     """Retrieve scored chunks from documents allowed for the user's role and department."""
-    vector_store = load_vector_store()
-
     allowed_sources = get_allowed_source_path(
         role,
         department,
@@ -183,10 +146,12 @@ def retrieve_relevant_chunks_with_scores(
     if not allowed_sources:
         return []
 
-    scored_results = vector_store.similarity_search_with_relevance_scores(
-        question,
-        k=top_k,
-        filter={"source": {"$in": allowed_sources}},
+    vector_backend = get_vector_backend()
+
+    scored_results = vector_backend.similarity_search_with_scores(
+        question=question,
+        allowed_sources=allowed_sources,
+        top_k=top_k,
     )
 
     return [
