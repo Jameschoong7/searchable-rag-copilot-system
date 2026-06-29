@@ -331,5 +331,131 @@
     "chroma_vector_count": null,
     "chroma_db_size_bytes": null,
     "chroma_db_size_mb": null
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 1,
+    "updated_sources": [
+      "data/simulated/DOC-UPLOAD-005_v6_Incident_Response_Policy.docx"
+    ],
+    "cleanup_sources": [
+      "data/simulated/DOC-UPLOAD-005_v5_Incident_Response_Policy.docx",
+      "data/simulated/DOC-UPLOAD-005_v6_Incident_Response_Policy.docx"
+    ],
+    "elapsed_seconds": 7.422,
+    "before": {
+      "vector_backend": "chroma",
+      "active_metadata_records": 17,
+      "simulated_source_files": 25,
+      "indexed_chunk_count": 112,
+      "index_size_bytes": 1933476,
+      "index_size_mb": 1.84,
+      "index_size_available": true,
+      "chroma_vector_count": 112,
+      "chroma_db_size_bytes": 1933476,
+      "chroma_db_size_mb": 1.84
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/DOC-UPLOAD-005_v6_Incident_Response_Policy.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 14
+      }
+    ],
+    "cleanup_results": [
+      {
+        "source": "data/simulated/DOC-UPLOAD-005_v5_Incident_Response_Policy.docx",
+        "deleted_vector_count": 14
+      },
+      {
+        "source": "data/simulated/DOC-UPLOAD-005_v6_Incident_Response_Policy.docx",
+        "deleted_vector_count": 0
+      }
+    ],
+    "total_deleted_vectors": 14,
+    "total_document_objects_loaded": 1,
+    "total_chunks_indexed": 14,
+    "estimated_unchanged_chunks_avoided": 98,
+    "after": {
+      "vector_backend": "chroma",
+      "active_metadata_records": 17,
+      "simulated_source_files": 25,
+      "indexed_chunk_count": 112,
+      "index_size_bytes": 2007204,
+      "index_size_mb": 1.91,
+      "index_size_available": true,
+      "chroma_vector_count": 112,
+      "chroma_db_size_bytes": 2007204,
+      "chroma_db_size_mb": 1.91
+    },
+    "delta": {
+      "indexed_chunk_count": 0,
+      "index_size_bytes": 73728,
+      "index_size_mb": 0.06999999999999984
+    }
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 1,
+    "updated_sources": [
+      "data/simulated/DOC-UPLOAD-005_v7_Incident_Response_Policy.docx"
+    ],
+    "cleanup_sources": [
+      "data/simulated/DOC-UPLOAD-005_v6_Incident_Response_Policy.docx",
+      "data/simulated/DOC-UPLOAD-005_v7_Incident_Response_Policy.docx"
+    ],
+    "elapsed_seconds": 62.383,
+    "before": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 17,
+      "simulated_source_files": 26,
+      "indexed_chunk_count": 98,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/DOC-UPLOAD-005_v7_Incident_Response_Policy.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 14
+      }
+    ],
+    "cleanup_results": [
+      {
+        "source": "data/simulated/DOC-UPLOAD-005_v6_Incident_Response_Policy.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/DOC-UPLOAD-005_v7_Incident_Response_Policy.docx",
+        "deleted_vector_count": 0
+      }
+    ],
+    "total_deleted_vectors": 0,
+    "total_document_objects_loaded": 1,
+    "total_chunks_indexed": 14,
+    "estimated_unchanged_chunks_avoided": 84,
+    "after": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 17,
+      "simulated_source_files": 26,
+      "indexed_chunk_count": 98,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "delta": {
+      "indexed_chunk_count": 0,
+      "index_size_bytes": null,
+      "index_size_mb": null
+    }
   }
 ]

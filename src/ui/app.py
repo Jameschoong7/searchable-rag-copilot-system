@@ -932,17 +932,17 @@ if selected_page == "Performance":
                 )
 
             with metric_columns[3]:
-                 active_index_delta = (
+                active_index_delta = (
                 "Portal only"
                 if db_size_mb is None
                 else f"{db_size_mb} MB"
             )
 
-            st.metric(
-                "Active Index",
-                f"{active_vectors} vectors",
-                active_index_delta,
-            )
+                st.metric(
+                    "Active Index",
+                    f"{active_vectors} vectors",
+                    active_index_delta,
+                )
 
             avoided_percent = (
                 avoided_chunks / before_active_vectors * 100
