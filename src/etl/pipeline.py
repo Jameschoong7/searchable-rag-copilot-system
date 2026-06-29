@@ -172,9 +172,14 @@ def chunk_documents(documents: list) -> list:
     return chunks
 
 
-def embed_and_store(chunks: list, db_path: str, collection_name: str) -> None:
-    """Persist chunked documents through the configured vector backend."""
-    vector_backend = get_vector_backend()
+def embed_and_store(
+    chunks: list,
+    db_path: str,
+    collection_name: str,
+    vector_backend=None,
+) -> None:
+    """Persist chunked documents through the selected vector backend."""
+    vector_backend = vector_backend or get_vector_backend()
 
     vector_backend.store_chunks(
         chunks=chunks,
@@ -347,8 +352,9 @@ def rebuild_vector_store(
     docs_path: str | None = None,
     db_path: str | None = None,
     collection_name: str | None = None,
+    vector_backend=None,
 ) -> dict:
-    """Rebuild the configured search index from active local working documents."""
+    """Rebuild the selected search index from active local working documents."""
     docs_path = docs_path or os.getenv("DOCUMENTS_PATH")
     db_path = db_path or os.getenv("CHROMA_DB_PATH")
     collection_name = collection_name or os.getenv("CHROMA_COLLECTION_NAME")
@@ -356,13 +362,19 @@ def rebuild_vector_store(
     if docs_path is None or db_path is None or collection_name is None:
         raise ValueError("DOCUMENTS_PATH and vector backend index settings are required.")
 
-    vector_backend = get_vector_backend()
+    vector_backend = vector_backend or get_vector_backend()
     vector_backend.reset_index(db_path, collection_name)
 
     active_filenames = get_active_metadata_filenames()
     documents, source_file_count = load_documents(docs_path, active_filenames)
     chunks = chunk_documents(documents)
-    embed_and_store(chunks, db_path, collection_name)
+
+    embed_and_store(
+        chunks,
+        db_path,
+        collection_name,
+        vector_backend=vector_backend,
+    )
 
     return {
         "documents_indexed": source_file_count,

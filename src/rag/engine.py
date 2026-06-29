@@ -6,6 +6,7 @@ from pathlib import Path
 
 from src.metadata.repository import load_document_metadata
 from src.vector.factory import get_vector_backend
+from src.core.config import read_app_config
 
 
 from langchain_community.llms import Ollama
@@ -336,6 +337,8 @@ def generate_answer(
             ),
             "sources": [],
         }
+    
+    app_config = read_app_config()
 
     #prepare context and citation
     context_text, sources = build_context_and_sources(chunks)
@@ -359,6 +362,8 @@ def generate_answer(
     Do not merge, reinterpret, or add requirements from general knowledge.
     When an excerpt contains a bullet list, reproduce only those bullet items.
     Before answering, verify that every stated rule appears explicitly in the excerpts.
+
+    Additional admin guardrail: {app_config.guardrail_prompt}
 
     Source excerpts:
     {context_text}

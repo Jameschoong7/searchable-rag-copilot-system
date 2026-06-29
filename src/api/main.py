@@ -22,6 +22,21 @@ from src.core.constants import (
 )
 
 
+from src.core.config import (
+    find_changed_settings,
+    get_config_as_settings_dict,
+    read_app_config,
+    read_app_config_with_pending,
+    settings_require_rebuild,
+    validate_runtime_settings,
+)
+from src.core.settings_repository import (
+    load_pending_runtime_settings,
+    promote_pending_runtime_settings,
+    save_pending_runtime_settings,
+    save_runtime_settings,
+)
+
 @app.get("/health")
 def health_check() -> dict:
     """Return a simple status check so clients can confirm the API is running."""
@@ -62,6 +77,7 @@ class ReindexResponse(BaseModel):
 
     status: str
     documents_indexed: int
+    document_objects_loaded: int
     chunks_indexed: int
     message: str
 
@@ -139,6 +155,35 @@ class MetadataUpdateValidationResponse(BaseModel):
     allowed_departments: list[str]
 
 
+class SettingsResponse(BaseModel):
+    """Represent current backend-owned runtime settings."""
+
+    settings: dict[str, str]
+    pending_settings: dict[str, str] = {}
+    rebuild_required: bool = False
+    changed_keys: list[str] = []
+    message: str = ""
+
+
+class SettingsUpdateRequest(BaseModel):
+    """Represent admin-submitted runtime setting changes."""
+
+    role: str
+    updated_by: str
+    settings: dict[str, str]
+
+
+class SettingsUpdateResponse(BaseModel):
+    """Represent the result of saving backend-owned runtime settings."""
+
+    status: str
+    settings: dict[str, str]
+    pending_settings: dict[str, str]
+    changed_keys: list[str]
+    rebuild_required: bool
+    message: str
+
+
 @app.post("/query", response_model=QueryResponse)
 def query_knowledge_base(request: QueryRequest) -> QueryResponse:
     """Answer a user question by calling the shared RAG engine."""
@@ -175,36 +220,154 @@ def query_knowledge_base(request: QueryRequest) -> QueryResponse:
     )
 
 
+@app.get("/admin/settings", response_model=SettingsResponse)
+def get_admin_settings() -> SettingsResponse:
+    """Return current backend-owned runtime settings for the admin UI."""
+    current_settings = get_config_as_settings_dict(read_app_config())
+    pending_settings = load_pending_runtime_settings()
+
+    return SettingsResponse(
+        settings=current_settings,
+        pending_settings=pending_settings,
+        rebuild_required=bool(pending_settings),
+        changed_keys=list(pending_settings.keys()),
+        message=(
+            "Runtime settings loaded. Full rebuild is required for pending settings."
+            if pending_settings
+            else "Runtime settings loaded."
+        ),
+    )
+
+
+@app.post("/admin/settings", response_model=SettingsUpdateResponse)
+def update_admin_settings(request: SettingsUpdateRequest) -> SettingsUpdateResponse:
+    """Validate and save backend-owned runtime settings."""
+    if request.role != SYSTEM_ADMIN_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="Only System Admin can update runtime settings.",
+        )
+
+    current_settings = get_config_as_settings_dict(read_app_config())
+
+    try:
+        validate_runtime_settings(request.settings)
+
+        changed_keys = find_changed_settings(
+            current_settings,
+            request.settings,
+        )
+
+        risky_settings = {
+            key: value
+            for key, value in request.settings.items()
+            if settings_require_rebuild([key])
+            and key in changed_keys
+        }
+
+        safe_settings = {
+            key: value
+            for key, value in request.settings.items()
+            if key not in risky_settings
+        }
+
+        if safe_settings:
+            save_runtime_settings(
+                settings=safe_settings,
+                updated_by=request.updated_by,
+            )
+
+        if risky_settings:
+            save_pending_runtime_settings(
+                settings=risky_settings,
+                requested_by=request.updated_by,
+            )
+
+        updated_settings = get_config_as_settings_dict(read_app_config())
+        pending_settings = load_pending_runtime_settings()
+        rebuild_required = bool(pending_settings)
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        ) from error
+
+    if rebuild_required:
+        message = (
+            "Settings saved. Full search index rebuild is required before "
+            "pending vector or embedding changes become active."
+        )
+    elif changed_keys:
+        message = "Settings saved. No search index rebuild is required."
+    else:
+        message = "No setting changes detected."
+
+    return SettingsUpdateResponse(
+        status="saved",
+        settings=updated_settings,
+        pending_settings=pending_settings,
+        changed_keys=changed_keys,
+        rebuild_required=rebuild_required,
+        message=message,
+    )
+
+
 @app.post("/admin/reindex", response_model=ReindexResponse)
 def reindex_knowledge_base(request: ReindexRequest) -> ReindexResponse:
-    """Rebuild the configured search index through the shared backend API."""
+    """Rebuild the target search index and promote pending config only after success."""
     if request.role != SYSTEM_ADMIN_ROLE:
         raise HTTPException(
             status_code=403,
             detail="Only System Admin can rebuild the vector index.",
         )
+
     try:
         import gc
-        from src.vector.factory import get_vector_backend
+
         from src.evaluation.index_benchmark import (
             build_full_rebuild_benchmark,
             save_benchmark_result,
         )
+        from src.vector.factory import (
+            get_vector_backend,
+            get_vector_backend_for_config,
+        )
 
-        get_vector_backend().clear_vector_store_cache()
+        # Active backend remains the safe serving backend until rebuild succeeds.
+        active_backend = get_vector_backend()
+
+        # Target backend includes pending vector/embedding settings.
+        target_config = read_app_config_with_pending()
+        target_backend = get_vector_backend_for_config(target_config)
+
+        active_backend.clear_vector_store_cache()
+        target_backend.clear_vector_store_cache()
         gc.collect()
 
-        benchmark_result = build_full_rebuild_benchmark()
+        benchmark_result = build_full_rebuild_benchmark(config=target_config)
         save_benchmark_result(benchmark_result)
         result = benchmark_result["rebuild_result"]
 
-        get_vector_backend().clear_vector_store_cache()
+        promoted_settings = promote_pending_runtime_settings(
+            updated_by=request.role,
+        )
+
+        active_backend.clear_vector_store_cache()
+        target_backend.clear_vector_store_cache()
         gc.collect()
+
     except Exception as error:
         raise HTTPException(
             status_code=500,
-            detail=f"Index rebuild failed: {error}",
+            detail=f"Index rebuild failed. Active settings were not changed: {error}",
         ) from error
+
+    promotion_message = (
+        f" Promoted pending setting(s): {', '.join(promoted_settings.keys())}."
+        if promoted_settings
+        else ""
+    )
 
     return ReindexResponse(
         status="success",
@@ -215,6 +378,7 @@ def reindex_knowledge_base(request: ReindexRequest) -> ReindexResponse:
             f"Rebuilt search index with {result['documents_indexed']} file(s), "
             f"{result['document_objects_loaded']} document object(s), "
             f"and {result['chunks_indexed']} chunk(s)."
+            f"{promotion_message}"
         ),
     )
 

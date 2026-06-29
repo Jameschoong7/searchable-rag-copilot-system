@@ -96,6 +96,7 @@ API_URL = f"{API_BASE_URL}/query"
 API_HEALTH_URL = f"{API_BASE_URL}/health"
 METADATA_UPDATE_VALIDATE_URL = f"{API_BASE_URL}/admin/validate-metadata-update"
 ARCHIVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/archive-document"
+SETTINGS_URL = f"{API_BASE_URL}/admin/settings"
 QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
 EVALUATION_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/retrieval_eval_results.json"
 INDEX_BENCHMARK_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_results.json"
@@ -109,7 +110,7 @@ def request_backend_reindex() -> dict:
         json={
             "role": st.session_state["role"],
         },
-        timeout=300,
+        timeout=900,
     )
 
     response.raise_for_status()
@@ -124,6 +125,33 @@ def request_pending_index_update() -> dict:
             "role": st.session_state["role"],
         },
         timeout=300,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_admin_settings() -> dict:
+    """Load backend-owned runtime settings from FastAPI."""
+    response = requests.get(
+        SETTINGS_URL,
+        timeout=30,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_settings_update(settings: dict[str, str]) -> dict:
+    """Ask FastAPI to validate and save runtime settings."""
+    response = requests.post(
+        SETTINGS_URL,
+        json={
+            "role": st.session_state["role"],
+            "updated_by": st.session_state["user"],
+            "settings": settings,
+        },
+        timeout=30,
     )
 
     response.raise_for_status()
@@ -2337,38 +2365,155 @@ elif selected_page == "Settings":
     st.header("System Settings")
     st.caption("Admin-only backend mode, retrieval, and guardrail configuration.")
 
-    app_config = read_app_config()
+    try:
+        settings_response = request_admin_settings()
+        current_settings = settings_response["settings"]
+    except requests.exceptions.RequestException as error:
+        st.error(f"Could not load backend settings: {error}")
+        st.stop()
 
-    st.subheader("Migration Mode")
+    if st.session_state.get("settings_message"):
+        if st.session_state.get("settings_rebuild_required"):
+            st.warning(st.session_state["settings_message"])
+        else:
+            st.success(st.session_state["settings_message"])
 
-    mode_columns = st.columns(5)
+    with st.container(border=True):
+        st.subheader("Current Architecture")
+        mode_columns = st.columns(5)
+        mode_columns[0].metric("Storage", current_settings["storage_backend"])
+        mode_columns[1].metric("Vector", current_settings["vector_backend"])
+        mode_columns[2].metric("Embedding", current_settings["embedding_backend"])
+        mode_columns[3].metric("LLM", current_settings["llm_backend"])
+        mode_columns[4].metric("SharePoint", "simulated")
 
-    with mode_columns[0]:
-        st.metric("Storage", app_config.storage_backend)
+    with st.form("runtime_settings_form", border=True):
+        st.subheader("Configure Backend")
+        
+        st.markdown("**Infrastructure Backends**")
+        infra_col1, infra_col2 = st.columns(2)
+        
+        with infra_col1:
+            storage_backend = st.selectbox(
+                "Storage Backend",
+                options=["local", "azure_blob"],
+                index=["local", "azure_blob"].index(current_settings["storage_backend"]),
+                help="Determines where physical documents and files are stored."
+            )
+            embedding_backend = st.selectbox(
+                "Embedding Backend",
+                options=["local", "azure_openai"],
+                index=["local", "azure_openai"].index(current_settings["embedding_backend"]),
+                help="Model used to generate vector embeddings for chunks."
+            )
 
-    with mode_columns[1]:
-        st.metric("Vector", app_config.vector_backend)
+        with infra_col2:
+            vector_backend = st.selectbox(
+                "Vector Backend",
+                options=["chroma", "azure_search"],
+                index=["chroma", "azure_search"].index(current_settings["vector_backend"]),
+                help="Database used to store and query vector embeddings."
+            )
+            llm_backend = st.selectbox(
+                "LLM Backend",
+                options=["ollama", "azure_openai"],
+                index=["ollama", "azure_openai"].index(current_settings["llm_backend"]),
+                help="Primary text generation model."
+            )
 
-    with mode_columns[2]:
-        st.metric("LLM", app_config.llm_backend)
+        st.divider()
 
-    with mode_columns[3]:
-        graph_status = "Enabled" if app_config.graph_connector_enabled else "Disabled"
-        st.metric("Graph", graph_status)
+        st.markdown("**Retrieval & Guardrails**")
+        param_col1, param_col2 = st.columns(2)
+        
+        with param_col1:
+            top_k = st.number_input(
+                "Top-K Results",
+                min_value=1,
+                max_value=20,
+                value=int(current_settings["top_k"]),
+                step=1,
+                help="Number of document chunks retrieved per query."
+            )
+            
+        with param_col2:
+            minimum_relevance_threshold = st.number_input(
+                "Min Relevance Threshold",
+                min_value=0.0,
+                max_value=1.0,
+                value=float(current_settings["minimum_relevance_threshold"]),
+                step=0.01,
+                help="Filters out chunks with similarity scores below this threshold."
+            )
 
-    with mode_columns[4]:
-        st.metric("SharePoint", app_config.sharepoint_mode)
-
-    st.caption(
-        "These values are read from environment configuration. Local fallback remains "
-        "available when Azure or Graph services are unavailable."
-    )
-
-    with st.expander("Backend mode rules"):
-        st.write(
-            "- SQLite remains the source of truth for metadata, ACL/RBAC, versioning, logs, and audit.\n"
-            "- Azure AI Search stores searchable chunks only; it does not replace SQLite governance.\n"
-            "- Azure Blob Storage can replace local document storage when configured.\n"
-            "- Azure OpenAI is used only after deployment, endpoint, and API key are confirmed.\n"
-            "- SharePoint remains simulated until enterprise Microsoft 365 tenant access is available."
+        guardrail_prompt = st.text_area(
+            "Admin Guardrail Prompt",
+            value=current_settings["guardrail_prompt"],
+            height=120,
+            help="System prompt injected to enforce organizational rules on the LLM."
         )
+
+        submitted_settings = st.form_submit_button("Save Runtime Settings", type="primary")
+
+        if submitted_settings:
+            risky_change = (
+                vector_backend != current_settings["vector_backend"]
+                or embedding_backend != current_settings["embedding_backend"]
+            )
+
+            if risky_change:
+                st.warning(
+                    "Changing vector or embedding backend requires rebuilding the active search index. "
+                    "Until rebuild completes, search results may be incomplete or stale."
+                )
+
+            try:
+                update_response = request_settings_update({
+                    "storage_backend": storage_backend,
+                    "vector_backend": vector_backend,
+                    "embedding_backend": embedding_backend,
+                    "llm_backend": llm_backend,
+                    "top_k": str(top_k),
+                    "minimum_relevance_threshold": str(minimum_relevance_threshold),
+                    "guardrail_prompt": guardrail_prompt,
+                })
+            except requests.exceptions.HTTPError as error:
+                st.error(f"Settings rejected by backend: {error.response.text}")
+            except requests.exceptions.RequestException as error:
+                st.error(f"Could not save backend settings: {error}")
+            else:
+                st.session_state["settings_message"] = update_response["message"]
+                st.session_state["settings_rebuild_required"] = update_response["rebuild_required"]
+                st.session_state["settings_changed_keys"] = update_response.get("changed_keys", [])
+                st.rerun()
+
+    if st.session_state.get("settings_rebuild_required"):
+        with st.container(border=True):
+            st.subheader("Search Index Rebuild Required")
+            st.info(
+                "A vector or embedding mode change was detected. Run a full rebuild "
+                "when you are ready. This is manual to prevent Azure quota/cost spikes."
+            )
+
+            if st.button("Run Rebuild Now", type="primary", use_container_width=True):
+                with st.spinner("Rebuilding configured search index..."):
+                    try:
+                        rebuild_result = request_backend_reindex()
+                    except Exception as error:
+                        st.session_state["settings_message"] = f"Search index rebuild failed: {error}"
+                        st.session_state["settings_rebuild_required"] = True
+                        st.error(st.session_state["settings_message"])
+                    else:
+                        st.session_state["settings_message"] = rebuild_result["message"]
+                        st.session_state["settings_rebuild_required"] = False
+                        st.success(rebuild_result["message"])
+                        st.rerun()
+
+    with st.expander("Backend Mode Rules"):
+        st.markdown("""
+        * **SQLite** remains the source of truth for metadata, ACL/RBAC, versioning, logs, and audit.
+        * **Azure AI Search** stores searchable chunks only; it does not replace SQLite governance.
+        * **Azure Blob Storage** can replace local document storage when configured.
+        * **Azure OpenAI** is used only after deployment, endpoint, and API key are confirmed.
+        * **SharePoint** remains simulated until enterprise Microsoft 365 tenant access is available.
+        """)

@@ -1,19 +1,11 @@
 {
-  "benchmark_type": "batch_incremental_update",
-  "changed_document_count": 1,
-  "updated_sources": [
-    "data/simulated/DOC-UPLOAD-005_v7_Incident_Response_Policy.docx"
-  ],
-  "cleanup_sources": [
-    "data/simulated/DOC-UPLOAD-005_v6_Incident_Response_Policy.docx",
-    "data/simulated/DOC-UPLOAD-005_v7_Incident_Response_Policy.docx"
-  ],
-  "elapsed_seconds": 62.383,
+  "benchmark_type": "full_rebuild",
+  "elapsed_seconds": 441.558,
   "before": {
     "vector_backend": "azure_search",
     "active_metadata_records": 17,
     "simulated_source_files": 26,
-    "indexed_chunk_count": 98,
+    "indexed_chunk_count": 0,
     "index_size_bytes": null,
     "index_size_mb": null,
     "index_size_available": false,
@@ -21,33 +13,18 @@
     "chroma_db_size_bytes": null,
     "chroma_db_size_mb": null
   },
-  "update_results": [
-    {
-      "source": "data/simulated/DOC-UPLOAD-005_v7_Incident_Response_Policy.docx",
-      "deleted_vector_count": 0,
-      "document_objects_loaded": 1,
-      "chunks_indexed": 14
-    }
-  ],
-  "cleanup_results": [
-    {
-      "source": "data/simulated/DOC-UPLOAD-005_v6_Incident_Response_Policy.docx",
-      "deleted_vector_count": 0
-    },
-    {
-      "source": "data/simulated/DOC-UPLOAD-005_v7_Incident_Response_Policy.docx",
-      "deleted_vector_count": 0
-    }
-  ],
-  "total_deleted_vectors": 0,
-  "total_document_objects_loaded": 1,
-  "total_chunks_indexed": 14,
-  "estimated_unchanged_chunks_avoided": 84,
+  "rebuild_result": {
+    "documents_indexed": 17,
+    "document_objects_loaded": 23,
+    "chunks_indexed": 98,
+    "collection_name": "rag_documents",
+    "db_path": "./data/chroma_db"
+  },
   "after": {
     "vector_backend": "azure_search",
     "active_metadata_records": 17,
     "simulated_source_files": 26,
-    "indexed_chunk_count": 98,
+    "indexed_chunk_count": 0,
     "index_size_bytes": null,
     "index_size_mb": null,
     "index_size_available": false,

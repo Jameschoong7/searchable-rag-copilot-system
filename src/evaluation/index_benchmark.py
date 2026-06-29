@@ -4,8 +4,8 @@ from pathlib import Path
 import sys
 import time
 
-from src.core.config import read_app_config
-from src.vector.factory import get_vector_backend
+from src.core.config import AppConfig, read_app_config
+from src.vector.factory import get_vector_backend, get_vector_backend_for_config
 from dotenv import load_dotenv
 
 from src.metadata.repository import load_document_metadata
@@ -55,11 +55,11 @@ def calculate_index_delta(after_snapshot: dict, before_snapshot: dict) -> dict:
     }
 
 
-def build_index_benchmark_snapshot() -> dict:
-    """Create one benchmark snapshot for metadata, source files, and the configured index."""
+def build_index_benchmark_snapshot(config: AppConfig | None = None) -> dict:
+    """Create one benchmark snapshot for metadata, source files, and the selected index."""
     active_documents = load_document_metadata()
-    config = read_app_config()
-    vector_backend = get_vector_backend()
+    config = config or read_app_config()
+    vector_backend = get_vector_backend_for_config(config)
 
     index_record_count = vector_backend.get_index_record_count()
     index_size_bytes = vector_backend.get_index_size_bytes()
@@ -85,17 +85,20 @@ def build_index_benchmark_snapshot() -> dict:
     }
 
 
-def build_full_rebuild_benchmark() -> dict:
-    """Measure the cost and storage result of rebuilding the full vector index."""
+def build_full_rebuild_benchmark(config: AppConfig | None = None) -> dict:
+    """Measure the cost and storage result of rebuilding the selected vector index."""
     from src.etl.pipeline import rebuild_vector_store
 
-    before_snapshot = build_index_benchmark_snapshot()
+    config = config or read_app_config()
+    vector_backend = get_vector_backend_for_config(config)
+
+    before_snapshot = build_index_benchmark_snapshot(config)
 
     start_time = time.perf_counter()
-    rebuild_result = rebuild_vector_store()
+    rebuild_result = rebuild_vector_store(vector_backend=vector_backend)
     elapsed_seconds = round(time.perf_counter() - start_time, 3)
 
-    after_snapshot = build_index_benchmark_snapshot()
+    after_snapshot = build_index_benchmark_snapshot(config)
 
     return {
         "benchmark_type": "full_rebuild",
