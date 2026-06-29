@@ -1,11 +1,11 @@
 {
   "benchmark_type": "full_rebuild",
-  "elapsed_seconds": 441.558,
+  "elapsed_seconds": 448.213,
   "before": {
     "vector_backend": "azure_search",
     "active_metadata_records": 17,
     "simulated_source_files": 26,
-    "indexed_chunk_count": 0,
+    "indexed_chunk_count": 98,
     "index_size_bytes": null,
     "index_size_mb": null,
     "index_size_available": false,
@@ -33,7 +33,7 @@
     "chroma_db_size_mb": null
   },
   "delta": {
-    "indexed_chunk_count": 0,
+    "indexed_chunk_count": -98,
     "index_size_bytes": null,
     "index_size_mb": null
   }

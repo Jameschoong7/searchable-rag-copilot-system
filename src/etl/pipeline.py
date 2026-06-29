@@ -348,6 +348,59 @@ def index_changed_documents_with_cleanup(
     }
 
 
+def rebuild_chroma_vector_store_safely(
+    docs_path: str,
+    db_path: str,
+    collection_name: str,
+    vector_backend,
+) -> dict:
+    """Rebuild Chroma in a temporary directory, then swap it into place after success."""
+    active_db_path = Path(db_path)
+    temp_db_path = active_db_path.with_name(f"{active_db_path.name}_rebuild_tmp")
+
+    if temp_db_path.exists():
+        shutil.rmtree(temp_db_path)
+
+    try:
+        active_filenames = get_active_metadata_filenames()
+        documents, source_file_count = load_documents(docs_path, active_filenames)
+        chunks = chunk_documents(documents)
+
+        vector_backend.reset_index(str(temp_db_path), collection_name)
+
+        embed_and_store(
+            chunks,
+            str(temp_db_path),
+            collection_name,
+            vector_backend=vector_backend,
+        )
+
+        vector_backend.clear_vector_store_cache()
+
+        if active_db_path.exists():
+            shutil.rmtree(active_db_path)
+
+        temp_db_path.rename(active_db_path)
+
+        vector_backend.clear_vector_store_cache()
+
+        return {
+            "documents_indexed": source_file_count,
+            "document_objects_loaded": len(documents),
+            "chunks_indexed": len(chunks),
+            "collection_name": collection_name,
+            "db_path": db_path,
+        }
+
+    except Exception:
+        vector_backend.clear_vector_store_cache()
+
+        if temp_db_path.exists():
+            shutil.rmtree(temp_db_path)
+
+        raise
+
+
 def rebuild_vector_store(
     docs_path: str | None = None,
     db_path: str | None = None,
@@ -363,6 +416,13 @@ def rebuild_vector_store(
         raise ValueError("DOCUMENTS_PATH and vector backend index settings are required.")
 
     vector_backend = vector_backend or get_vector_backend()
+    if getattr(vector_backend, "__name__", "").endswith("chroma_backend"):
+        return rebuild_chroma_vector_store_safely(
+            docs_path=docs_path,
+            db_path=db_path,
+            collection_name=collection_name,
+            vector_backend=vector_backend,
+        )
     vector_backend.reset_index(db_path, collection_name)
 
     active_filenames = get_active_metadata_filenames()

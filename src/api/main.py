@@ -43,6 +43,7 @@ from src.core.job_repository import (
     JOB_STATUS_RUNNING,
     JOB_STATUS_SUCCEEDED,
     JOB_TYPE_CHAT_QUERY,
+    JOB_TYPE_REINDEX,
     create_job,
     get_job,
     get_latest_job,
@@ -83,6 +84,12 @@ class ReindexRequest(BaseModel):
     """Represent an admin reindex request from a frontend client."""
 
     role: str
+
+
+class ReindexJobRequest(ReindexRequest):
+    """Represent a durable reindex request submitted as a backend job."""
+
+    user: str
 
 
 class ReindexResponse(BaseModel):
@@ -272,6 +279,38 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
         )
 
 
+def run_reindex_job(job_id: str, request: ReindexJobRequest) -> None:
+    """Run one full reindex in the background and store status in the job table."""
+    update_job(
+        job_id,
+        JOB_STATUS_RUNNING,
+        "Rebuilding target search index. Active settings remain unchanged until success.",
+    )
+
+    try:
+        result = run_full_reindex(updated_by=request.user)
+
+        update_job(
+            job_id,
+            JOB_STATUS_SUCCEEDED,
+            result["message"],
+            result,
+        )
+    except Exception as error:
+        update_job(
+            job_id,
+            JOB_STATUS_FAILED,
+            f"Index rebuild failed. Active settings were not changed: {error}",
+            {
+                "status": "failed",
+                "documents_indexed": 0,
+                "document_objects_loaded": 0,
+                "chunks_indexed": 0,
+                "message": str(error),
+            },
+        )
+
+
 @app.post("/query", response_model=QueryResponse)
 def query_knowledge_base(request: QueryRequest) -> QueryResponse:
     """Answer a user question by calling the shared RAG engine."""
@@ -401,55 +440,36 @@ def update_admin_settings(request: SettingsUpdateRequest) -> SettingsUpdateRespo
     )
 
 
-@app.post("/admin/reindex", response_model=ReindexResponse)
-def reindex_knowledge_base(request: ReindexRequest) -> ReindexResponse:
+def run_full_reindex(updated_by: str) -> dict:
     """Rebuild the target search index and promote pending config only after success."""
-    if request.role != SYSTEM_ADMIN_ROLE:
-        raise HTTPException(
-            status_code=403,
-            detail="Only System Admin can rebuild the vector index.",
-        )
+    import gc
 
-    try:
-        import gc
+    from src.evaluation.index_benchmark import (
+        build_full_rebuild_benchmark,
+        save_benchmark_result,
+    )
+    from src.vector.factory import (
+        get_vector_backend,
+        get_vector_backend_for_config,
+    )
 
-        from src.evaluation.index_benchmark import (
-            build_full_rebuild_benchmark,
-            save_benchmark_result,
-        )
-        from src.vector.factory import (
-            get_vector_backend,
-            get_vector_backend_for_config,
-        )
+    active_backend = get_vector_backend()
+    target_config = read_app_config_with_pending()
+    target_backend = get_vector_backend_for_config(target_config)
 
-        # Active backend remains the safe serving backend until rebuild succeeds.
-        active_backend = get_vector_backend()
+    active_backend.clear_vector_store_cache()
+    target_backend.clear_vector_store_cache()
+    gc.collect()
 
-        # Target backend includes pending vector/embedding settings.
-        target_config = read_app_config_with_pending()
-        target_backend = get_vector_backend_for_config(target_config)
+    benchmark_result = build_full_rebuild_benchmark(config=target_config)
+    save_benchmark_result(benchmark_result)
+    result = benchmark_result["rebuild_result"]
 
-        active_backend.clear_vector_store_cache()
-        target_backend.clear_vector_store_cache()
-        gc.collect()
+    promoted_settings = promote_pending_runtime_settings(updated_by=updated_by)
 
-        benchmark_result = build_full_rebuild_benchmark(config=target_config)
-        save_benchmark_result(benchmark_result)
-        result = benchmark_result["rebuild_result"]
-
-        promoted_settings = promote_pending_runtime_settings(
-            updated_by=request.role,
-        )
-
-        active_backend.clear_vector_store_cache()
-        target_backend.clear_vector_store_cache()
-        gc.collect()
-
-    except Exception as error:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Index rebuild failed. Active settings were not changed: {error}",
-        ) from error
+    active_backend.clear_vector_store_cache()
+    target_backend.clear_vector_store_cache()
+    gc.collect()
 
     promotion_message = (
         f" Promoted pending setting(s): {', '.join(promoted_settings.keys())}."
@@ -457,18 +477,38 @@ def reindex_knowledge_base(request: ReindexRequest) -> ReindexResponse:
         else ""
     )
 
-    return ReindexResponse(
-        status="success",
-        documents_indexed=result["documents_indexed"],
-        document_objects_loaded=result["document_objects_loaded"],
-        chunks_indexed=result["chunks_indexed"],
-        message=(
+    return {
+        "status": "success",
+        "documents_indexed": result["documents_indexed"],
+        "document_objects_loaded": result["document_objects_loaded"],
+        "chunks_indexed": result["chunks_indexed"],
+        "message": (
             f"Rebuilt search index with {result['documents_indexed']} file(s), "
             f"{result['document_objects_loaded']} document object(s), "
             f"and {result['chunks_indexed']} chunk(s)."
             f"{promotion_message}"
         ),
-    )
+    }
+
+
+@app.post("/admin/reindex", response_model=ReindexResponse)
+def reindex_knowledge_base(request: ReindexRequest) -> ReindexResponse:
+    """Synchronously rebuild the target search index for compatibility/testing."""
+    if request.role != SYSTEM_ADMIN_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="Only System Admin can rebuild the vector index.",
+        )
+
+    try:
+        result = run_full_reindex(updated_by=request.role)
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Index rebuild failed. Active settings were not changed: {error}",
+        ) from error
+
+    return ReindexResponse(**result)
 
 
 @app.post("/admin/index-updates", response_model=IndexUpdatesResponse)
@@ -793,6 +833,17 @@ def create_chat_query_job(
     return JobResponse(**job)
 
 
+@app.get("/admin/jobs/latest", response_model=JobResponse | None)
+def get_latest_backend_job(job_type: str | None = None) -> JobResponse | None:
+    """Return the latest backend job, optionally filtered by type."""
+    job = get_latest_job(job_type)
+
+    if job is None:
+        return None
+
+    return JobResponse(**job)
+
+
 @app.get("/admin/jobs/{job_id}", response_model=JobResponse)
 def get_backend_job(job_id: str) -> JobResponse:
     """Return one backend job by ID."""
@@ -804,12 +855,24 @@ def get_backend_job(job_id: str) -> JobResponse:
     return JobResponse(**job)
 
 
-@app.get("/admin/jobs/latest", response_model=JobResponse | None)
-def get_latest_backend_job(job_type: str | None = None) -> JobResponse | None:
-    """Return the latest backend job, optionally filtered by type."""
-    job = get_latest_job(job_type)
+@app.post("/admin/reindex-jobs", response_model=JobResponse)
+def create_reindex_job(
+    request: ReindexJobRequest,
+    background_tasks: BackgroundTasks,
+) -> JobResponse:
+    """Create a durable backend reindex job so Streamlit reruns do not interrupt rebuild."""
+    if request.role != SYSTEM_ADMIN_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="Only System Admin can rebuild the vector index.",
+        )
 
-    if job is None:
-        return None
+    job = create_job(
+        job_type=JOB_TYPE_REINDEX,
+        created_by=request.user,
+        message="Search index rebuild queued.",
+    )
+
+    background_tasks.add_task(run_reindex_job, job["job_id"], request)
 
     return JobResponse(**job)

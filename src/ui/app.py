@@ -96,6 +96,7 @@ API_URL = f"{API_BASE_URL}/query"
 API_HEALTH_URL = f"{API_BASE_URL}/health"
 CHAT_JOBS_URL = f"{API_BASE_URL}/chat/jobs"
 BACKEND_JOBS_URL = f"{API_BASE_URL}/admin/jobs"
+REINDEX_JOBS_URL = f"{API_BASE_URL}/admin/reindex-jobs"
 METADATA_UPDATE_VALIDATE_URL = f"{API_BASE_URL}/admin/validate-metadata-update"
 ARCHIVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/archive-document"
 SETTINGS_URL = f"{API_BASE_URL}/admin/settings"
@@ -113,6 +114,21 @@ def request_backend_reindex() -> dict:
             "role": st.session_state["role"],
         },
         timeout=900,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def submit_reindex_job() -> dict:
+    """Submit a full search-index rebuild as a durable backend job."""
+    response = requests.post(
+        REINDEX_JOBS_URL,
+        json={
+            "role": st.session_state["role"],
+            "user": st.session_state["user"],
+        },
+        timeout=10,
     )
 
     response.raise_for_status()
@@ -350,6 +366,39 @@ def poll_active_chat_job() -> None:
 
     st.session_state.pop("active_chat_job_id", None)
     st.session_state["chat_is_processing"] = False
+    st.rerun()
+
+
+@st.fragment(run_every="2s")
+def poll_active_reindex_job() -> None:
+    """Poll the active reindex job without blocking the whole Streamlit app."""
+    active_reindex_job_id = st.session_state.get("active_reindex_job_id")
+
+    if not active_reindex_job_id:
+        return
+
+    try:
+        job = get_backend_job(active_reindex_job_id)
+    except requests.exceptions.RequestException as error:
+        st.warning(f"Reindex job status unavailable: {error}")
+        return
+
+    if job["status"] in ["queued", "running"]:
+        st.info(job["message"])
+        return
+
+    if job["status"] == "succeeded":
+        result = job["result"]
+        st.session_state["settings_message"] = result["message"]
+        st.session_state["settings_rebuild_required"] = False
+        st.session_state["reindex_job_message"] = result["message"]
+
+    elif job["status"] == "failed":
+        st.session_state["settings_message"] = job["message"]
+        st.session_state["settings_rebuild_required"] = True
+        st.session_state["reindex_job_message"] = job["message"]
+
+    st.session_state.pop("active_reindex_job_id", None)
     st.rerun()
 
 
@@ -887,6 +936,8 @@ st.sidebar.markdown(
 )
 
 st.sidebar.divider()
+
+poll_active_reindex_job()
 
 kb_page_label = get_kb_page_label()
 
@@ -1805,16 +1856,19 @@ elif selected_page in ["KB Management", "KB Status"]:
                                     st.rerun()
 
                 with index_action_columns[1]:
-                    if st.button("Rebuild Full Active Index", use_container_width=True):
-                        with st.spinner("Rebuilding configured search index..."):
-                            try:
-                                rebuild_result = request_backend_reindex()
-                                rebuild_message = rebuild_result["message"]
-                            except Exception as error:
-                                st.error(f"Index rebuild failed: {error}")
-                            else:
-                                st.success(rebuild_message)
-                                st.rerun()
+                   if st.button(
+                        "Rebuild Full Active Index",
+                        use_container_width=True,
+                        disabled=bool(st.session_state.get("active_reindex_job_id")),
+                    ):
+                        try:
+                            job = submit_reindex_job()
+                        except requests.exceptions.RequestException as error:
+                            st.error(f"Could not submit rebuild job: {error}")
+                        else:
+                            st.session_state["active_reindex_job_id"] = job["job_id"]
+                            st.session_state["reindex_job_message"] = "Search index rebuild queued."
+                            st.rerun()
 
         if st.session_state["upload_message"]:
             st.warning(st.session_state["upload_message"])
@@ -2536,18 +2590,18 @@ elif selected_page == "Settings":
             )
 
             if st.button("Run Rebuild Now", type="primary", use_container_width=True):
-                with st.spinner("Rebuilding configured search index..."):
-                    try:
-                        rebuild_result = request_backend_reindex()
-                    except Exception as error:
-                        st.session_state["settings_message"] = f"Search index rebuild failed: {error}"
-                        st.session_state["settings_rebuild_required"] = True
-                        st.error(st.session_state["settings_message"])
-                    else:
-                        st.session_state["settings_message"] = rebuild_result["message"]
-                        st.session_state["settings_rebuild_required"] = False
-                        st.success(rebuild_result["message"])
-                        st.rerun()
+                try:
+                    job = submit_reindex_job()
+                except requests.exceptions.RequestException as error:
+                    st.session_state["settings_message"] = f"Could not submit rebuild job: {error}"
+                    st.session_state["settings_rebuild_required"] = True
+                    st.error(st.session_state["settings_message"])
+                else:
+                    st.session_state["active_reindex_job_id"] = job["job_id"]
+                    st.session_state["settings_message"] = "Search index rebuild queued."
+                    st.session_state["settings_rebuild_required"] = True
+                    st.rerun()
+
 
     with st.expander("Backend Mode Rules"):
         st.markdown("""

@@ -497,5 +497,85 @@
       "index_size_bytes": null,
       "index_size_mb": null
     }
+  },
+  {
+    "benchmark_type": "full_rebuild",
+    "elapsed_seconds": 7.305,
+    "before": {
+      "vector_backend": "chroma",
+      "active_metadata_records": 17,
+      "simulated_source_files": 26,
+      "indexed_chunk_count": 0,
+      "index_size_bytes": 0,
+      "index_size_mb": 0.0,
+      "index_size_available": true,
+      "chroma_vector_count": 0,
+      "chroma_db_size_bytes": 0,
+      "chroma_db_size_mb": 0.0
+    },
+    "rebuild_result": {
+      "documents_indexed": 17,
+      "document_objects_loaded": 23,
+      "chunks_indexed": 98,
+      "collection_name": "rag_documents",
+      "db_path": "./data/chroma_db"
+    },
+    "after": {
+      "vector_backend": "chroma",
+      "active_metadata_records": 17,
+      "simulated_source_files": 26,
+      "indexed_chunk_count": 98,
+      "index_size_bytes": 1613988,
+      "index_size_mb": 1.54,
+      "index_size_available": true,
+      "chroma_vector_count": 98,
+      "chroma_db_size_bytes": 1613988,
+      "chroma_db_size_mb": 1.54
+    },
+    "delta": {
+      "indexed_chunk_count": 98,
+      "index_size_bytes": 1613988,
+      "index_size_mb": 1.54
+    }
+  },
+  {
+    "benchmark_type": "full_rebuild",
+    "elapsed_seconds": 448.213,
+    "before": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 17,
+      "simulated_source_files": 26,
+      "indexed_chunk_count": 98,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "rebuild_result": {
+      "documents_indexed": 17,
+      "document_objects_loaded": 23,
+      "chunks_indexed": 98,
+      "collection_name": "rag_documents",
+      "db_path": "./data/chroma_db"
+    },
+    "after": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 17,
+      "simulated_source_files": 26,
+      "indexed_chunk_count": 0,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "delta": {
+      "indexed_chunk_count": -98,
+      "index_size_bytes": null,
+      "index_size_mb": null
+    }
   }
 ]
