@@ -2,7 +2,7 @@
 # REQ_F003: Provides the backend route that a future Teams chatbot can call
 # REQ_F005: Provides the backend route that the Streamlit web app can call
 
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel
 
 
@@ -36,6 +36,19 @@ from src.core.settings_repository import (
     save_pending_runtime_settings,
     save_runtime_settings,
 )
+
+
+from src.core.job_repository import (
+    JOB_STATUS_FAILED,
+    JOB_STATUS_RUNNING,
+    JOB_STATUS_SUCCEEDED,
+    JOB_TYPE_CHAT_QUERY,
+    create_job,
+    get_job,
+    get_latest_job,
+    update_job,
+)
+
 
 @app.get("/health")
 def health_check() -> dict:
@@ -182,6 +195,81 @@ class SettingsUpdateResponse(BaseModel):
     changed_keys: list[str]
     rebuild_required: bool
     message: str
+
+
+class ChatJobRequest(QueryRequest):
+    """Represent a durable chat query submitted as a backend job."""
+
+    user: str
+
+
+class JobResponse(BaseModel):
+    """Represent one backend job record."""
+
+    job_id: str
+    job_type: str
+    status: str
+    message: str
+    result: dict
+    created_by: str
+    created_at: str
+    updated_at: str
+
+
+def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
+    """Run one chat query in the background and store the answer in the job table."""
+    import time
+
+    update_job(
+        job_id,
+        JOB_STATUS_RUNNING,
+        "Retrieving authorised knowledge chunks and generating answer.",
+    )
+
+    start_time = time.perf_counter()
+
+    try:
+        from src.rag.engine import generate_answer
+
+        result = generate_answer(
+            question=request.question.strip(),
+            role=request.role,
+            department=request.department,
+            department_filter=request.department_filter,
+            file_type_filter=request.file_type_filter,
+        )
+
+        update_job(
+            job_id,
+            JOB_STATUS_SUCCEEDED,
+            "Chat answer generated.",
+            {
+                "question": result["question"],
+                "answer": result["answer"],
+                "sources": result["sources"],
+                "role": request.role,
+                "department": request.department,
+                "department_filter": request.department_filter,
+                "file_type_filter": request.file_type_filter,
+                "latency_seconds": round(time.perf_counter() - start_time, 3),
+            },
+        )
+    except Exception as error:
+        update_job(
+            job_id,
+            JOB_STATUS_FAILED,
+            f"Chat query failed: {error}",
+            {
+                "question": request.question,
+                "answer": "",
+                "sources": [],
+                "role": request.role,
+                "department": request.department,
+                "department_filter": request.department_filter,
+                "file_type_filter": request.file_type_filter,
+                "latency_seconds": round(time.perf_counter() - start_time, 3),
+            },
+        )
 
 
 @app.post("/query", response_model=QueryResponse)
@@ -681,3 +769,47 @@ def validate_metadata_update(
         status_code=403,
         detail="Unknown role cannot edit knowledge base metadata.",
     )
+
+
+@app.post("/chat/jobs", response_model=JobResponse)
+def create_chat_query_job(
+    request: ChatJobRequest,
+    background_tasks: BackgroundTasks,
+) -> JobResponse:
+    """Create a durable backend chat job so Streamlit reruns do not interrupt answers."""
+    question = request.question.strip()
+
+    if not question:
+        raise HTTPException(status_code=400, detail="Question cannot be empty.")
+
+    job = create_job(
+        job_type=JOB_TYPE_CHAT_QUERY,
+        created_by=request.user,
+        message="Chat query queued.",
+    )
+
+    background_tasks.add_task(run_chat_query_job, job["job_id"], request)
+
+    return JobResponse(**job)
+
+
+@app.get("/admin/jobs/{job_id}", response_model=JobResponse)
+def get_backend_job(job_id: str) -> JobResponse:
+    """Return one backend job by ID."""
+    job = get_job(job_id)
+
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found.")
+
+    return JobResponse(**job)
+
+
+@app.get("/admin/jobs/latest", response_model=JobResponse | None)
+def get_latest_backend_job(job_type: str | None = None) -> JobResponse | None:
+    """Return the latest backend job, optionally filtered by type."""
+    job = get_latest_job(job_type)
+
+    if job is None:
+        return None
+
+    return JobResponse(**job)

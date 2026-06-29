@@ -94,6 +94,8 @@ REINDEX_URL = f"{API_BASE_URL}/admin/reindex"
 INDEX_UPDATES_URL = f"{API_BASE_URL}/admin/index-updates"
 API_URL = f"{API_BASE_URL}/query"
 API_HEALTH_URL = f"{API_BASE_URL}/health"
+CHAT_JOBS_URL = f"{API_BASE_URL}/chat/jobs"
+BACKEND_JOBS_URL = f"{API_BASE_URL}/admin/jobs"
 METADATA_UPDATE_VALIDATE_URL = f"{API_BASE_URL}/admin/validate-metadata-update"
 ARCHIVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/archive-document"
 SETTINGS_URL = f"{API_BASE_URL}/admin/settings"
@@ -238,6 +240,117 @@ def ask_backend(
 
     response.raise_for_status()
     return response.json()
+
+
+def submit_chat_job(
+    question: str,
+    department_filter: str | None,
+    file_type_filter: str | None,
+) -> dict:
+    """Submit one chat question as a durable backend job."""
+    response = requests.post(
+        CHAT_JOBS_URL,
+        json={
+            "user": st.session_state["user"],
+            "question": question,
+            "role": st.session_state["role"],
+            "department": st.session_state["department"],
+            "department_filter": department_filter,
+            "file_type_filter": file_type_filter,
+        },
+        timeout=10,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def get_backend_job(job_id: str) -> dict:
+    """Poll one backend job by ID."""
+    response = requests.get(
+        f"{BACKEND_JOBS_URL}/{job_id}",
+        timeout=10,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+@st.fragment(run_every="2s")
+def poll_active_chat_job() -> None:
+    """Poll the active chat job without rerunning the whole Streamlit app aggressively."""
+    active_chat_job_id = st.session_state.get("active_chat_job_id")
+
+    if not active_chat_job_id:
+        return
+
+    try:
+        job = get_backend_job(active_chat_job_id)
+    except requests.exceptions.RequestException as error:
+        st.warning(f"Chat job status unavailable: {error}")
+        return
+
+    if job["status"] in ["queued", "running"]:
+        st.info(job["message"])
+        return
+
+    if job["status"] == "succeeded":
+        result = job["result"]
+        answer_status = classify_answer_status(
+            result["answer"],
+            result["sources"],
+        )
+
+        write_query_log(
+            question=result["question"],
+            department_filter=result.get("department_filter"),
+            file_type_filter=result.get("file_type_filter"),
+            status=answer_status,
+            sources=result["sources"],
+            latency_seconds=result.get("latency_seconds", 0),
+        )
+
+        context_text = (
+            f"Access context: {result['role']} / {result['department']} | "
+            f"Search department: {result.get('department_filter') or 'ACL-permitted shared scope'} | "
+            f"File type: {result.get('file_type_filter')}"
+        )
+
+        st.session_state["chat_messages"].append(
+            {
+                "role": "assistant",
+                "content": result["answer"],
+                "sources": result["sources"],
+                "context": context_text,
+                "status": answer_status,
+            }
+        )
+
+    elif job["status"] == "failed":
+        result = job.get("result", {})
+
+        write_query_log(
+            question=result.get("question", "Unknown question"),
+            department_filter=result.get("department_filter"),
+            file_type_filter=result.get("file_type_filter"),
+            status="api_error",
+            sources=[],
+            latency_seconds=result.get("latency_seconds", 0),
+        )
+
+        st.session_state["chat_messages"].append(
+            {
+                "role": "assistant",
+                "content": job["message"],
+                "sources": [],
+                "context": "",
+                "status": "api_error",
+            }
+        )
+
+    st.session_state.pop("active_chat_job_id", None)
+    st.session_state["chat_is_processing"] = False
+    st.rerun()
 
 
 def is_api_online() -> bool:
@@ -2245,7 +2358,7 @@ elif selected_page == "Chat":
             )
 
     with example_columns[-1]:
-        if st.button("🧹 Clear", use_container_width=True):
+        if st.button("🧹 Clear", use_container_width=True, disabled=chat_is_processing):
             st.session_state["chat_messages"] = []
             st.rerun()
 
@@ -2261,105 +2374,32 @@ elif selected_page == "Chat":
                 "role": "user",
                 "content": clean_question,
             }
-
             st.session_state["chat_messages"].append(user_message)
 
-            with chat_container:
-                with st.chat_message("user"):
-                    st.write(clean_question)
+            try:
+                job = submit_chat_job(
+                    clean_question,
+                    department_filter,
+                    file_type_filter,
+                )
+            except requests.exceptions.RequestException as error:
+                st.session_state["chat_messages"].append(
+                    {
+                        "role": "assistant",
+                        "content": f"Could not submit chat job: {error}",
+                        "sources": [],
+                        "context": "",
+                        "status": "connection_error",
+                    }
+                )
+                st.session_state["chat_is_processing"] = False
+            else:
+                st.session_state["active_chat_job_id"] = job["job_id"]
+                st.session_state["chat_is_processing"] = True
 
-                with st.chat_message("assistant"):
-                    with st.spinner(
-                        "Retrieving authorised knowledge chunks and generating answer..."
-                    ):
-                        try:
-                            start_time = time.perf_counter()
-                            result = ask_backend(
-                                clean_question,
-                                department_filter,
-                                file_type_filter,
-                            )
-                        except requests.exceptions.HTTPError as error:
-                            latency_seconds = time.perf_counter() - start_time
-                            write_query_log(
-                                question=clean_question,
-                                department_filter=department_filter,
-                                file_type_filter=file_type_filter,
-                                status="api_error",
-                                sources=[],
-                                latency_seconds=latency_seconds,
-                            )
-                            assistant_message = {
-                                "role": "assistant",
-                                "content": f"API returned an error: {error.response.text}",
-                                "sources": [],
-                                "context": "",
-                                "status": "api_error",
-                            }
-                        except requests.exceptions.RequestException as error:
-                            latency_seconds = time.perf_counter() - start_time
-                            write_query_log(
-                                question=clean_question,
-                                department_filter=department_filter,
-                                file_type_filter=file_type_filter,
-                                status="connection_error",
-                                sources=[],
-                                latency_seconds=latency_seconds,
-                            )
-                            assistant_message = {
-                                "role": "assistant",
-                                "content": f"Could not connect to the FastAPI backend: {error}",
-                                "sources": [],
-                                "context": "",
-                                "status": "connection_error",
-                            }
-                        else:
-                            latency_seconds = time.perf_counter() - start_time
-                            answer_status = classify_answer_status(
-                                result["answer"],
-                                result["sources"]
-                            )
-                            write_query_log(
-                                question=clean_question,
-                                department_filter=department_filter,
-                                file_type_filter=file_type_filter,
-                                status=answer_status,
-                                sources=result["sources"],
-                                latency_seconds=latency_seconds
-                            )
-                            context_text = (
-                                f"Access context: {result['role']} / {result['department']} | "
-                                f"Search department: {department_filter or 'ACL-permitted shared scope'} | "
-                                f"File type: {file_type_filter}"
-                            )
-
-                            assistant_message = {
-                                "role": "assistant",
-                                "content": result["answer"],
-                                "sources": result["sources"],
-                                "context": context_text,
-                                "status": answer_status,
-                            }
-
-                    show_status_message(assistant_message["status"])
-                    st.write(assistant_message["content"])
-
-                    if assistant_message.get("sources") or assistant_message.get("context"):
-                        meta_col1, meta_col2 = st.columns(2)
-                        if assistant_message.get("sources"):
-                            with meta_col1:
-                                with st.expander("📑 View Sources"):
-                                    for source in assistant_message["sources"]:
-                                        st.code(source, language=None)
-                        if assistant_message.get("context"):
-                            with meta_col2:
-                                with st.expander("🔍 Query Context"):
-                                    st.caption(assistant_message["context"])
-
-            st.session_state["chat_messages"].append(assistant_message)
-            st.session_state["chat_is_processing"] = False
             st.rerun()
 
+    poll_active_chat_job()
 
 elif selected_page == "Settings":
     st.header("System Settings")

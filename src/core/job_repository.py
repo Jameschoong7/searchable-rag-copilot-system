@@ -14,6 +14,7 @@ JOB_STATUS_SUCCEEDED = "succeeded"
 JOB_STATUS_FAILED = "failed"
 
 JOB_TYPE_REINDEX = "reindex"
+JOB_TYPE_CHAT_QUERY = "chat_query"
 
 
 def now_text() -> str:
