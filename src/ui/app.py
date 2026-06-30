@@ -1183,7 +1183,7 @@ if selected_page == "Performance":
             st.metric(
                 "Indexed Documents",
                 f"{indexed_document_count}",
-                "Simulated KB records",
+                "Active KB records",
             )
 
         st.caption(
@@ -1545,9 +1545,9 @@ if selected_page == "Performance":
             "within the top 5 retrieved chunks.**"
         )
         st.caption(
-            "Current Top-K Accuracy and Miss Rate use the latest local labelled "
-            "retrieval evaluation result. Prototype benchmark values should be treated "
-            "as presentation examples only."
+            "Top-K Accuracy and Miss Rate are calculated from the latest labelled "
+            "retrieval evaluation result. Each labelled query defines an expected source "
+            "or expected miss/block outcome."
         )
         if evaluation_results and evaluation_results.get("threshold_interpretation"):
             threshold_interpretation = evaluation_results["threshold_interpretation"]

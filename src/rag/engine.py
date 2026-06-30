@@ -133,10 +133,19 @@ def retrieve_relevant_chunks_with_scores(
     department: str,
     department_filter: str | None = None,
     file_type_filter: str | None = None,
-    top_k: int = 5,
-    minimum_relevance_score: float = 0.25,
+    top_k: int | None = None,
+    minimum_relevance_score: float | None = None,
 ) -> list[tuple]:
     """Retrieve scored chunks from documents allowed for the user's role and department."""
+
+    app_config = read_app_config()
+    effective_top_k = top_k if top_k is not None else app_config.top_k
+    effective_minimum_relevance_score = (
+        minimum_relevance_score
+        if minimum_relevance_score is not None
+        else app_config.minimum_relevance_threshold
+    )
+
     allowed_sources = get_allowed_source_path(
         role,
         department,
@@ -152,13 +161,13 @@ def retrieve_relevant_chunks_with_scores(
     scored_results = vector_backend.similarity_search_with_scores(
         question=question,
         allowed_sources=allowed_sources,
-        top_k=top_k,
+        top_k=effective_top_k,
     )
 
     return [
         (document, score)
         for document, score in scored_results
-        if score >= minimum_relevance_score
+        if score >= effective_minimum_relevance_score
     ]
 
 
@@ -168,7 +177,8 @@ def retrieve_relevant_chunks(
     department: str,
     department_filter: str | None = None,
     file_type_filter: str | None = None,
-    top_k: int = 5,
+    top_k: int | None = None,
+    minimum_relevance_score: float | None = None,
 ) -> list:
     """Retrieve only chunks from documents allowed for the user's role and department."""
     scored_chunks = retrieve_relevant_chunks_with_scores(
@@ -178,7 +188,7 @@ def retrieve_relevant_chunks(
         department_filter=department_filter,
         file_type_filter=file_type_filter,
         top_k=top_k,
-        minimum_relevance_score=0.25,
+        minimum_relevance_score=minimum_relevance_score,
     )
 
     return [
@@ -271,6 +281,23 @@ def build_context_and_sources(chunks:list) -> tuple[str,list]:
     return context_text,unique_sources
 
 
+def is_low_information_query(question: str) -> bool:
+    """Detect vague test/greeting queries that should not trigger vector retrieval."""
+    tokens = re.findall(r"[a-z0-9]+", question.lower())
+
+    low_information_terms = {
+        "test",
+        "testing",
+        "hello",
+        "hi",
+        "ok",
+        "okay",
+        "help",
+    }
+
+    return len(tokens) == 1 and tokens[0] in low_information_terms
+
+
 def generate_answer(
     question: str,
     role: str = "General Employee",
@@ -279,6 +306,18 @@ def generate_answer(
     file_type_filter: str | None = None,
 ) -> dict:
     """Generate a cited answer using only documents allowed for the user."""
+
+    if is_low_information_query(question):
+        return {
+            "question": question,
+            "answer": (
+                "I could not find a specific knowledge-base request in your question. "
+                "Please ask a more specific question, such as a policy name, process, "
+                "department, or task you need help with."
+            ),
+            "sources": [],
+        }
+
     restricted_documents = find_restricted_matching_documents(
         question,
         role,
