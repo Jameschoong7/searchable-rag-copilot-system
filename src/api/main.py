@@ -4,6 +4,7 @@
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel
+import re
 
 
 # Create the shared FastAPI application used by both frontend platforms.
@@ -44,11 +45,27 @@ from src.core.job_repository import (
     JOB_STATUS_SUCCEEDED,
     JOB_TYPE_CHAT_QUERY,
     JOB_TYPE_REINDEX,
+    JOB_TYPE_INDEX_UPDATE,
     create_job,
     get_job,
     get_latest_job,
     update_job,
 )
+
+
+def is_meaningful_question(question: str) -> bool:
+    """Reject punctuation-only or too-short queries before retrieval."""
+    words = re.findall(r"[a-zA-Z0-9]+", question)
+
+    if not words:
+        return False
+
+    meaningful_words = [
+        word for word in words
+        if len(word) >= 2
+    ]
+
+    return bool(meaningful_words)
 
 
 @app.get("/health")
@@ -106,6 +123,12 @@ class IndexUpdatesRequest(BaseModel):
     """Represent an admin request to index pending document updates."""
 
     role: str
+
+
+class IndexUpdatesJobRequest(IndexUpdatesRequest):
+    """Represent a durable pending-index update request submitted as a backend job."""
+
+    user: str
 
 
 class IndexUpdatesResponse(BaseModel):
@@ -311,6 +334,40 @@ def run_reindex_job(job_id: str, request: ReindexJobRequest) -> None:
         )
 
 
+def run_index_update_job(job_id: str, request: IndexUpdatesJobRequest) -> None:
+    """Run pending document indexing in the background and store job status."""
+    update_job(
+        job_id,
+        JOB_STATUS_RUNNING,
+        "Updating pending documents in the active search index.",
+    )
+
+    try:
+        result = run_pending_index_update(updated_by=request.user)
+
+        update_job(
+            job_id,
+            JOB_STATUS_SUCCEEDED,
+            result["message"],
+            result,
+        )
+    except Exception as error:
+        update_job(
+            job_id,
+            JOB_STATUS_FAILED,
+            f"Pending index update failed: {error}",
+            {
+                "status": "failed",
+                "pending_document_count": 0,
+                "updated_sources": [],
+                "total_deleted_vectors": 0,
+                "total_chunks_indexed": 0,
+                "elapsed_seconds": 0,
+                "message": str(error),
+            },
+        )
+
+
 @app.post("/query", response_model=QueryResponse)
 def query_knowledge_base(request: QueryRequest) -> QueryResponse:
     """Answer a user question by calling the shared RAG engine."""
@@ -321,7 +378,13 @@ def query_knowledge_base(request: QueryRequest) -> QueryResponse:
             status_code=400,
             detail="Question cannot be empty.",
         )
-
+    
+    if not is_meaningful_question(question):
+        raise HTTPException(
+            status_code=400,
+            detail="Question must contain meaningful words, not only punctuation or symbols.",
+        )
+    
     try:
         from src.rag.engine import generate_answer
 
@@ -511,6 +574,107 @@ def reindex_knowledge_base(request: ReindexRequest) -> ReindexResponse:
     return ReindexResponse(**result)
 
 
+def run_pending_index_update(updated_by: str) -> dict:
+    """Index active pending documents and persist benchmark/update metadata."""
+    import time
+    from pathlib import Path
+
+    from src.etl.pipeline import index_changed_documents_with_cleanup
+    from src.evaluation.index_benchmark import (
+        build_index_benchmark_snapshot,
+        calculate_index_delta,
+        save_benchmark_result,
+    )
+    from src.metadata.repository import (
+        load_pending_index_documents,
+        load_replaced_documents_for_new_versions,
+        mark_documents_indexed,
+    )
+
+    pending_documents = load_pending_index_documents()
+
+    if not pending_documents:
+        return {
+            "status": "no_pending_documents",
+            "pending_document_count": 0,
+            "updated_sources": [],
+            "total_deleted_vectors": 0,
+            "total_chunks_indexed": 0,
+            "elapsed_seconds": 0,
+            "message": "No pending document updates require indexing.",
+        }
+
+    pending_document_ids = [
+        document["document_id"]
+        for document in pending_documents
+    ]
+
+    replaced_documents = load_replaced_documents_for_new_versions(
+        pending_document_ids
+    )
+
+    index_source_paths = [
+        str(Path("data/simulated") / document["filename"])
+        for document in pending_documents
+    ]
+
+    replaced_source_paths = [
+        str(Path("data/simulated") / document["filename"])
+        for document in replaced_documents
+    ]
+
+    cleanup_source_paths = replaced_source_paths + index_source_paths
+
+    before_snapshot = build_index_benchmark_snapshot()
+
+    start_time = time.perf_counter()
+    update_result = index_changed_documents_with_cleanup(
+        index_source_paths=index_source_paths,
+        cleanup_source_paths=cleanup_source_paths,
+    )
+    elapsed_seconds = round(time.perf_counter() - start_time, 3)
+
+    after_snapshot = build_index_benchmark_snapshot()
+
+    benchmark_result = {
+        "benchmark_type": "batch_incremental_update",
+        "changed_document_count": update_result["changed_document_count"],
+        "updated_sources": update_result["updated_sources"],
+        "cleanup_sources": update_result["cleanup_sources"],
+        "elapsed_seconds": elapsed_seconds,
+        "before": before_snapshot,
+        "update_results": update_result["update_results"],
+        "cleanup_results": update_result["cleanup_results"],
+        "total_deleted_vectors": update_result["total_deleted_vectors"],
+        "total_document_objects_loaded": update_result["total_document_objects_loaded"],
+        "total_chunks_indexed": update_result["total_chunks_indexed"],
+        "estimated_unchanged_chunks_avoided": max(
+            before_snapshot["indexed_chunk_count"] - update_result["total_chunks_indexed"],
+            0,
+        ),
+        "after": after_snapshot,
+        "delta": calculate_index_delta(after_snapshot, before_snapshot),
+        "updated_by": updated_by,
+    }
+
+    save_benchmark_result(benchmark_result)
+    mark_documents_indexed(pending_document_ids)
+
+    return {
+        "status": "success",
+        "pending_document_count": len(pending_documents),
+        "updated_sources": update_result["updated_sources"],
+        "total_deleted_vectors": update_result["total_deleted_vectors"],
+        "total_chunks_indexed": update_result["total_chunks_indexed"],
+        "elapsed_seconds": elapsed_seconds,
+        "message": (
+            f"Indexed {len(pending_documents)} pending document(s), refreshed "
+            f"{update_result['total_chunks_indexed']} chunk(s), and replaced "
+            f"{update_result['total_deleted_vectors']} old vector(s)."
+        ),
+    }
+
+
 @app.post("/admin/index-updates", response_model=IndexUpdatesResponse)
 def index_pending_document_updates(request: IndexUpdatesRequest) -> IndexUpdatesResponse:
     """Run incremental indexing for active documents marked as pending index."""
@@ -521,114 +685,14 @@ def index_pending_document_updates(request: IndexUpdatesRequest) -> IndexUpdates
         )
 
     try:
-        import time
-        from pathlib import Path
-
-        from src.etl.pipeline import index_changed_documents_with_cleanup
-        from src.evaluation.index_benchmark import (
-            build_index_benchmark_snapshot,
-            calculate_index_delta,
-            save_benchmark_result,
-        )
-        from src.metadata.repository import (
-            load_pending_index_documents,
-            load_replaced_documents_for_new_versions,
-            mark_documents_indexed,
-        )
-
-        pending_documents = load_pending_index_documents()
-
-        if not pending_documents:
-            return IndexUpdatesResponse(
-                status="no_pending_documents",
-                pending_document_count=0,
-                updated_sources=[],
-                total_deleted_vectors=0,
-                total_chunks_indexed=0,
-                elapsed_seconds=0,
-                message="No pending document updates require indexing.",
-            )
-
-        pending_document_ids = [
-            document["document_id"]
-            for document in pending_documents
-        ]
-
-        replaced_documents = load_replaced_documents_for_new_versions(
-            pending_document_ids
-        )
-
-        index_source_paths = [
-            str(Path("data/simulated") / document["filename"])
-            for document in pending_documents
-        ]
-
-        replaced_source_paths = [
-            str(Path("data/simulated") / document["filename"])
-            for document in replaced_documents
-        ]
-
-        cleanup_source_paths = replaced_source_paths + index_source_paths
-
-        before_snapshot = build_index_benchmark_snapshot()
-
-        start_time = time.perf_counter()
-        update_result = index_changed_documents_with_cleanup(
-            index_source_paths=index_source_paths,
-            cleanup_source_paths=cleanup_source_paths,
-        )
-        elapsed_seconds = round(time.perf_counter() - start_time, 3)
-
-        after_snapshot = build_index_benchmark_snapshot()
-
-        benchmark_result = {
-            "benchmark_type": "batch_incremental_update",
-            "changed_document_count": update_result["changed_document_count"],
-            "updated_sources": update_result["updated_sources"],
-            "cleanup_sources": update_result["cleanup_sources"],
-            "elapsed_seconds": elapsed_seconds,
-            "before": before_snapshot,
-            "update_results": update_result["update_results"],
-            "cleanup_results": update_result["cleanup_results"],
-            "total_deleted_vectors": update_result["total_deleted_vectors"],
-            "total_document_objects_loaded": update_result["total_document_objects_loaded"],
-            "total_chunks_indexed": update_result["total_chunks_indexed"],
-            "estimated_unchanged_chunks_avoided": max(
-                before_snapshot["indexed_chunk_count"] - update_result["total_chunks_indexed"],
-                0,
-            ),
-            "after": after_snapshot,
-            "delta": calculate_index_delta(after_snapshot, before_snapshot),
-        }
-
-        save_benchmark_result(benchmark_result)
-
-        mark_documents_indexed(
-            [
-                document["document_id"]
-                for document in pending_documents
-            ]
-        )
-
+        result = run_pending_index_update(updated_by=request.role)
     except Exception as error:
         raise HTTPException(
             status_code=500,
             detail=f"Pending index update failed: {error}",
         ) from error
 
-    return IndexUpdatesResponse(
-        status="success",
-        pending_document_count=len(pending_documents),
-        updated_sources=update_result["updated_sources"],
-        total_deleted_vectors=update_result["total_deleted_vectors"],
-        total_chunks_indexed=update_result["total_chunks_indexed"],
-        elapsed_seconds=elapsed_seconds,
-        message=(
-            f"Indexed {len(pending_documents)} pending document(s), refreshed "
-            f"{update_result['total_chunks_indexed']} chunk(s), and replaced "
-            f"{update_result['total_deleted_vectors']} old vector(s)."
-        ),
-    )
+    return IndexUpdatesResponse(**result)
 
 
 @app.post("/admin/validate-upload", response_model=UploadValidationResponse)
@@ -822,6 +886,12 @@ def create_chat_query_job(
     if not question:
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
 
+    if not is_meaningful_question(question):
+        raise HTTPException(
+            status_code=400,
+            detail="Question must contain meaningful words, not only punctuation or symbols.",
+        )
+
     job = create_job(
         job_type=JOB_TYPE_CHAT_QUERY,
         created_by=request.user,
@@ -874,5 +944,28 @@ def create_reindex_job(
     )
 
     background_tasks.add_task(run_reindex_job, job["job_id"], request)
+
+    return JobResponse(**job)
+
+
+@app.post("/admin/index-update-jobs", response_model=JobResponse)
+def create_index_update_job(
+    request: IndexUpdatesJobRequest,
+    background_tasks: BackgroundTasks,
+) -> JobResponse:
+    """Create a durable pending-index update job so Streamlit reruns do not interrupt indexing."""
+    if request.role != SYSTEM_ADMIN_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="Only System Admin can index pending document updates.",
+        )
+
+    job = create_job(
+        job_type=JOB_TYPE_INDEX_UPDATE,
+        created_by=request.user,
+        message="Pending document index update queued.",
+    )
+
+    background_tasks.add_task(run_index_update_job, job["job_id"], request)
 
     return JobResponse(**job)

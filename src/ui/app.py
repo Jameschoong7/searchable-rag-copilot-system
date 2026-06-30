@@ -91,12 +91,12 @@ API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 
 UPLOAD_VALIDATE_URL = f"{API_BASE_URL}/admin/validate-upload"
 REINDEX_URL = f"{API_BASE_URL}/admin/reindex"
-INDEX_UPDATES_URL = f"{API_BASE_URL}/admin/index-updates"
 API_URL = f"{API_BASE_URL}/query"
 API_HEALTH_URL = f"{API_BASE_URL}/health"
 CHAT_JOBS_URL = f"{API_BASE_URL}/chat/jobs"
 BACKEND_JOBS_URL = f"{API_BASE_URL}/admin/jobs"
 REINDEX_JOBS_URL = f"{API_BASE_URL}/admin/reindex-jobs"
+INDEX_UPDATE_JOBS_URL = f"{API_BASE_URL}/admin/index-update-jobs"
 METADATA_UPDATE_VALIDATE_URL = f"{API_BASE_URL}/admin/validate-metadata-update"
 ARCHIVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/archive-document"
 SETTINGS_URL = f"{API_BASE_URL}/admin/settings"
@@ -104,7 +104,7 @@ QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
 EVALUATION_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/retrieval_eval_results.json"
 INDEX_BENCHMARK_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_results.json"
 INDEX_BENCHMARK_HISTORY_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_history.json"
-
+QUERY_HISTORY_LIMIT = 50
 
 def request_backend_reindex() -> dict:
     """Ask the FastAPI backend to rebuild the configured search index."""
@@ -135,14 +135,15 @@ def submit_reindex_job() -> dict:
     return response.json()
 
 
-def request_pending_index_update() -> dict:
-    """Ask FastAPI to incrementally index pending document updates."""
+def submit_index_update_job() -> dict:
+    """Submit pending-document indexing as a durable backend job."""
     response = requests.post(
-        INDEX_UPDATES_URL,
+        INDEX_UPDATE_JOBS_URL,
         json={
             "role": st.session_state["role"],
+            "user": st.session_state["user"],
         },
-        timeout=300,
+        timeout=10,
     )
 
     response.raise_for_status()
@@ -317,7 +318,7 @@ def poll_active_chat_job() -> None:
             result["sources"],
         )
 
-        write_query_log(
+        query_log_id = write_query_log(
             question=result["question"],
             department_filter=result.get("department_filter"),
             file_type_filter=result.get("file_type_filter"),
@@ -339,13 +340,15 @@ def poll_active_chat_job() -> None:
                 "sources": result["sources"],
                 "context": context_text,
                 "status": answer_status,
+                "query_log_id": query_log_id,
+                "feedback": "none",
             }
         )
 
     elif job["status"] == "failed":
         result = job.get("result", {})
 
-        write_query_log(
+        query_log_id = write_query_log(
             question=result.get("question", "Unknown question"),
             department_filter=result.get("department_filter"),
             file_type_filter=result.get("file_type_filter"),
@@ -361,6 +364,8 @@ def poll_active_chat_job() -> None:
                 "sources": [],
                 "context": "",
                 "status": "api_error",
+                "query_log_id": query_log_id,
+                "feedback": "none",
             }
         )
 
@@ -392,13 +397,46 @@ def poll_active_reindex_job() -> None:
         st.session_state["settings_message"] = result["message"]
         st.session_state["settings_rebuild_required"] = False
         st.session_state["reindex_job_message"] = result["message"]
+        st.session_state["reindex_job_status"] = "success"
 
     elif job["status"] == "failed":
         st.session_state["settings_message"] = job["message"]
         st.session_state["settings_rebuild_required"] = True
         st.session_state["reindex_job_message"] = job["message"]
+        st.session_state["reindex_job_status"] = "error"
 
     st.session_state.pop("active_reindex_job_id", None)
+    st.rerun()
+
+
+@st.fragment(run_every="2s")
+def poll_active_index_update_job() -> None:
+    """Poll the active pending-index update job without blocking Streamlit navigation."""
+    active_index_update_job_id = st.session_state.get("active_index_update_job_id")
+
+    if not active_index_update_job_id:
+        return
+
+    try:
+        job = get_backend_job(active_index_update_job_id)
+    except requests.exceptions.RequestException as error:
+        st.warning(f"Index update job status unavailable: {error}")
+        return
+
+    if job["status"] in ["queued", "running"]:
+        st.info(job["message"])
+        return
+
+    if job["status"] == "succeeded":
+        result = job["result"]
+        st.session_state["index_update_job_message"] = result["message"]
+        st.session_state["index_update_job_status"] = "success"
+
+    elif job["status"] == "failed":
+        st.session_state["index_update_job_message"] = job["message"]
+        st.session_state["index_update_job_status"] = "error"
+
+    st.session_state.pop("active_index_update_job_id", None)
     st.rerun()
 
 
@@ -513,6 +551,23 @@ def initialise_query_log_database() -> None:
             """
         )
 
+        existing_columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(query_logs)")
+        }
+
+        feedback_columns = {
+            "feedback": "TEXT DEFAULT 'none'",
+            "feedback_note": "TEXT",
+            "feedback_at": "TEXT",
+        }
+
+        for column_name, column_type in feedback_columns.items():
+            if column_name not in existing_columns:
+                connection.execute(
+                    f"ALTER TABLE query_logs ADD COLUMN {column_name} {column_type}"
+                )
+
 
 def classify_answer_status(answer: str, sources: list[str]) -> str:
     """Classify the result so dashboard metrics can group query outcomes."""
@@ -565,6 +620,26 @@ def show_status_message(status: str) -> None:
         st.error(label)
 
 
+def show_escalation_guidance(status: str) -> None:
+    """Show next-step guidance when the answer is blocked or unresolved."""
+    if status == "permission_block":
+        st.caption(
+            "Next step: request access from your project manager, document owner, "
+            "or the department that owns this policy. The system did not use restricted "
+            "content to generate the answer."
+        )
+    elif status == "not_found":
+        st.caption(
+            "Next step: ask a more specific question, check whether another department owns "
+            "this information, ask your manager, or request that an admin adds the missing "
+            "document to the knowledge base."
+        )
+    elif status in ["api_error", "connection_error"]:
+        st.caption(
+            "Next step: retry later or contact the system admin if the issue continues."
+        )
+
+
 def write_query_log(
         question: str,
         department_filter: str | None,
@@ -572,12 +647,12 @@ def write_query_log(
         status: str,
         sources: list[str],
         latency_seconds: float,
-) -> None:
+) -> int:
     """Insert one structured chat query event into the local SQLite log."""
     initialise_query_log_database()
 
     with sqlite3.connect(QUERY_LOG_DB_PATH) as connection:
-        connection.execute(
+        cursor = connection.execute(
             """
             INSERT INTO query_logs (
                 timestamp,
@@ -607,6 +682,31 @@ def write_query_log(
             )
         )
 
+        return cursor.lastrowid
+
+
+def update_query_feedback(query_log_id: int, feedback: str, feedback_note: str | None = None) -> None:
+    """Update user feedback for one logged query."""
+    initialise_query_log_database()
+
+    with sqlite3.connect(QUERY_LOG_DB_PATH) as connection:
+        connection.execute(
+            """
+            UPDATE query_logs
+            SET
+                feedback = ?,
+                feedback_note = ?,
+                feedback_at = ?
+            WHERE id = ?
+            """,
+            (
+                feedback,
+                feedback_note,
+                datetime.now().isoformat(timespec="seconds"),
+                query_log_id,
+            ),
+        )
+
 
 def read_query_log_summary() -> dict:
     """Read real local query-log signals for the Performance dashboard."""
@@ -627,7 +727,7 @@ def read_query_log_summary() -> dict:
         ).fetchone()
 
         recent_rows = connection.execute(
-            """
+             """
             SELECT
                 timestamp,
                 user,
@@ -640,8 +740,9 @@ def read_query_log_summary() -> dict:
                 latency_seconds
             FROM query_logs
             ORDER BY id DESC
-            LIMIT 10
-            """
+            LIMIT ?
+            """,
+            (QUERY_HISTORY_LIMIT,),
         ).fetchall()
 
         daily_latency_rows = connection.execute(
@@ -657,6 +758,30 @@ def read_query_log_summary() -> dict:
             """
         ).fetchall()
 
+        review_rows = connection.execute(
+            """
+            SELECT
+                id,
+                timestamp,
+                user,
+                role,
+                department,
+                question,
+                status,
+                sources_json,
+                latency_seconds,
+                feedback,
+                feedback_note
+            FROM query_logs
+            WHERE
+                status != 'success'
+                OR feedback = 'reported_issue'
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (QUERY_HISTORY_LIMIT,),
+        ).fetchall()
+
         return {
             "total_queries": summary_row[0],
             "average_latency": summary_row[1],
@@ -664,6 +789,8 @@ def read_query_log_summary() -> dict:
             "unresolved_queries": summary_row[3] or 0,
             "recent_queries": recent_rows,
             "daily_latency_rows": daily_latency_rows,
+            "query_history_limit": QUERY_HISTORY_LIMIT,
+            "review_rows": review_rows,
         }
 
 
@@ -809,7 +936,7 @@ st.set_page_config(
 
 if not is_logged_in():
     st.title("Searchable RAG Copilot")
-    st.caption("Demo sign-in for the standalone Admin Web Portal.")
+    st.caption("Sign in to the standalone Admin Web Portal.")
     
     with st.container(border=True):
         username = st.text_input("Username", value="admin_jc")
@@ -819,7 +946,7 @@ if not is_logged_in():
             if login_user(username.strip(), password):
                 st.rerun()
             else:
-                st.error("Invalid demo username or password.")
+                st.error("Invalid username or password.")
 
     st.stop()
 
@@ -938,6 +1065,7 @@ st.sidebar.markdown(
 st.sidebar.divider()
 
 poll_active_reindex_job()
+poll_active_index_update_job()
 
 kb_page_label = get_kb_page_label()
 
@@ -959,6 +1087,29 @@ st.sidebar.divider()
 if st.sidebar.button("Logout", use_container_width=True):
     logout_user()
     st.rerun()
+
+
+if st.session_state["role"] == SYSTEM_ADMIN_ROLE and selected_page != kb_page_label:
+    pending_index_documents = [
+        document
+        for document in load_document_metadata()
+        if get_index_status_label(document) == "Pending Index"
+    ]
+
+    if pending_index_documents:
+        with st.container(border=True):
+            st.warning(
+                f"**Admin Action Required:** {len(pending_index_documents)} document(s) waiting for search index update."
+            )
+            
+            st.markdown("Review pending documents in **KB Management**, then run **Update for Pending Documents**.")
+
+            with st.expander("View waiting documents"):
+                for document in pending_index_documents[:3]:
+                    st.caption(f"• {document['title']} ({document['document_id']})")
+                
+                if len(pending_index_documents) > 3:
+                    st.caption(f"+ {len(pending_index_documents) - 3} more...")
 
 
 if selected_page == "Performance":
@@ -1063,7 +1214,11 @@ if selected_page == "Performance":
                 query_log_summary["unresolved_queries"],
             )
 
-    st.subheader("Incremental Index Health")
+    st.subheader("Search Index Update Status")
+    st.caption(
+        "Shows whether the active search index reflects approved/latest documents, "
+        "and compares full rebuild work against incremental document updates."
+    )
 
     if index_benchmark_results:
         after_snapshot = index_benchmark_results.get("after", index_benchmark_results)
@@ -1095,9 +1250,9 @@ if selected_page == "Performance":
             )
 
             st.success(
-                f"Latest incremental update refreshed {changed_document_count} changed "
+                f"Latest index update processed {changed_document_count} changed "
                 f"{document_label} in {elapsed_seconds}s. {chunks_refreshed} chunks were "
-                f"re-indexed and {avoided_chunks} unchanged chunks were avoided."
+                f"re-indexed and {avoided_chunks} unchanged chunks were skipped."
             )
 
             metric_columns = st.columns(4)
@@ -1111,14 +1266,14 @@ if selected_page == "Performance":
 
             with metric_columns[1]:
                 st.metric(
-                    "Chunks Refreshed",
+                    "Chunks Re-indexed",
                     chunks_refreshed,
                     f"{avoided_chunks} unchanged avoided",
                 )
 
             with metric_columns[2]:
                 st.metric(
-                    "Vectors Replaced",
+                    "Old Vectors Removed",
                     deleted_vectors,
                     "Removed before re-index",
                 )
@@ -1415,7 +1570,32 @@ if selected_page == "Performance":
             else:
                 st.info(threshold_interpretation["recommendation"])
 
-    with st.expander("View Retrieval Miss Log & Context", expanded=False):
+    with st.expander("Admin Review Queue - Live Issues & Benchmark Misses", expanded=False):
+        st.markdown("**Live Query Issues / User Feedback**")
+        live_review_rows = [
+            {
+                "Log ID": row[0],
+                "Timestamp": row[1],
+                "User": row[2],
+                "Role": row[3],
+                "Department": row[4],
+                "Question": row[5],
+                "Status": row[6],
+                "Sources": ", ".join(json.loads(row[7])),
+                "Latency (s)": row[8],
+                "Feedback": row[9],
+                "Note": row[10],
+            }
+            for row in query_log_summary["review_rows"]
+        ]
+
+        if live_review_rows:
+            st.dataframe(live_review_rows, use_container_width=True, hide_index=True)
+        else:
+            st.success("No live query issues or reported feedback in the latest logged queries.")
+
+        st.divider()
+        st.markdown("**Labelled Benchmark Misses**")
         if evaluation_results and evaluation_results["miss_rows"]:
             real_miss_rows = [
                 {
@@ -1445,7 +1625,14 @@ if selected_page == "Performance":
                 "`python -m src.evaluation.retrieval_eval` to generate miss review data."
             )
 
-    with st.expander("Recent Logged Queries", expanded=False):
+    with st.expander(
+        f"Query History - Latest {query_log_summary['query_history_limit']} Logged Queries",
+        expanded=False,
+    ):
+        st.caption(
+            "This is the persisted local chat/query history used for audit-style review, "
+            "debugging, and dashboard signals."
+        )
         recent_query_rows = [
             {
                 "Timestamp": row[0],
@@ -1564,8 +1751,8 @@ elif selected_page in ["KB Management", "KB Status"]:
                 with new_document_tab:
                     st.markdown("**1. Upload & Categorize Document**")
                     st.caption(
-                        "Uploads a TXT file into data/simulated and appends trusted metadata. "
-                        "Rebuild the vector index after upload before searching the new document."
+                        "Upload captures document title, department, category, tags, and access scope. "
+                        "File identity, storage location, version, uploader, timestamp, index status, and extraction status are assigned by the system."
                     )
 
                     if "upload_form_version" not in st.session_state:
@@ -1661,71 +1848,78 @@ elif selected_page in ["KB Management", "KB Status"]:
                                 filename = normalise_uploaded_filename(uploaded_file.name)
                                 file_type = get_uploaded_file_type(filename)
 
+                                upload_error = None
+
                                 if file_type == "UNKNOWN":
-                                    st.error("Only TXT, PDF, and DOCX uploads are supported in the current local prototype.")
-                                    st.stop()
-
-                                if metadata_exists_for_filename(filename):
-                                    st.error(
-                                        "Metadata already exists for this filename. Rename the file or remove the existing metadata record first."
+                                    upload_error = "Only TXT, PDF, and DOCX uploads are supported."
+                                elif metadata_exists_for_filename(filename):
+                                    upload_error = (
+                                        "Metadata already exists for this filename. Rename the file or "
+                                        "upload it as a new version instead."
                                     )
-                                    st.stop()
 
-                                try:
-                                    approved_metadata = request_upload_validation(
-                                        document_department=department,
-                                        allowed_roles=allowed_roles,
-                                        allowed_departments=allowed_departments,
-                                    )
-                                except requests.exceptions.HTTPError as error:
-                                    st.error(f"Upload rejected by backend: {error.response.text}")
-                                    st.stop()
-                                except requests.exceptions.RequestException as error:
-                                    st.error(f"Could not validate upload metadata: {error}")
-                                    st.stop()
+                                if upload_error:
+                                    st.error(upload_error)
+                                else:
+                                    try:
+                                        approved_metadata = request_upload_validation(
+                                            document_department=department,
+                                            allowed_roles=allowed_roles,
+                                            allowed_departments=allowed_departments,
+                                        )
+                                    except requests.exceptions.HTTPError as error:
+                                        st.error(f"Upload rejected by backend: {error.response.text}")
+                                    except requests.exceptions.RequestException as error:
+                                        st.error(f"Could not validate upload metadata: {error}")
+                                    else:
+                                        stored_document = save_uploaded_file(uploaded_file)
+                                        filename = stored_document.filename
 
-                                stored_document = save_uploaded_file(uploaded_file)
-                                filename = stored_document.filename
+                                        new_document = {
+                                            "document_id": generate_document_id(documents),
+                                            "title": title.strip(),
+                                            "filename": filename,
+                                            "storage_backend": stored_document.storage_backend,
+                                            "storage_uri": stored_document.storage_uri,
+                                            "file_type": file_type,
+                                            "source": "Manual Upload",
+                                            "department": approved_metadata["document_department"],
+                                            "category": category.strip() or "General",
+                                            "tags": [
+                                                tag.strip()
+                                                for tag in tags_text.split(",")
+                                                if tag.strip()
+                                            ],
+                                            "allowed_roles": approved_metadata["allowed_roles"],
+                                            "allowed_departments": approved_metadata["allowed_departments"],
+                                            "uploaded_by": st.session_state["user"],
+                                            "uploaded_at": datetime.now().isoformat(timespec="minutes"),
+                                            "page_number": None,
+                                            "chunk_id": "pending_index",
+                                            "visual_extraction_status": get_visual_extraction_status(file_type),
+                                        }
 
-                                new_document = {
-                                    "document_id": generate_document_id(documents),
-                                    "title": title.strip(),
-                                    "filename": filename,
-                                    "storage_backend": stored_document.storage_backend,
-                                    "storage_uri": stored_document.storage_uri,
-                                    "file_type": file_type,
-                                    "source": "Manual Upload",
-                                    "department": approved_metadata["document_department"],
-                                    "category": category.strip() or "General",
-                                    "tags": [
-                                        tag.strip()
-                                        for tag in tags_text.split(",")
-                                        if tag.strip()
-                                    ],
-                                    "allowed_roles": approved_metadata["allowed_roles"],
-                                    "allowed_departments": approved_metadata["allowed_departments"],
-                                    "uploaded_by": st.session_state["user"],
-                                    "uploaded_at": datetime.now().isoformat(timespec="minutes"),
-                                    "page_number": None,
-                                    "chunk_id": "pending_index",
-                                    "visual_extraction_status": get_visual_extraction_status(file_type),
-                                }
+                                        append_document_metadata(new_document)
 
-                                append_document_metadata(new_document)
+                                        index_owner_message = (
+                                            "Run Update for Pending Documents so the latest approved content is available in chat."
+                                            if st.session_state["role"] == SYSTEM_ADMIN_ROLE
+                                            else "System Admin action is required to update the search index before this content is available in chat."
+                                        )
 
-                                st.session_state["upload_message"] = (
-                                    f"Saved {filename} and appended metadata record "
-                                    f"{new_document['document_id']}. Rebuild the search index before searching it."
-                                )
+                                        st.session_state["upload_message"] = (
+                                            f"Saved {filename} and metadata record {new_document['document_id']}. "
+                                            f"{index_owner_message}"
+                                        )
 
-                                st.session_state["upload_form_version"] += 1
-                                st.rerun()
+                                        st.session_state["upload_form_version"] += 1
+                                        st.rerun()
 
                 with new_version_tab:
                     st.markdown("**Upload Replacement As New Version**")
                     st.caption(
-                        "Select an existing active document, then upload its replacement. "
-                        "The previous metadata record will be archived and the new version will be marked pending index."
+                        "Select an active document and upload its replacement. "
+                        "The system archives the previous version, creates the next version record, and marks it for search index update."
                     )
 
                     manageable_documents = [
@@ -1782,54 +1976,61 @@ elif selected_page in ["KB Management", "KB Status"]:
 
                                     file_type = get_uploaded_file_type(stored_filename)
 
-                                    if file_type == "UNKNOWN":
-                                        st.error("Only TXT, PDF, and DOCX uploads are supported.")
-                                        st.stop()
+                                    version_upload_error = None
 
-                                    if metadata_exists_for_filename(stored_filename):
-                                        st.error(
+                                    if file_type == "UNKNOWN":
+                                        version_upload_error = "Only TXT, PDF, and DOCX uploads are supported."
+                                    elif metadata_exists_for_filename(stored_filename):
+                                        version_upload_error = (
                                             "A stored file for this version already exists. "
                                             "Please choose a different replacement file or check existing metadata."
                                         )
-                                        st.stop()
 
-                                    stored_version_document = save_uploaded_file_as(
-                                        uploaded_version_file,
-                                        stored_filename,
-                                    )
+                                    if version_upload_error:
+                                        st.error(version_upload_error)
+                                    else:
+                                        stored_version_document = save_uploaded_file_as(
+                                            uploaded_version_file,
+                                            stored_filename,
+                                        )
 
-                                    new_version_document = selected_version_document.copy()
-                                    new_version_document.update(
-                                        {
-                                            "document_id": generate_version_document_id(
-                                                selected_version_document,
-                                                next_version_number,
-                                            ),
-                                            "filename": stored_version_document.filename,
-                                            "storage_backend": stored_version_document.storage_backend,
-                                            "storage_uri": stored_version_document.storage_uri,
-                                            "file_type": file_type,
-                                            "uploaded_by": st.session_state["user"],
-                                            "uploaded_at": datetime.now().isoformat(timespec="minutes"),
-                                            "page_number": None,
-                                            "chunk_id": "pending_index",
-                                            "visual_extraction_status": get_visual_extraction_status(file_type),
-                                            "content_hash": None,
-                                        }
-                                    )
+                                        new_version_document = selected_version_document.copy()
+                                        new_version_document.update(
+                                            {
+                                                "document_id": generate_version_document_id(
+                                                    selected_version_document,
+                                                    next_version_number,
+                                                ),
+                                                "filename": stored_version_document.filename,
+                                                "storage_backend": stored_version_document.storage_backend,
+                                                "storage_uri": stored_version_document.storage_uri,
+                                                "file_type": file_type,
+                                                "uploaded_by": st.session_state["user"],
+                                                "uploaded_at": datetime.now().isoformat(timespec="minutes"),
+                                                "page_number": None,
+                                                "chunk_id": "pending_index",
+                                                "visual_extraction_status": get_visual_extraction_status(file_type),
+                                                "content_hash": None,
+                                            }
+                                        )
 
-                                    create_new_document_version(
-                                        previous_document_id=selected_version_document["document_id"],
-                                        new_document=new_version_document,
-                                        archived_at=datetime.now().isoformat(timespec="minutes"),
-                                    )
+                                        create_new_document_version(
+                                            previous_document_id=selected_version_document["document_id"],
+                                            new_document=new_version_document,
+                                            archived_at=datetime.now().isoformat(timespec="minutes"),
+                                        )
 
-                                    st.session_state["upload_message"] = (
-                                        f"Created {selected_version_document['title']} "
-                                        f"v{next_version_number}. Run Incremental Index Update "
-                                        "to remove old vectors and index the new version."
-                                    )
-                                    st.rerun()
+                                        index_owner_message = (
+                                            "Run Update for Pending Documents to replace old search vectors and activate the new version in chat."
+                                            if st.session_state["role"] == SYSTEM_ADMIN_ROLE
+                                            else "System Admin action is required to replace old search vectors and activate the new version in chat."
+                                        )
+
+                                        st.session_state["upload_message"] = (
+                                            f"Created {selected_version_document['title']} v{next_version_number}. "
+                                            f"{index_owner_message}"
+                                        )
+                                        st.rerun()
 
         if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
             with st.container(border=True):
@@ -1839,21 +2040,43 @@ elif selected_page in ["KB Management", "KB Status"]:
                     "when you want to reconstruct the active index from scratch."
                 )
 
+                if st.session_state.get("index_update_job_message"):
+                    index_update_status = st.session_state.get("index_update_job_status", "info")
+
+                    if index_update_status == "success":
+                        st.success(st.session_state["index_update_job_message"])
+                    elif index_update_status == "error":
+                        st.error(st.session_state["index_update_job_message"])
+                    else:
+                        st.info(st.session_state["index_update_job_message"])
+
+                if st.session_state.get("reindex_job_message"):
+                    reindex_status = st.session_state.get("reindex_job_status", "info")
+
+                    if reindex_status == "success":
+                        st.success(st.session_state["reindex_job_message"])
+                    elif reindex_status == "error":
+                        st.error(st.session_state["reindex_job_message"])
+                    else:
+                        st.info(st.session_state["reindex_job_message"])
+
                 index_action_columns = st.columns(2)
 
                 with index_action_columns[0]:
-                    if st.button("Run Incremental Index Update", use_container_width=True):
-                        with st.spinner("Indexing pending document updates..."):
-                            try:
-                                index_update_result = request_pending_index_update()
-                            except Exception as error:
-                                st.error(f"Incremental index update failed: {error}")
-                            else:
-                                if index_update_result["status"] == "no_pending_documents":
-                                    st.info(index_update_result["message"])
-                                else:
-                                    st.success(index_update_result["message"])
-                                    st.rerun()
+                    if st.button(
+                        "Run Update for Pending Documents",
+                        use_container_width=True,
+                        disabled=bool(st.session_state.get("active_index_update_job_id")),
+                    ):
+                        try:
+                            job = submit_index_update_job()
+                        except requests.exceptions.RequestException as error:
+                            st.error(f"Could not submit index update job: {error}")
+                        else:
+                            st.session_state["active_index_update_job_id"] = job["job_id"]
+                            st.session_state["index_update_job_message"] = "Pending document index update queued."
+                            st.session_state["index_update_job_status"] = "info"
+                            st.rerun()
 
                 with index_action_columns[1]:
                    if st.button(
@@ -1868,6 +2091,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                         else:
                             st.session_state["active_reindex_job_id"] = job["job_id"]
                             st.session_state["reindex_job_message"] = "Search index rebuild queued."
+                            st.session_state["reindex_job_status"] = "info"
                             st.rerun()
 
         if st.session_state["upload_message"]:
@@ -1920,9 +2144,15 @@ elif selected_page in ["KB Management", "KB Status"]:
                 )
 
                 if pending_index_count:
-                    st.warning(
-                        f"{pending_index_count} document(s) need indexing before chat can use the latest content."
-                    )
+                    if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+                        st.warning(
+                            f"{pending_index_count} document(s) require search index update before chat can use the latest content. "
+                            "Use Run Update for Pending Documents in Document Ingestion & Indexing."
+                        )
+                    else:
+                        st.warning(
+                            f"{pending_index_count} document(s) are waiting for System Admin search index update before chat can use the latest content."
+                        )
                 else:
                     st.success("All visible active documents are indexed.")
 
@@ -2203,34 +2433,32 @@ elif selected_page in ["KB Management", "KB Status"]:
                                     )
                                 except requests.exceptions.HTTPError as error:
                                     st.error(f"Metadata update rejected by backend: {error.response.text}")
-                                    st.stop()
                                 except requests.exceptions.RequestException as error:
                                     st.error(f"Could not validate metadata update: {error}")
-                                    st.stop()
+                                else:
+                                    updated_document = selected_document.copy()
+                                    updated_document.update(
+                                        {
+                                            "title": edited_title.strip(),
+                                            "department": approved_metadata["document_department"],
+                                            "category": edited_category.strip() or "General",
+                                            "tags": [
+                                                tag.strip()
+                                                for tag in edited_tags_text.split(",")
+                                                if tag.strip()
+                                            ],
+                                            "allowed_roles": approved_metadata["allowed_roles"],
+                                            "allowed_departments": approved_metadata["allowed_departments"],
+                                        }
+                                    )
 
-                                updated_document = selected_document.copy()
-                                updated_document.update(
-                                    {
-                                        "title": edited_title.strip(),
-                                        "department": approved_metadata["document_department"],
-                                        "category": edited_category.strip() or "General",
-                                        "tags": [
-                                            tag.strip()
-                                            for tag in edited_tags_text.split(",")
-                                            if tag.strip()
-                                        ],
-                                        "allowed_roles": approved_metadata["allowed_roles"],
-                                        "allowed_departments": approved_metadata["allowed_departments"],
-                                    }
-                                )
+                                    update_document_metadata(
+                                        selected_document["document_id"],
+                                        updated_document,
+                                    )
 
-                                update_document_metadata(
-                                    selected_document["document_id"],
-                                    updated_document,
-                                )
-
-                                st.success("Metadata updated. ACL changes apply to chat immediately.")
-                                st.rerun()
+                                    st.success("Metadata updated. ACL changes apply to chat immediately.")
+                                    st.rerun()
                     
 
 elif selected_page == "Chat":
@@ -2342,6 +2570,8 @@ elif selected_page == "Chat":
             with st.chat_message(message["role"]):
                 if message["role"] == "assistant" and message.get("status"):
                     show_status_message(message["status"])
+                    if st.session_state["role"] != SYSTEM_ADMIN_ROLE:
+                        show_escalation_guidance(message["status"])
 
                 st.write(message["content"])
 
@@ -2358,6 +2588,38 @@ elif selected_page == "Chat":
                         with meta_col2:
                             with st.expander("🔍 Query Context"):
                                 st.caption(message["context"])
+                if (
+                    message["role"] == "assistant"
+                    and message.get("query_log_id")
+                    and message.get("feedback", "none") == "none"
+                ):
+                    feedback_columns = st.columns(2)
+
+                    with feedback_columns[0]:
+                        if st.button(
+                            "Helpful",
+                            key=f"helpful_{message['query_log_id']}",
+                            use_container_width=True,
+                        ):
+                            update_query_feedback(message["query_log_id"], "helpful")
+                            message["feedback"] = "helpful"
+                            st.rerun()
+
+                    with feedback_columns[1]:
+                        if st.button(
+                            "Report Issue",
+                            key=f"issue_{message['query_log_id']}",
+                            use_container_width=True,
+                        ):
+                            update_query_feedback(message["query_log_id"], "reported_issue")
+                            message["feedback"] = "reported_issue"
+                            st.rerun()
+
+                elif message["role"] == "assistant" and message.get("feedback") == "helpful":
+                    st.caption("Feedback recorded: helpful")
+
+                elif message["role"] == "assistant" and message.get("feedback") == "reported_issue":
+                    st.caption("Feedback recorded: reported issue")
 
     chat_is_processing = st.session_state.get("chat_is_processing", False)
 
@@ -2436,6 +2698,24 @@ elif selected_page == "Chat":
                     department_filter,
                     file_type_filter,
                 )
+            except requests.exceptions.HTTPError as error:
+                detail = "The question could not be submitted."
+
+                try:
+                    detail = error.response.json().get("detail", detail)
+                except ValueError:
+                    pass
+
+                st.session_state["chat_messages"].append(
+                    {
+                        "role": "assistant",
+                        "content": detail,
+                        "sources": [],
+                        "context": "",
+                        "status": "not_found",
+                    }
+                )
+                st.session_state["chat_is_processing"] = False
             except requests.exceptions.RequestException as error:
                 st.session_state["chat_messages"].append(
                     {
@@ -2479,7 +2759,7 @@ elif selected_page == "Settings":
         mode_columns[1].metric("Vector", current_settings["vector_backend"])
         mode_columns[2].metric("Embedding", current_settings["embedding_backend"])
         mode_columns[3].metric("LLM", current_settings["llm_backend"])
-        mode_columns[4].metric("SharePoint", "simulated")
+        mode_columns[4].metric("SharePoint", "managed connector")
 
     with st.form("runtime_settings_form", border=True):
         st.subheader("Configure Backend")
@@ -2558,7 +2838,7 @@ elif selected_page == "Settings":
             if risky_change:
                 st.warning(
                     "Changing vector or embedding backend requires rebuilding the active search index. "
-                    "Until rebuild completes, search results may be incomplete or stale."
+                    "Until rebuild completes, queries continue using the previously built index."
                 )
 
             try:
@@ -2585,8 +2865,8 @@ elif selected_page == "Settings":
         with st.container(border=True):
             st.subheader("Search Index Rebuild Required")
             st.info(
-                "A vector or embedding mode change was detected. Run a full rebuild "
-                "when you are ready. This is manual to prevent Azure quota/cost spikes."
+                "A vector or embedding mode change was detected. Run a full rebuild when ready "
+                "to activate the selected retrieval configuration."
             )
 
             if st.button("Run Rebuild Now", type="primary", use_container_width=True):
@@ -2606,8 +2886,8 @@ elif selected_page == "Settings":
     with st.expander("Backend Mode Rules"):
         st.markdown("""
         * **SQLite** remains the source of truth for metadata, ACL/RBAC, versioning, logs, and audit.
-        * **Azure AI Search** stores searchable chunks only; it does not replace SQLite governance.
-        * **Azure Blob Storage** can replace local document storage when configured.
-        * **Azure OpenAI** is used only after deployment, endpoint, and API key are confirmed.
-        * **SharePoint** remains simulated until enterprise Microsoft 365 tenant access is available.
+        * **Azure AI Search** stores searchable chunks only; governance remains controlled by the backend.
+        * **Azure Blob Storage** stores uploaded source documents when configured.
+        * **Azure OpenAI** can be used when endpoint, deployment, and key configuration are available.
+        * **SharePoint** uses the governed source connector model; live enterprise sync depends on tenant configuration.
         """)
