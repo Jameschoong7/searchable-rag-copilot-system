@@ -41,7 +41,6 @@ from src.core.constants import (
     SYSTEM_ADMIN_ROLE,
 )
 
-from src.core.config import read_app_config
 
 from src.storage.document_storage import save_document_bytes
 
@@ -1167,7 +1166,7 @@ if selected_page == "Performance":
 
         with metric_columns[1]:
             st.metric(
-                "Top-K Accuracy (K=5)",
+                "Eval Top-K Accuracy (K=5)",
                 top_k_accuracy,
                 top_k_delta,
             )
@@ -1187,8 +1186,9 @@ if selected_page == "Performance":
             )
 
         st.caption(
-            "TTFA is calculated from local chat logs. Top-K Accuracy and Miss Rate come "
-            "from the latest labelled retrieval evaluation run."
+            "TTFA is calculated from local chat logs. Eval Top-K Accuracy and Miss Rate come "
+            "from the latest labelled retrieval evaluation run. Live chat retrieval uses "
+            "the active Top-K and threshold from Settings."
         )
 
     with st.container(border=True):
@@ -1541,8 +1541,8 @@ if selected_page == "Performance":
 
     with st.expander("How benchmark accuracy is measured"):
         st.markdown(
-            "**Top-K Accuracy checks whether the expected source document appears "
-            "within the top 5 retrieved chunks.**"
+            "**Eval Top-K Accuracy checks whether the expected source document appears "
+            "within the top 5 retrieved chunks in the labelled evaluation run.**"
         )
         st.caption(
             "Top-K Accuracy and Miss Rate are calculated from the latest labelled "
@@ -2759,7 +2759,7 @@ elif selected_page == "Settings":
         mode_columns[1].metric("Vector", current_settings["vector_backend"])
         mode_columns[2].metric("Embedding", current_settings["embedding_backend"])
         mode_columns[3].metric("LLM", current_settings["llm_backend"])
-        mode_columns[4].metric("SharePoint", "managed connector")
+        mode_columns[4].metric("SharePoint", current_settings.get("sharepoint_mode", "simulated"))
 
     with st.form("runtime_settings_form", border=True):
         st.subheader("Configure Backend")

@@ -1,10 +1,18 @@
 {
-  "benchmark_type": "full_rebuild",
-  "elapsed_seconds": 448.213,
+  "benchmark_type": "batch_incremental_update",
+  "changed_document_count": 1,
+  "updated_sources": [
+    "data/simulated/DOC-UPLOAD-005_v9_Incident_Response_Policy.docx"
+  ],
+  "cleanup_sources": [
+    "data/simulated/DOC-UPLOAD-005_v8_Incident_Response_Policy.docx",
+    "data/simulated/DOC-UPLOAD-005_v9_Incident_Response_Policy.docx"
+  ],
+  "elapsed_seconds": 62.758,
   "before": {
     "vector_backend": "azure_search",
     "active_metadata_records": 17,
-    "simulated_source_files": 26,
+    "simulated_source_files": 29,
     "indexed_chunk_count": 98,
     "index_size_bytes": null,
     "index_size_mb": null,
@@ -13,18 +21,33 @@
     "chroma_db_size_bytes": null,
     "chroma_db_size_mb": null
   },
-  "rebuild_result": {
-    "documents_indexed": 17,
-    "document_objects_loaded": 23,
-    "chunks_indexed": 98,
-    "collection_name": "rag_documents",
-    "db_path": "./data/chroma_db"
-  },
+  "update_results": [
+    {
+      "source": "data/simulated/DOC-UPLOAD-005_v9_Incident_Response_Policy.docx",
+      "deleted_vector_count": 0,
+      "document_objects_loaded": 1,
+      "chunks_indexed": 14
+    }
+  ],
+  "cleanup_results": [
+    {
+      "source": "data/simulated/DOC-UPLOAD-005_v8_Incident_Response_Policy.docx",
+      "deleted_vector_count": 14
+    },
+    {
+      "source": "data/simulated/DOC-UPLOAD-005_v9_Incident_Response_Policy.docx",
+      "deleted_vector_count": 0
+    }
+  ],
+  "total_deleted_vectors": 14,
+  "total_document_objects_loaded": 1,
+  "total_chunks_indexed": 14,
+  "estimated_unchanged_chunks_avoided": 84,
   "after": {
     "vector_backend": "azure_search",
     "active_metadata_records": 17,
-    "simulated_source_files": 26,
-    "indexed_chunk_count": 0,
+    "simulated_source_files": 29,
+    "indexed_chunk_count": 84,
     "index_size_bytes": null,
     "index_size_mb": null,
     "index_size_available": false,
@@ -33,8 +56,9 @@
     "chroma_db_size_mb": null
   },
   "delta": {
-    "indexed_chunk_count": -98,
+    "indexed_chunk_count": -14,
     "index_size_bytes": null,
     "index_size_mb": null
-  }
+  },
+  "updated_by": "admin_jc"
 }
