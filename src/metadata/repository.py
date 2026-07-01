@@ -378,6 +378,21 @@ def create_new_document_version(
     append_document_metadata(versioned_document)
 
 
+def approve_document_for_indexing(
+    document_id: str,
+    updated_document: dict,
+) -> None:
+    """Approve a reviewed connector document so it can be indexed."""
+    approved_document = updated_document.copy()
+    approved_document["is_active"] = 1
+    approved_document["chunk_id"] = "pending_index"
+
+    update_document_metadata(
+        document_id=document_id,
+        updated_document=approved_document,
+    )
+
+
 def metadata_exists_for_filename(filename: str) -> bool:
     """Check whether a metadata record already exists for a filename."""
     seed_metadata_database_from_json()

@@ -268,6 +268,29 @@ class JobResponse(BaseModel):
     updated_at: str
 
 
+class ApproveDocumentRequest(BaseModel):
+    """Represent an admin request to approve a pending-review document."""
+
+    role: str
+    user_department: str
+    document_id: str
+    title: str
+    department: str
+    category: str
+    tags: list[str]
+    allowed_roles: list[str]
+    allowed_departments: list[str]
+
+
+class ApproveDocumentResponse(BaseModel):
+    """Represent a connector document approved for indexing."""
+
+    status: str
+    document_id: str
+    chunk_id: str
+    message: str
+
+
 def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
     """Run one chat query in the background and store the answer in the job table."""
     import time
@@ -1316,3 +1339,91 @@ def create_index_update_job(
     background_tasks.add_task(run_index_update_job, job["job_id"], request)
 
     return JobResponse(**job)
+
+
+@app.post("/admin/approve-document", response_model=ApproveDocumentResponse)
+def approve_pending_document(
+    request: ApproveDocumentRequest,
+) -> ApproveDocumentResponse:
+    """Approve a pending-review connector document and mark it for indexing."""
+    if request.role == GENERAL_EMPLOYEE_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="General Employee cannot approve connector documents.",
+        )
+
+    try:
+        from src.metadata.repository import (
+            approve_document_for_indexing,
+            load_document_metadata,
+        )
+
+        all_documents = load_document_metadata(include_inactive=True)
+
+        target_document = next(
+            (
+                document
+                for document in all_documents
+                if document["document_id"] == request.document_id
+            ),
+            None,
+        )
+
+        if target_document is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Document not found.",
+            )
+
+        if target_document.get("chunk_id") != "pending_review":
+            raise HTTPException(
+                status_code=400,
+                detail="Only pending-review documents can be approved.",
+            )
+
+        if request.role == PROJECT_MANAGER_ROLE:
+            if target_document["department"] != request.user_department:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Project Manager can only approve own-department documents.",
+                )
+
+        approved_metadata = approve_upload_scope(
+            role=request.role,
+            user_department=request.user_department,
+            document_department=request.department,
+            allowed_roles=request.allowed_roles,
+            allowed_departments=request.allowed_departments,
+        )
+
+        updated_document = target_document.copy()
+        updated_document.update(
+            {
+                "title": request.title.strip(),
+                "department": approved_metadata.document_department,
+                "category": request.category.strip() or "Connector Import",
+                "tags": request.tags,
+                "allowed_roles": approved_metadata.allowed_roles,
+                "allowed_departments": approved_metadata.allowed_departments,
+            }
+        )
+
+        approve_document_for_indexing(
+            document_id=request.document_id,
+            updated_document=updated_document,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Document approval failed: {error}",
+        ) from error
+
+    return ApproveDocumentResponse(
+        status="approved",
+        document_id=request.document_id,
+        chunk_id="pending_index",
+        message="Document approved and marked for search index update.",
+    )
