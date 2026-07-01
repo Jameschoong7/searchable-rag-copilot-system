@@ -95,11 +95,43 @@ ARCHIVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/archive-document"
 SETTINGS_URL = f"{API_BASE_URL}/admin/settings"
 UPLOAD_DOCUMENT_URL = f"{API_BASE_URL}/admin/upload-document"
 UPLOAD_DOCUMENT_VERSION_URL = f"{API_BASE_URL}/admin/upload-document-version"
+APPROVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/approve-document"
 QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
 EVALUATION_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/retrieval_eval_results.json"
 INDEX_BENCHMARK_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_results.json"
 INDEX_BENCHMARK_HISTORY_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_history.json"
 QUERY_HISTORY_LIMIT = 50
+
+
+def request_document_approval(
+    document_id: str,
+    title: str,
+    department: str,
+    category: str,
+    tags: list[str],
+    allowed_roles: list[str],
+    allowed_departments: list[str],
+) -> dict:
+    """Ask FastAPI to approve one pending-review connector document."""
+    response = requests.post(
+        APPROVE_DOCUMENT_URL,
+        json={
+            "role": st.session_state["role"],
+            "user_department": st.session_state["department"],
+            "document_id": document_id,
+            "title": title,
+            "department": department,
+            "category": category,
+            "tags": tags,
+            "allowed_roles": allowed_roles,
+            "allowed_departments": allowed_departments,
+        },
+        timeout=30,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
 
 def request_backend_reindex() -> dict:
     """Ask the FastAPI backend to rebuild the configured search index."""
@@ -1665,6 +1697,12 @@ elif selected_page in ["KB Management", "KB Status"]:
         if can_view_document(document)
     ]
 
+    pending_review_documents = [
+        document
+        for document in load_document_metadata(include_inactive=True)
+        if document.get("chunk_id") == "pending_review"
+    ]
+
     summary_columns = st.columns(3)
 
     with summary_columns[0]:
@@ -2014,6 +2052,128 @@ elif selected_page in ["KB Management", "KB Status"]:
 
     st.divider()
 
+    if st.session_state["role"] in ["System Admin", "Project Manager"]:
+        st.subheader("Pending Connector Review")
+
+        reviewable_documents = [
+            document
+            for document in pending_review_documents
+            if (
+                st.session_state["role"] == "System Admin"
+                or document["department"] == st.session_state["department"]
+            )
+        ]
+
+        if not reviewable_documents:
+            st.caption("No connector documents are waiting for your review.")
+        else:
+            review_rows = [
+                {
+                    "Document ID": document["document_id"],
+                    "Title": document["title"],
+                    "Source": document["source"],
+                    "Suggested Department": document["department"],
+                    "Storage URI": document.get("storage_uri", ""),
+                    "Uploaded At": document.get("uploaded_at", ""),
+                }
+                for document in reviewable_documents
+            ]
+
+            st.dataframe(
+                review_rows,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            document_options = {
+                f"{document['title']} ({document['document_id']})": document
+                for document in reviewable_documents
+            }
+
+            selected_review_label = st.selectbox(
+                "Select connector document to review",
+                list(document_options.keys()),
+                key="selected_connector_review_document",
+            )
+
+            selected_review_document = document_options[selected_review_label]
+
+            with st.form(f"approve_connector_{selected_review_document['document_id']}"):
+                edited_title = st.text_input(
+                    "Title",
+                    value=selected_review_document["title"],
+                    key=f"approve_title_{selected_review_document['document_id']}",
+                )
+
+                edited_department = st.selectbox(
+                    "Department",
+                    DEPARTMENT_OPTIONS,
+                    index=DEPARTMENT_OPTIONS.index(selected_review_document["department"])
+                    if selected_review_document["department"] in DEPARTMENT_OPTIONS
+                    else 0,
+                    key=f"approve_department_{selected_review_document['document_id']}",
+                )
+
+                edited_category = st.text_input(
+                    "Category",
+                    value=selected_review_document["category"],
+                    key=f"approve_category_{selected_review_document['document_id']}",
+                )
+
+                edited_tags_text = st.text_input(
+                    "Tags",
+                    value=", ".join(selected_review_document["tags"]),
+                    key=f"approve_tags_{selected_review_document['document_id']}",
+                )
+
+                edited_allowed_roles = st.multiselect(
+                    "Allowed roles",
+                    ROLE_OPTIONS,
+                    default=[
+                        role
+                        for role in selected_review_document["allowed_roles"]
+                        if role in ROLE_OPTIONS
+                    ],
+                    key=f"approve_roles_{selected_review_document['document_id']}",
+                )
+
+                edited_allowed_departments = st.multiselect(
+                    "Allowed departments",
+                    DEPARTMENT_OPTIONS,
+                    default=[
+                        department
+                        for department in selected_review_document["allowed_departments"]
+                        if department in DEPARTMENT_OPTIONS
+                    ],
+                    key=f"approve_departments_{selected_review_document['document_id']}",
+                )
+
+                submitted_approval = st.form_submit_button("Approve for Indexing")
+
+                if submitted_approval:
+                    try:
+                        approval_result = request_document_approval(
+                            document_id=selected_review_document["document_id"],
+                            title=edited_title,
+                            department=edited_department,
+                            category=edited_category,
+                            tags=[
+                                tag.strip()
+                                for tag in edited_tags_text.split(",")
+                                if tag.strip()
+                            ],
+                            allowed_roles=edited_allowed_roles,
+                            allowed_departments=edited_allowed_departments,
+                        )
+                    except requests.exceptions.HTTPError as error:
+                        st.error(f"Approval rejected by backend: {error.response.text}")
+                    except requests.exceptions.RequestException as error:
+                        st.error(f"Could not approve connector document: {error}")
+                    else:
+                        st.success(approval_result["message"])
+                        st.rerun()
+
+    st.divider()
     if not visible_documents:
         st.warning("No documents are visible for the current role and department.")
     else:
