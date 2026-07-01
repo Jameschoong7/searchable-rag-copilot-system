@@ -23,11 +23,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 
 from src.metadata.repository import (
-    append_document_metadata,
-    create_new_document_version,
-    generate_document_id,
     load_document_metadata,
-    metadata_exists_for_filename,
     update_document_metadata,
 )
 
@@ -41,8 +37,6 @@ from src.core.constants import (
     SYSTEM_ADMIN_ROLE,
 )
 
-
-from src.storage.document_storage import save_document_bytes
 
 ROLE_AWARE_CHAT_PROMPTS = {
     SYSTEM_ADMIN_ROLE: {
@@ -99,6 +93,8 @@ INDEX_UPDATE_JOBS_URL = f"{API_BASE_URL}/admin/index-update-jobs"
 METADATA_UPDATE_VALIDATE_URL = f"{API_BASE_URL}/admin/validate-metadata-update"
 ARCHIVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/archive-document"
 SETTINGS_URL = f"{API_BASE_URL}/admin/settings"
+UPLOAD_DOCUMENT_URL = f"{API_BASE_URL}/admin/upload-document"
+UPLOAD_DOCUMENT_VERSION_URL = f"{API_BASE_URL}/admin/upload-document-version"
 QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
 EVALUATION_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/retrieval_eval_results.json"
 INDEX_BENCHMARK_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_results.json"
@@ -230,6 +226,70 @@ def request_metadata_update_validation(
             "allowed_departments": allowed_departments,
         },
         timeout=30,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_backend_document_upload(
+    uploaded_file,
+    title: str,
+    document_department: str,
+    category: str,
+    tags: list[str],
+    allowed_roles: list[str],
+    allowed_departments: list[str],
+) -> dict:
+    """Ask FastAPI to save an uploaded document and create trusted metadata."""
+    response = requests.post(
+        UPLOAD_DOCUMENT_URL,
+        data={
+            "role": st.session_state["role"],
+            "user": st.session_state["user"],
+            "user_department": st.session_state["department"],
+            "title": title,
+            "document_department": document_department,
+            "category": category,
+            "tags_json": json.dumps(tags),
+            "allowed_roles_json": json.dumps(allowed_roles),
+            "allowed_departments_json": json.dumps(allowed_departments),
+        },
+        files={
+            "file": (
+                uploaded_file.name,
+                uploaded_file.getvalue(),
+                uploaded_file.type or "application/octet-stream",
+            )
+        },
+        timeout=180,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_backend_document_version_upload(
+    uploaded_file,
+    previous_document_id: str,
+) -> dict:
+    """Ask FastAPI to save a replacement file and create a new document version."""
+    response = requests.post(
+        UPLOAD_DOCUMENT_VERSION_URL,
+        data={
+            "role": st.session_state["role"],
+            "user": st.session_state["user"],
+            "user_department": st.session_state["department"],
+            "previous_document_id": previous_document_id,
+        },
+        files={
+            "file": (
+                uploaded_file.name,
+                uploaded_file.getvalue(),
+                uploaded_file.type or "application/octet-stream",
+            )
+        },
+        timeout=180,
     )
 
     response.raise_for_status()
@@ -835,67 +895,6 @@ def normalise_uploaded_filename(filename: str) -> str:
     return filename.replace(" ", "_")
 
 
-def generate_version_document_id(previous_document: dict, next_version_number: int) -> str:
-    """Generate a readable document ID for a new version of an existing document."""
-    source_document_id = previous_document.get(
-        "source_document_id",
-        previous_document["document_id"],
-    )
-
-    return f"{source_document_id}-V{next_version_number}"
-
-
-def build_versioned_filename(
-    previous_document: dict,
-    uploaded_filename: str,
-    next_version_number: int,
-) -> str:
-    """Build a unique stored filename for a replacement document version."""
-    source_document_id = previous_document.get(
-        "source_document_id",
-        previous_document["document_id"],
-    )
-
-    safe_uploaded_filename = normalise_uploaded_filename(uploaded_filename)
-
-    return f"{source_document_id}_v{next_version_number}_{safe_uploaded_filename}"
-
-
-def save_uploaded_file_as(uploaded_file, stored_filename: str):
-    """Save an uploaded file using the configured document storage backend."""
-    return save_document_bytes(
-        stored_filename,
-        uploaded_file.getvalue(),
-    )
-
-
-def get_uploaded_file_type(filename: str) -> str:
-    """Return the metadata file type for a supported uploaded file."""
-    suffix = Path(filename).suffix.lower()
-
-    if suffix == ".txt":
-        return "TXT"
-
-    if suffix == ".pdf":
-        return "PDF"
-
-    if suffix == ".docx":
-        return "DOCX"
-
-    return "UNKNOWN"
-
-
-def get_visual_extraction_status(file_type: str) -> str:
-    """Return the local extraction status label for the uploaded file type."""
-    if file_type == "PDF":
-        return "PDF text extraction"
-    
-    if file_type == "DOCX":
-        return "Word text extraction"
-
-    return "Text only"
-
-
 def prepare_upload_title_state(uploaded_file, upload_form_version: int) -> str:
     """Prepare an editable title field when a new TXT file is selected."""
     title_key = f"upload_title{upload_form_version}"
@@ -912,14 +911,6 @@ def prepare_upload_title_state(uploaded_file, upload_form_version: int) -> str:
         st.session_state[title_key] = infer_title_from_uploaded_file(uploaded_file)
 
     return title_key
-
-
-def save_uploaded_file(uploaded_file):
-    """Save an uploaded file using the configured document storage backend."""
-    return save_document_bytes(
-        uploaded_file.name,
-        uploaded_file.getvalue(),
-    )
 
 
 def infer_title_from_uploaded_file(uploaded_file) -> str:
@@ -1844,76 +1835,40 @@ elif selected_page in ["KB Management", "KB Status"]:
                             elif not allowed_departments:
                                 st.error("Please select at least one allowed department.")
                             else:
-                                documents = load_document_metadata()
-                                filename = normalise_uploaded_filename(uploaded_file.name)
-                                file_type = get_uploaded_file_type(filename)
+                                tags = [
+                                    tag.strip()
+                                    for tag in tags_text.split(",")
+                                    if tag.strip()
+                                ]
 
-                                upload_error = None
-
-                                if file_type == "UNKNOWN":
-                                    upload_error = "Only TXT, PDF, and DOCX uploads are supported."
-                                elif metadata_exists_for_filename(filename):
-                                    upload_error = (
-                                        "Metadata already exists for this filename. Rename the file or "
-                                        "upload it as a new version instead."
+                                try:
+                                    upload_result = request_backend_document_upload(
+                                        uploaded_file=uploaded_file,
+                                        title=title.strip(),
+                                        document_department=department,
+                                        category=category.strip() or "General",
+                                        tags=tags,
+                                        allowed_roles=allowed_roles,
+                                        allowed_departments=allowed_departments,
                                     )
+                                except requests.exceptions.HTTPError as error:
+                                    st.error(f"Upload rejected by backend: {error.response.text}")
+                                    st.stop()
+                                except requests.exceptions.RequestException as error:
+                                    st.error(f"Could not upload document through backend: {error}")
+                                    st.stop()
 
-                                if upload_error:
-                                    st.error(upload_error)
-                                else:
-                                    try:
-                                        approved_metadata = request_upload_validation(
-                                            document_department=department,
-                                            allowed_roles=allowed_roles,
-                                            allowed_departments=allowed_departments,
-                                        )
-                                    except requests.exceptions.HTTPError as error:
-                                        st.error(f"Upload rejected by backend: {error.response.text}")
-                                    except requests.exceptions.RequestException as error:
-                                        st.error(f"Could not validate upload metadata: {error}")
-                                    else:
-                                        stored_document = save_uploaded_file(uploaded_file)
-                                        filename = stored_document.filename
+                                index_owner_message = (
+                                    "Run Update for Pending Documents so the latest approved content is available in chat."
+                                    if st.session_state["role"] == SYSTEM_ADMIN_ROLE
+                                    else "System Admin action is required to update the search index before this content is available in chat."
+                                )
 
-                                        new_document = {
-                                            "document_id": generate_document_id(documents),
-                                            "title": title.strip(),
-                                            "filename": filename,
-                                            "storage_backend": stored_document.storage_backend,
-                                            "storage_uri": stored_document.storage_uri,
-                                            "file_type": file_type,
-                                            "source": "Manual Upload",
-                                            "department": approved_metadata["document_department"],
-                                            "category": category.strip() or "General",
-                                            "tags": [
-                                                tag.strip()
-                                                for tag in tags_text.split(",")
-                                                if tag.strip()
-                                            ],
-                                            "allowed_roles": approved_metadata["allowed_roles"],
-                                            "allowed_departments": approved_metadata["allowed_departments"],
-                                            "uploaded_by": st.session_state["user"],
-                                            "uploaded_at": datetime.now().isoformat(timespec="minutes"),
-                                            "page_number": None,
-                                            "chunk_id": "pending_index",
-                                            "visual_extraction_status": get_visual_extraction_status(file_type),
-                                        }
-
-                                        append_document_metadata(new_document)
-
-                                        index_owner_message = (
-                                            "Run Update for Pending Documents so the latest approved content is available in chat."
-                                            if st.session_state["role"] == SYSTEM_ADMIN_ROLE
-                                            else "System Admin action is required to update the search index before this content is available in chat."
-                                        )
-
-                                        st.session_state["upload_message"] = (
-                                            f"Saved {filename} and metadata record {new_document['document_id']}. "
-                                            f"{index_owner_message}"
-                                        )
-
-                                        st.session_state["upload_form_version"] += 1
-                                        st.rerun()
+                                st.session_state["upload_message"] = (
+                                    f"{upload_result['message']} {index_owner_message}"
+                                )
+                                st.session_state["upload_form_version"] += 1
+                                st.rerun()
 
                 with new_version_tab:
                     st.markdown("**Upload Replacement As New Version**")
@@ -1968,69 +1923,29 @@ elif selected_page in ["KB Management", "KB Status"]:
                                 if uploaded_version_file is None:
                                     st.error("Please choose a replacement file before saving.")
                                 else:
-                                    stored_filename = build_versioned_filename(
-                                        selected_version_document,
-                                        uploaded_version_file.name,
-                                        next_version_number,
+                                    try:
+                                        version_result = request_backend_document_version_upload(
+                                            uploaded_file=uploaded_version_file,
+                                            previous_document_id=selected_version_document["document_id"],
+                                        )
+                                    except requests.exceptions.HTTPError as error:
+                                        st.error(f"Version upload rejected by backend: {error.response.text}")
+                                        st.stop()
+                                    except requests.exceptions.RequestException as error:
+                                        st.error(f"Could not upload replacement version through backend: {error}")
+                                        st.stop()
+
+                                    index_owner_message = (
+                                        "Run Update for Pending Documents to replace old search vectors and activate the new version in chat."
+                                        if st.session_state["role"] == SYSTEM_ADMIN_ROLE
+                                        else "System Admin action is required to replace old search vectors and activate the new version in chat."
                                     )
 
-                                    file_type = get_uploaded_file_type(stored_filename)
-
-                                    version_upload_error = None
-
-                                    if file_type == "UNKNOWN":
-                                        version_upload_error = "Only TXT, PDF, and DOCX uploads are supported."
-                                    elif metadata_exists_for_filename(stored_filename):
-                                        version_upload_error = (
-                                            "A stored file for this version already exists. "
-                                            "Please choose a different replacement file or check existing metadata."
-                                        )
-
-                                    if version_upload_error:
-                                        st.error(version_upload_error)
-                                    else:
-                                        stored_version_document = save_uploaded_file_as(
-                                            uploaded_version_file,
-                                            stored_filename,
-                                        )
-
-                                        new_version_document = selected_version_document.copy()
-                                        new_version_document.update(
-                                            {
-                                                "document_id": generate_version_document_id(
-                                                    selected_version_document,
-                                                    next_version_number,
-                                                ),
-                                                "filename": stored_version_document.filename,
-                                                "storage_backend": stored_version_document.storage_backend,
-                                                "storage_uri": stored_version_document.storage_uri,
-                                                "file_type": file_type,
-                                                "uploaded_by": st.session_state["user"],
-                                                "uploaded_at": datetime.now().isoformat(timespec="minutes"),
-                                                "page_number": None,
-                                                "chunk_id": "pending_index",
-                                                "visual_extraction_status": get_visual_extraction_status(file_type),
-                                                "content_hash": None,
-                                            }
-                                        )
-
-                                        create_new_document_version(
-                                            previous_document_id=selected_version_document["document_id"],
-                                            new_document=new_version_document,
-                                            archived_at=datetime.now().isoformat(timespec="minutes"),
-                                        )
-
-                                        index_owner_message = (
-                                            "Run Update for Pending Documents to replace old search vectors and activate the new version in chat."
-                                            if st.session_state["role"] == SYSTEM_ADMIN_ROLE
-                                            else "System Admin action is required to replace old search vectors and activate the new version in chat."
-                                        )
-
-                                        st.session_state["upload_message"] = (
-                                            f"Created {selected_version_document['title']} v{next_version_number}. "
-                                            f"{index_owner_message}"
-                                        )
-                                        st.rerun()
+                                    st.session_state["upload_message"] = (
+                                        f"{version_result['message']} {index_owner_message}"
+                                    )
+                                    st.session_state["upload_form_version"] += 1
+                                    st.rerun()
 
         if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
             with st.container(border=True):

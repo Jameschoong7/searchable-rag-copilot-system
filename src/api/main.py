@@ -2,9 +2,12 @@
 # REQ_F003: Provides the backend route that a future Teams chatbot can call
 # REQ_F005: Provides the backend route that the Streamlit web app can call
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 import re
+from datetime import datetime
+import hashlib
+import json
 
 
 # Create the shared FastAPI application used by both frontend platforms.
@@ -177,6 +180,25 @@ class UploadValidationResponse(BaseModel):
     document_department: str
     allowed_roles: list[str]
     allowed_departments: list[str]
+
+
+class UploadDocumentResponse(BaseModel):
+    """Represent a document created by a backend-owned upload."""
+
+    status: str
+    document_id: str
+    filename: str
+    storage_backend: str
+    storage_uri: str
+    chunk_id: str
+    message: str
+
+
+class UploadDocumentVersionResponse(UploadDocumentResponse):
+    """Represent a replacement version created by a backend-owned upload."""
+
+    previous_document_id: str
+    version_number: int
 
 
 class MetadataUpdateValidationRequest(BaseModel):
@@ -366,6 +388,139 @@ def run_index_update_job(job_id: str, request: IndexUpdatesJobRequest) -> None:
                 "message": str(error),
             },
         )
+
+
+def approve_upload_scope(
+    role: str,
+    user_department: str,
+    document_department: str,
+    allowed_roles: list[str],
+    allowed_departments: list[str],
+) -> UploadValidationResponse:
+    """Apply backend upload scope rules before file or metadata writes."""
+    if role == GENERAL_EMPLOYEE_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="General Employee cannot upload knowledge base documents.",
+        )
+
+    if role == PROJECT_MANAGER_ROLE:
+        return UploadValidationResponse(
+            status="approved",
+            document_department=user_department,
+            allowed_roles=expand_allowed_roles(
+                [
+                    allowed_role for allowed_role in allowed_roles
+                    if allowed_role in [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE]
+                ] or [PROJECT_MANAGER_ROLE]
+            ),
+            allowed_departments=[user_department],
+        )
+
+    if role == SYSTEM_ADMIN_ROLE:
+        if not allowed_roles:
+            raise HTTPException(
+                status_code=400,
+                detail="At least one allowed role is required.",
+            )
+
+        if not allowed_departments:
+            raise HTTPException(
+                status_code=400,
+                detail="At least one allowed department is required.",
+            )
+
+        return UploadValidationResponse(
+            status="approved",
+            document_department=document_department,
+            allowed_roles=expand_allowed_roles(allowed_roles),
+            allowed_departments=expand_allowed_departments(allowed_departments),
+        )
+
+    raise HTTPException(
+        status_code=403,
+        detail="Unknown role cannot upload knowledge base documents.",
+    )
+
+
+def parse_json_list_field(raw_value: str, field_name: str) -> list[str]:
+    """Parse a JSON list submitted through multipart form data."""
+    try:
+        parsed_value = json.loads(raw_value)
+    except json.JSONDecodeError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{field_name} must be a JSON list.",
+        ) from error
+
+    if not isinstance(parsed_value, list):
+        raise HTTPException(
+            status_code=400,
+            detail=f"{field_name} must be a JSON list.",
+        )
+
+    return [
+        str(item).strip()
+        for item in parsed_value
+        if str(item).strip()
+    ]
+
+
+def get_uploaded_file_type(filename: str) -> str:
+    """Return the metadata file type for a supported uploaded file."""
+    lowered_filename = filename.lower()
+
+    if lowered_filename.endswith(".txt"):
+        return "TXT"
+
+    if lowered_filename.endswith(".pdf"):
+        return "PDF"
+
+    if lowered_filename.endswith(".docx"):
+        return "DOCX"
+
+    raise HTTPException(
+        status_code=400,
+        detail="Only TXT, PDF, and DOCX uploads are supported.",
+    )
+
+
+def get_visual_extraction_status(file_type: str) -> str:
+    """Return the extraction status label for a supported uploaded file type."""
+    if file_type == "PDF":
+        return "PDF text extraction"
+
+    if file_type == "DOCX":
+        return "Word text extraction"
+
+    return "Text only"
+
+
+def generate_version_document_id(previous_document: dict, next_version_number: int) -> str:
+    """Generate a readable document ID for a new version of an existing document."""
+    source_document_id = previous_document.get(
+        "source_document_id",
+        previous_document["document_id"],
+    )
+
+    return f"{source_document_id}-V{next_version_number}"
+
+
+def build_versioned_filename(
+    previous_document: dict,
+    original_filename: str,
+    next_version_number: int,
+) -> str:
+    """Build a unique stored filename for a replacement document version."""
+    from src.storage.document_storage import normalise_storage_filename
+
+    source_document_id = previous_document.get(
+        "source_document_id",
+        previous_document["document_id"],
+    )
+    safe_uploaded_filename = normalise_storage_filename(original_filename)
+
+    return f"{source_document_id}_v{next_version_number}_{safe_uploaded_filename}"
 
 
 @app.post("/query", response_model=QueryResponse)
@@ -700,49 +855,241 @@ def validate_upload_metadata(
     request: UploadValidationRequest,
 ) -> UploadValidationResponse:
     """Validate upload metadata permissions before local file/metadata writes."""
-    if request.role == GENERAL_EMPLOYEE_ROLE:
+    return approve_upload_scope(
+        role=request.role,
+        user_department=request.user_department,
+        document_department=request.document_department,
+        allowed_roles=request.allowed_roles,
+        allowed_departments=request.allowed_departments,
+    )
+
+
+@app.post("/admin/upload-document", response_model=UploadDocumentResponse)
+async def upload_document(
+    file: UploadFile = File(...),
+    role: str = Form(...),
+    user: str = Form(...),
+    user_department: str = Form(...),
+    title: str = Form(...),
+    document_department: str = Form(...),
+    category: str = Form("General"),
+    tags_json: str = Form("[]"),
+    allowed_roles_json: str = Form("[]"),
+    allowed_departments_json: str = Form("[]"),
+) -> UploadDocumentResponse:
+    """Create one uploaded document through the backend-owned write path."""
+    from src.metadata.repository import (
+        append_document_metadata,
+        generate_document_id,
+        load_document_metadata,
+        metadata_exists_for_filename,
+    )
+    from src.storage.document_storage import (
+        normalise_storage_filename,
+        save_document_bytes,
+    )
+
+    if not title.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Document title is required.",
+        )
+
+    original_filename = file.filename or "uploaded_document"
+    safe_filename = normalise_storage_filename(original_filename)
+    file_type = get_uploaded_file_type(safe_filename)
+
+    if metadata_exists_for_filename(safe_filename):
+        raise HTTPException(
+            status_code=409,
+            detail="Metadata already exists for this filename.",
+        )
+
+    file_bytes = await file.read()
+
+    if not file_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail="Uploaded file cannot be empty.",
+        )
+
+    allowed_roles = parse_json_list_field(allowed_roles_json, "allowed_roles_json")
+    allowed_departments = parse_json_list_field(
+        allowed_departments_json,
+        "allowed_departments_json",
+    )
+    tags = parse_json_list_field(tags_json, "tags_json")
+
+    approved_metadata = approve_upload_scope(
+        role=role,
+        user_department=user_department,
+        document_department=document_department,
+        allowed_roles=allowed_roles,
+        allowed_departments=allowed_departments,
+    )
+
+    stored_document = save_document_bytes(safe_filename, file_bytes)
+    existing_documents = load_document_metadata(include_inactive=True)
+    document_id = generate_document_id(existing_documents)
+
+    new_document = {
+        "document_id": document_id,
+        "title": title.strip(),
+        "filename": stored_document.filename,
+        "storage_backend": stored_document.storage_backend,
+        "storage_uri": stored_document.storage_uri,
+        "file_type": file_type,
+        "source": "Manual Upload",
+        "department": approved_metadata.document_department,
+        "category": category.strip() or "General",
+        "tags": tags,
+        "allowed_roles": approved_metadata.allowed_roles,
+        "allowed_departments": approved_metadata.allowed_departments,
+        "uploaded_by": user,
+        "uploaded_at": datetime.now().isoformat(timespec="minutes"),
+        "page_number": None,
+        "chunk_id": "pending_index",
+        "visual_extraction_status": get_visual_extraction_status(file_type),
+        "source_document_id": document_id,
+        "version_number": 1,
+        "is_active": 1,
+        "content_hash": hashlib.sha256(file_bytes).hexdigest(),
+        "archived_at": None,
+        "replaced_by_document_id": None,
+    }
+
+    append_document_metadata(new_document)
+
+    return UploadDocumentResponse(
+        status="success",
+        document_id=document_id,
+        filename=stored_document.filename,
+        storage_backend=stored_document.storage_backend,
+        storage_uri=stored_document.storage_uri,
+        chunk_id="pending_index",
+        message=(
+            f"Uploaded {stored_document.filename}, saved metadata record "
+            f"{document_id}, and marked it pending index."
+        ),
+    )
+
+
+@app.post("/admin/upload-document-version", response_model=UploadDocumentVersionResponse)
+async def upload_document_version(
+    file: UploadFile = File(...),
+    role: str = Form(...),
+    user: str = Form(...),
+    user_department: str = Form(...),
+    previous_document_id: str = Form(...),
+) -> UploadDocumentVersionResponse:
+    """Create a replacement version through the backend-owned write path."""
+    from src.metadata.repository import (
+        create_new_document_version,
+        load_document_metadata,
+        metadata_exists_for_filename,
+    )
+    from src.storage.document_storage import save_document_bytes
+
+    if role == GENERAL_EMPLOYEE_ROLE:
         raise HTTPException(
             status_code=403,
-            detail="General Employee cannot upload knowledge base documents.",
+            detail="General Employee cannot upload document versions.",
         )
 
-    if request.role == PROJECT_MANAGER_ROLE:
-        return UploadValidationResponse(
-            status="approved",
-            document_department=request.user_department,
-            allowed_roles=expand_allowed_roles(
-                [
-                    role for role in request.allowed_roles
-                    if role in [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE]
-                ] or [PROJECT_MANAGER_ROLE]
-            ),
-            allowed_departments=[request.user_department],
+    all_documents = load_document_metadata(include_inactive=True)
+    previous_document = next(
+        (
+            document for document in all_documents
+            if document["document_id"] == previous_document_id
+        ),
+        None,
+    )
+
+    if previous_document is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Previous document was not found.",
         )
 
-    if request.role == SYSTEM_ADMIN_ROLE:
-        if not request.allowed_roles:
-            raise HTTPException(
-                status_code=400,
-                detail="At least one allowed role is required.",
-            )
-
-        if not request.allowed_departments:
-            raise HTTPException(
-                status_code=400,
-                detail="At least one allowed department is required.",
-            )
-
-        return UploadValidationResponse(
-            status="approved",
-            document_department=request.document_department,
-            allowed_roles=expand_allowed_roles(request.allowed_roles),
-            allowed_departments=expand_allowed_departments(request.allowed_departments),
+    if previous_document.get("is_active") == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot replace an archived document version.",
         )
 
-    raise HTTPException(
-        status_code=403,
-        detail="Unknown role cannot upload knowledge base documents.",
-      )
+    if role == PROJECT_MANAGER_ROLE and previous_document["department"] != user_department:
+        raise HTTPException(
+            status_code=403,
+            detail="Project Manager can only replace own-department documents.",
+        )
+
+    original_filename = file.filename or "replacement_document"
+    previous_version_number = previous_document.get("version_number") or 1
+    next_version_number = previous_version_number + 1
+    stored_filename = build_versioned_filename(
+        previous_document,
+        original_filename,
+        next_version_number,
+    )
+    file_type = get_uploaded_file_type(stored_filename)
+
+    if metadata_exists_for_filename(stored_filename):
+        raise HTTPException(
+            status_code=409,
+            detail="Metadata already exists for this replacement filename.",
+        )
+
+    file_bytes = await file.read()
+
+    if not file_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail="Uploaded replacement file cannot be empty.",
+        )
+
+    stored_document = save_document_bytes(stored_filename, file_bytes)
+    new_document_id = generate_version_document_id(
+        previous_document,
+        next_version_number,
+    )
+
+    new_version_document = previous_document.copy()
+    new_version_document.update(
+        {
+            "document_id": new_document_id,
+            "filename": stored_document.filename,
+            "storage_backend": stored_document.storage_backend,
+            "storage_uri": stored_document.storage_uri,
+            "file_type": file_type,
+            "uploaded_by": user,
+            "uploaded_at": datetime.now().isoformat(timespec="minutes"),
+            "page_number": None,
+            "chunk_id": "pending_index",
+            "visual_extraction_status": get_visual_extraction_status(file_type),
+            "content_hash": hashlib.sha256(file_bytes).hexdigest(),
+        }
+    )
+
+    create_new_document_version(
+        previous_document_id=previous_document["document_id"],
+        new_document=new_version_document,
+        archived_at=datetime.now().isoformat(timespec="minutes"),
+    )
+
+    return UploadDocumentVersionResponse(
+        status="success",
+        document_id=new_document_id,
+        previous_document_id=previous_document["document_id"],
+        filename=stored_document.filename,
+        storage_backend=stored_document.storage_backend,
+        storage_uri=stored_document.storage_uri,
+        chunk_id="pending_index",
+        version_number=next_version_number,
+        message=(
+            f"Created {previous_document['title']} v{next_version_number}, "
+            "archived the previous version, and marked the new version pending index."
+        ),
+    )
 
 
 @app.post("/admin/archive-document", response_model=ArchiveDocumentResponse)
