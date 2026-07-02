@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+import re
 
 from src.core.constants import SYSTEM_ADMIN_ROLE, GENERAL_EMPLOYEE_ROLE
 from src.metadata.repository import append_document_metadata
@@ -134,3 +135,19 @@ def stage_graph_document_for_review(
     append_document_metadata(metadata)
 
     return metadata
+
+
+def build_graph_document_id(prefix: str, item_id: str) -> str:
+    """Build a stable metadata ID from a Graph item ID."""
+    safe_item_id = re.sub(r"[^A-Za-z0-9_-]+", "-", item_id).strip("-")
+    return f"{prefix}-{safe_item_id}"
+
+
+def build_graph_storage_filename(source_type: str, item_id: str, original_filename: str) -> str:
+    """Build a unique stored filename while preserving the original extension."""
+    original_path = Path(original_filename)
+    safe_item_id = re.sub(r"[^A-Za-z0-9_-]+", "-", item_id).strip("-")
+    safe_stem = re.sub(r"[^A-Za-z0-9_-]+", "_", original_path.stem).strip("_")
+    suffix = original_path.suffix
+
+    return f"{source_type}_{safe_item_id}_{safe_stem}{suffix}"

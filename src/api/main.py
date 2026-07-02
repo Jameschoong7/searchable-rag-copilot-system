@@ -100,6 +100,51 @@ class QueryResponse(BaseModel):
     department: str
 
 
+class GraphConnectorListRequest(BaseModel):
+    """Represent an admin request to list files from the configured OneDrive root."""
+
+    role: str
+
+
+class OneDriveFileSummary(BaseModel):
+    """Represent one file discovered from the configured OneDrive connector root."""
+
+    id: str
+    name: str
+    connector_path: str
+    size: int | None = None
+    last_modified_datetime: str | None = None
+
+
+class OneDriveFilesResponse(BaseModel):
+    """Represent files discovered from the configured OneDrive connector root."""
+
+    status: str
+    files: list[OneDriveFileSummary]
+
+
+class StageOneDriveFileRequest(BaseModel):
+    """Represent an admin request to stage one OneDrive file for metadata review."""
+
+    role: str
+    user: str
+    item_id: str
+    name: str
+    connector_path: str
+
+
+class StageOneDriveFileResponse(BaseModel):
+    """Represent a OneDrive file staged as a pending-review KB document."""
+
+    status: str
+    document_id: str
+    filename: str
+    storage_backend: str
+    storage_uri: str
+    chunk_id: str
+    message: str
+
+
 class ReindexRequest(BaseModel):
     """Represent an admin reindex request from a frontend client."""
 
@@ -1427,3 +1472,115 @@ def approve_pending_document(
         chunk_id="pending_index",
         message="Document approved and marked for search index update.",
     )
+
+
+@app.post("/admin/graph/onedrive/files", response_model=OneDriveFilesResponse)
+def list_graph_onedrive_files(
+    request: GraphConnectorListRequest,
+) -> OneDriveFilesResponse:
+    """List files under the configured OneDrive connector root."""
+    if request.role != SYSTEM_ADMIN_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="Only System Admin can scan OneDrive connector files.",
+        )
+
+    try:
+        from src.connectors.graph_client import list_onedrive_files_recursive
+
+        discovered_files = list_onedrive_files_recursive()
+
+    except RuntimeError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(
+            status_code=502,
+            detail=f"OneDrive scan failed: {error}",
+        ) from error
+
+    files = [
+        OneDriveFileSummary(
+            id=file_item["id"],
+            name=file_item["name"],
+            connector_path=file_item["connector_path"],
+            size=file_item.get("size"),
+            last_modified_datetime=file_item.get("lastModifiedDateTime"),
+        )
+        for file_item in discovered_files
+    ]
+
+    return OneDriveFilesResponse(status="success", files=files)
+
+@app.post("/admin/graph/onedrive/stage-file", response_model=StageOneDriveFileResponse)
+def stage_onedrive_file(
+    request: StageOneDriveFileRequest,
+) -> StageOneDriveFileResponse:
+    """Download one OneDrive file and stage it for admin metadata review."""
+    if request.role != SYSTEM_ADMIN_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="Only System Admin can stage OneDrive connector files.",
+        )
+
+    try:
+        from src.connectors.graph_client import download_onedrive_file_by_item_id
+        from src.connectors.graph_connector import (
+            build_graph_document_id,
+            build_graph_storage_filename,
+            stage_graph_file_for_review,
+        )
+        from src.metadata.repository import load_document_metadata
+
+        document_id = build_graph_document_id("GRAPH-OD", request.item_id)
+
+        existing_documents = load_document_metadata(include_inactive=True)
+        if any(document["document_id"] == document_id for document in existing_documents):
+            raise HTTPException(
+                status_code=409,
+                detail="This OneDrive file has already been staged.",
+            )
+
+        content_bytes = download_onedrive_file_by_item_id(request.item_id)
+
+        if not content_bytes:
+            raise HTTPException(
+                status_code=400,
+                detail="Downloaded OneDrive file is empty.",
+            )
+
+        stored_filename = build_graph_storage_filename(
+            source_type="onedrive",
+            item_id=request.item_id,
+            original_filename=request.name,
+        )
+
+        metadata = stage_graph_file_for_review(
+            document_id=document_id,
+            title=request.name,
+            original_filename=stored_filename,
+            content_bytes=content_bytes,
+            source_path=request.connector_path,
+            source_type="onedrive",
+            uploaded_by=request.user,
+        )
+
+    except HTTPException:
+        raise
+    except RuntimeError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(
+            status_code=502,
+            detail=f"OneDrive staging failed: {error}",
+        ) from error
+
+    return StageOneDriveFileResponse(
+        status="staged",
+        document_id=metadata["document_id"],
+        filename=metadata["filename"],
+        storage_backend=metadata["storage_backend"],
+        storage_uri=metadata["storage_uri"],
+        chunk_id=metadata["chunk_id"],
+        message="OneDrive file downloaded and staged for metadata review.",
+    )
+
