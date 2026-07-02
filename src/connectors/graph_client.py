@@ -1,5 +1,6 @@
 import requests
 
+from src.connectors.graph_auth import get_graph_access_token
 from src.core.config import read_app_config
 
 
@@ -13,11 +14,10 @@ def get_graph_headers() -> dict:
     if not app_config.graph_connector_enabled:
         raise RuntimeError("Graph connector is disabled. Set GRAPH_CONNECTOR_ENABLED=true.")
 
-    if not app_config.graph_access_token:
-        raise RuntimeError("GRAPH_ACCESS_TOKEN is required for Graph connector requests.")
+    access_token = get_graph_access_token()
 
     return {
-        "Authorization": f"Bearer {app_config.graph_access_token}",
+        "Authorization": f"Bearer {access_token}",
     }
 
 
