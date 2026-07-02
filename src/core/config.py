@@ -45,6 +45,8 @@ class AppConfig:
     embedding_backend: str
     llm_backend: str
     graph_connector_enabled: bool
+    graph_access_token: str | None
+    graph_onedrive_root_path: str
     sharepoint_mode: str
     top_k: int
     minimum_relevance_threshold: float
@@ -102,6 +104,11 @@ def read_app_config() -> AppConfig:
                 "false",
                 runtime_settings,
             )
+        ),
+        graph_access_token=os.getenv("GRAPH_ACCESS_TOKEN"),
+        graph_onedrive_root_path=os.getenv(
+            "GRAPH_ONEDRIVE_ROOT_PATH",
+            "/Enterprise Knowledge Base",
         ),
         sharepoint_mode=read_config_value(
             "SHAREPOINT_MODE",
@@ -167,6 +174,11 @@ def read_app_config_with_pending() -> AppConfig:
                 "false",
                 merged_settings,
             )
+        ),
+        graph_access_token=os.getenv("GRAPH_ACCESS_TOKEN"),
+        graph_onedrive_root_path=os.getenv(
+            "GRAPH_ONEDRIVE_ROOT_PATH",
+            "/Enterprise Knowledge Base",
         ),
         sharepoint_mode=read_config_value(
             "SHAREPOINT_MODE",

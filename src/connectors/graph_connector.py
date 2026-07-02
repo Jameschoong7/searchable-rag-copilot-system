@@ -3,6 +3,7 @@ from pathlib import Path
 
 from src.core.constants import SYSTEM_ADMIN_ROLE, GENERAL_EMPLOYEE_ROLE
 from src.metadata.repository import append_document_metadata
+from src.storage.document_storage import save_document_bytes
 
 
 DEPARTMENT_PATH_KEYWORDS = {
@@ -14,6 +15,38 @@ DEPARTMENT_PATH_KEYWORDS = {
     "security": "Security",
     "operations": "Operations",
 }
+
+
+def stage_graph_file_for_review(
+    document_id: str,
+    title: str,
+    original_filename: str,
+    content_bytes: bytes,
+    source_path: str,
+    source_type: str,
+    uploaded_by: str = "graph_connector",
+) -> dict:
+    """Stage a downloaded Graph file with a real local/Blob-backed source file."""
+    stored_document = save_document_bytes(
+        filename=original_filename,
+        content=content_bytes,
+    )
+
+    metadata = build_pending_review_metadata(
+        document_id=document_id,
+        title=title,
+        filename=stored_document.filename,
+        source_path=source_path,
+        source_type=source_type,
+        uploaded_by=uploaded_by,
+    )
+
+    metadata["storage_backend"] = stored_document.storage_backend
+    metadata["storage_uri"] = stored_document.storage_uri
+
+    append_document_metadata(metadata)
+
+    return metadata
 
 
 def infer_department_from_source_path(source_path: str) -> str | None:
@@ -88,7 +121,7 @@ def stage_graph_document_for_review(
     source_type: str,
     uploaded_by: str = "graph_connector",
 ) -> dict:
-    """Stage one Graph-ingested document in SQLite for admin metadata review."""
+    """Deprecated metadata-only staging helper. Do not use for real connector ingestion."""
     metadata = build_pending_review_metadata(
         document_id=document_id,
         title=title,
