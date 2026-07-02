@@ -87,3 +87,29 @@ def get_graph_access_token() -> str:
         )
 
     return result["access_token"]
+
+
+def run_device_login() -> dict:
+    """Run a device-code sign-in and persist the resulting MSAL token cache."""
+    cache = load_token_cache()
+    app = build_public_client(cache)
+
+    flow = app.initiate_device_flow(scopes=get_graph_scopes())
+
+    if "user_code" not in flow:
+        raise RuntimeError(f"Device login could not start: {flow}")
+
+    print(flow["message"])
+
+    result = app.acquire_token_by_device_flow(flow)
+
+    save_token_cache(cache)
+
+    if "access_token" not in result:
+        raise RuntimeError(f"Device login failed: {result}")
+
+    return {
+        "status": "success",
+        "account": result.get("id_token_claims", {}).get("preferred_username"),
+        "scopes": get_graph_scopes(),
+    }
