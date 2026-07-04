@@ -2,7 +2,7 @@ from datetime import datetime
 from pathlib import Path
 import re
 
-from src.core.constants import SYSTEM_ADMIN_ROLE, GENERAL_EMPLOYEE_ROLE
+from src.core.constants import SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE
 from src.metadata.repository import append_document_metadata
 from src.storage.document_storage import save_document_bytes
 
@@ -80,7 +80,7 @@ def build_pending_review_metadata(
 
     if inferred_department:
         department = inferred_department
-        allowed_roles = [SYSTEM_ADMIN_ROLE, GENERAL_EMPLOYEE_ROLE]
+        allowed_roles = [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE]
         allowed_departments = [inferred_department]
     else:
         department = "IT"

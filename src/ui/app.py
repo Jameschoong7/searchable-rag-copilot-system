@@ -97,6 +97,8 @@ UPLOAD_DOCUMENT_URL = f"{API_BASE_URL}/admin/upload-document"
 UPLOAD_DOCUMENT_VERSION_URL = f"{API_BASE_URL}/admin/upload-document-version"
 APPROVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/approve-document"
 QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
+ONEDRIVE_FILES_URL = f"{API_BASE_URL}/admin/graph/onedrive/files"
+ONEDRIVE_STAGE_FILE_URL = f"{API_BASE_URL}/admin/graph/onedrive/stage-file"
 EVALUATION_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/retrieval_eval_results.json"
 INDEX_BENCHMARK_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_results.json"
 INDEX_BENCHMARK_HISTORY_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_history.json"
@@ -127,6 +129,38 @@ def request_document_approval(
             "allowed_departments": allowed_departments,
         },
         timeout=30,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_onedrive_file_scan() -> dict:
+    """Ask FastAPI to list files under the configured OneDrive connector root."""
+    response = requests.post(
+        ONEDRIVE_FILES_URL,
+        json={
+            "role": st.session_state["role"],
+        },
+        timeout=60,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_onedrive_file_stage(file_item: dict) -> dict:
+    """Ask FastAPI to download and stage one OneDrive file for metadata review."""
+    response = requests.post(
+        ONEDRIVE_STAGE_FILE_URL,
+        json={
+            "role": st.session_state["role"],
+            "user": st.session_state["user"],
+            "item_id": file_item["id"],
+            "name": file_item["name"],
+            "connector_path": file_item["connector_path"],
+        },
+        timeout=120,
     )
 
     response.raise_for_status()
@@ -2051,6 +2085,69 @@ elif selected_page in ["KB Management", "KB Status"]:
             st.warning(st.session_state["upload_message"])
 
     st.divider()
+
+    if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+        st.subheader("OneDrive Connector")
+
+        with st.container(border=True):
+            st.caption(
+                "Scans the configured OneDrive knowledge-base root only. "
+                "Selected files are staged for metadata and ACL review before indexing."
+            )
+
+            if st.button("Scan OneDrive Root", use_container_width=True):
+                try:
+                    scan_result = request_onedrive_file_scan()
+                except requests.exceptions.HTTPError as error:
+                    st.error(f"OneDrive scan rejected by backend: {error.response.text}")
+                except requests.exceptions.RequestException as error:
+                    st.error(f"Could not scan OneDrive connector: {error}")
+                else:
+                    st.session_state["onedrive_files"] = scan_result["files"]
+                    st.success(f"Found {len(scan_result['files'])} file(s).")
+
+            onedrive_files = st.session_state.get("onedrive_files", [])
+
+            if onedrive_files:
+                st.dataframe(
+                    [
+                        {
+                            "Name": file_item["name"],
+                            "Path": file_item["connector_path"],
+                            "Size": file_item.get("size"),
+                            "Modified": file_item.get("last_modified_datetime"),
+                        }
+                        for file_item in onedrive_files
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+                file_options = {
+                    f"{file_item['name']} - {file_item['connector_path']}": file_item
+                    for file_item in onedrive_files
+                }
+
+                selected_file_label = st.selectbox(
+                    "Select OneDrive file to stage",
+                    list(file_options.keys()),
+                    key="selected_onedrive_file_to_stage",
+                )
+
+                if st.button("Stage Selected File for Review", use_container_width=True):
+                    try:
+                        stage_result = request_onedrive_file_stage(
+                            file_options[selected_file_label]
+                        )
+                    except requests.exceptions.HTTPError as error:
+                        st.error(f"OneDrive staging rejected by backend: {error.response.text}")
+                    except requests.exceptions.RequestException as error:
+                        st.error(f"Could not stage OneDrive file: {error}")
+                    else:
+                        st.success(stage_result["message"])
+                        st.rerun()
+
+        st.divider()
 
     if st.session_state["role"] in ["System Admin", "Project Manager"]:
         st.subheader("Pending Connector Review")
