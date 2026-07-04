@@ -2114,13 +2114,14 @@ elif selected_page in ["KB Management", "KB Status"]:
                         {
                             "Name": file_item["name"],
                             "Path": file_item["connector_path"],
-                            "Size": file_item.get("size"),
+                            "Size (KB)": file_item.get("size"),
                             "Modified": file_item.get("last_modified_datetime"),
                         }
                         for file_item in onedrive_files
                     ],
                     use_container_width=True,
                     hide_index=True,
+                    height=260,
                 )
 
                 file_options = {
@@ -2128,24 +2129,77 @@ elif selected_page in ["KB Management", "KB Status"]:
                     for file_item in onedrive_files
                 }
 
-                selected_file_label = st.selectbox(
-                    "Select OneDrive file to stage",
+                selection_columns = st.columns(3)
+
+                with selection_columns[0]:
+                    if st.button("Select All Files", use_container_width=True):
+                        st.session_state["selected_onedrive_files_to_stage"] = list(file_options.keys())
+                        st.rerun()
+
+                with selection_columns[1]:
+                    if st.button("Clear Selection", use_container_width=True):
+                        st.session_state["selected_onedrive_files_to_stage"] = []
+                        st.rerun()
+
+                with selection_columns[2]:
+                    st.caption(f"{len(onedrive_files)} discovered file(s)")
+
+                selected_file_labels = st.multiselect(
+                    "Select OneDrive files to stage",
                     list(file_options.keys()),
-                    key="selected_onedrive_file_to_stage",
+                    key="selected_onedrive_files_to_stage",
                 )
 
-                if st.button("Stage Selected File for Review", use_container_width=True):
-                    try:
-                        stage_result = request_onedrive_file_stage(
-                            file_options[selected_file_label]
-                        )
-                    except requests.exceptions.HTTPError as error:
-                        st.error(f"OneDrive staging rejected by backend: {error.response.text}")
-                    except requests.exceptions.RequestException as error:
-                        st.error(f"Could not stage OneDrive file: {error}")
-                    else:
-                        st.success(stage_result["message"])
-                        st.rerun()
+                if st.button(
+                    "Stage Selected Files for Review",
+                    use_container_width=True,
+                    disabled=not selected_file_labels,
+                ):
+                    stage_results = []
+
+                    for selected_file_label in selected_file_labels:
+                        selected_file = file_options[selected_file_label]
+
+                        try:
+                            stage_result = request_onedrive_file_stage(selected_file)
+                        except requests.exceptions.HTTPError as error:
+                            stage_results.append(
+                                {
+                                    "File": selected_file["name"],
+                                    "Path": selected_file["connector_path"],
+                                    "Status": "Rejected",
+                                    "Message": error.response.text,
+                                }
+                            )
+                        except requests.exceptions.RequestException as error:
+                            stage_results.append(
+                                {
+                                    "File": selected_file["name"],
+                                    "Path": selected_file["connector_path"],
+                                    "Status": "Error",
+                                    "Message": str(error),
+                                }
+                            )
+                        else:
+                            stage_results.append(
+                                {
+                                    "File": selected_file["name"],
+                                    "Path": selected_file["connector_path"],
+                                    "Status": "Staged",
+                                    "Message": stage_result["message"],
+                                }
+                            )
+
+                    st.session_state["onedrive_stage_results"] = stage_results
+                    st.rerun()
+
+                if st.session_state.get("onedrive_stage_results"):
+                    st.dataframe(
+                        st.session_state["onedrive_stage_results"],
+                        use_container_width=True,
+                        hide_index=True,
+                        height=260,
+                    )
 
         st.divider()
 
