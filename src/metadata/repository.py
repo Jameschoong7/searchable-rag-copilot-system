@@ -393,6 +393,31 @@ def approve_document_for_indexing(
     )
 
 
+def reject_pending_review_document(
+    document_id: str,
+    rejected_at: str,
+) -> None:
+    """Mark a pending-review connector document as rejected without deleting audit history."""
+    initialise_metadata_database()
+
+    with sqlite3.connect(METADATA_DB_PATH) as connection:
+        connection.execute(
+            """
+            UPDATE document_metadata
+            SET
+                is_active = 0,
+                chunk_id = 'rejected',
+                archived_at = ?
+            WHERE document_id = ?
+            AND chunk_id = 'pending_review'
+            """,
+            (
+                rejected_at,
+                document_id,
+            ),
+        )
+
+
 def metadata_exists_for_filename(filename: str) -> bool:
     """Check whether a metadata record already exists for a filename."""
     seed_metadata_database_from_json()

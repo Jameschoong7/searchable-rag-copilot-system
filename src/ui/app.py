@@ -96,9 +96,11 @@ SETTINGS_URL = f"{API_BASE_URL}/admin/settings"
 UPLOAD_DOCUMENT_URL = f"{API_BASE_URL}/admin/upload-document"
 UPLOAD_DOCUMENT_VERSION_URL = f"{API_BASE_URL}/admin/upload-document-version"
 APPROVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/approve-document"
+REJECT_STAGED_DOCUMENT_URL = f"{API_BASE_URL}/admin/reject-staged-document"
 QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
 ONEDRIVE_FILES_URL = f"{API_BASE_URL}/admin/graph/onedrive/files"
 ONEDRIVE_STAGE_FILE_URL = f"{API_BASE_URL}/admin/graph/onedrive/stage-file"
+ONEDRIVE_STAGE_FILES_JOB_URL = f"{API_BASE_URL}/admin/graph/onedrive/stage-files-job"
 EVALUATION_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/retrieval_eval_results.json"
 INDEX_BENCHMARK_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_results.json"
 INDEX_BENCHMARK_HISTORY_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_history.json"
@@ -135,6 +137,22 @@ def request_document_approval(
     return response.json()
 
 
+def request_staged_document_rejection(document_id: str) -> dict:
+    """Ask FastAPI to reject one pending-review connector document."""
+    response = requests.post(
+        REJECT_STAGED_DOCUMENT_URL,
+        json={
+            "role": st.session_state["role"],
+            "user_department": st.session_state["department"],
+            "document_id": document_id,
+        },
+        timeout=30,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
 def request_onedrive_file_scan() -> dict:
     """Ask FastAPI to list files under the configured OneDrive connector root."""
     response = requests.post(
@@ -161,6 +179,29 @@ def request_onedrive_file_stage(file_item: dict) -> dict:
             "connector_path": file_item["connector_path"],
         },
         timeout=120,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def submit_onedrive_stage_job(file_items: list[dict]) -> dict:
+    """Submit selected OneDrive files as one durable backend staging job."""
+    response = requests.post(
+        ONEDRIVE_STAGE_FILES_JOB_URL,
+        json={
+            "role": st.session_state["role"],
+            "user": st.session_state["user"],
+            "files": [
+                {
+                    "item_id": file_item["id"],
+                    "name": file_item["name"],
+                    "connector_path": file_item["connector_path"],
+                }
+                for file_item in file_items
+            ],
+        },
+        timeout=10,
     )
 
     response.raise_for_status()
@@ -562,6 +603,41 @@ def poll_active_index_update_job() -> None:
         st.session_state["index_update_job_status"] = "error"
 
     st.session_state.pop("active_index_update_job_id", None)
+    st.rerun()
+
+
+@st.fragment(run_every="2s")
+def poll_active_onedrive_stage_job() -> None:
+    """Poll the active OneDrive staging job without blocking Streamlit navigation."""
+    active_job_id = st.session_state.get("active_onedrive_stage_job_id")
+
+    if not active_job_id:
+        return
+
+    try:
+        job = get_backend_job(active_job_id)
+    except requests.exceptions.RequestException as error:
+        st.warning(f"OneDrive staging job status unavailable: {error}")
+        return
+
+    if job["status"] in ["queued", "running"]:
+        st.info(job["message"])
+        return
+
+    if job["status"] == "succeeded":
+        result = job["result"]
+        st.session_state["onedrive_stage_results"] = result.get("results", [])
+        st.session_state["onedrive_stage_message"] = result.get(
+            "message",
+            job["message"],
+        )
+        st.session_state["onedrive_stage_status"] = "success"
+
+    elif job["status"] == "failed":
+        st.session_state["onedrive_stage_message"] = job["message"]
+        st.session_state["onedrive_stage_status"] = "error"
+
+    st.session_state.pop("active_onedrive_stage_job_id", None)
     st.rerun()
 
 
@@ -1122,6 +1198,7 @@ st.sidebar.divider()
 
 poll_active_reindex_job()
 poll_active_index_update_job()
+poll_active_onedrive_stage_job()
 
 kb_page_label = get_kb_page_label()
 
@@ -2095,7 +2172,11 @@ elif selected_page in ["KB Management", "KB Status"]:
                 "Selected files are staged for metadata and ACL review before indexing."
             )
 
-            if st.button("Scan OneDrive Root", use_container_width=True):
+            if st.button(
+                "Scan OneDrive Root",
+                use_container_width=True,
+                key="scan_onedrive_root_button",
+            ):
                 try:
                     scan_result = request_onedrive_file_scan()
                 except requests.exceptions.HTTPError as error:
@@ -2132,12 +2213,20 @@ elif selected_page in ["KB Management", "KB Status"]:
                 selection_columns = st.columns(3)
 
                 with selection_columns[0]:
-                    if st.button("Select All Files", use_container_width=True):
+                    if st.button(
+                        "Select All Files",
+                        use_container_width=True,
+                        key="select_all_onedrive_files_button",
+                    ):
                         st.session_state["selected_onedrive_files_to_stage"] = list(file_options.keys())
                         st.rerun()
 
                 with selection_columns[1]:
-                    if st.button("Clear Selection", use_container_width=True):
+                    if st.button(
+                        "Clear Selection",
+                        use_container_width=True,
+                        key="clear_onedrive_selection_button",
+                    ):
                         st.session_state["selected_onedrive_files_to_stage"] = []
                         st.rerun()
 
@@ -2153,45 +2242,28 @@ elif selected_page in ["KB Management", "KB Status"]:
                 if st.button(
                     "Stage Selected Files for Review",
                     use_container_width=True,
-                    disabled=not selected_file_labels,
+                    disabled=(
+                        not selected_file_labels
+                        or bool(st.session_state.get("active_onedrive_stage_job_id"))
+                    ),
+                    key="submit_onedrive_stage_job_button",
                 ):
-                    stage_results = []
+                    selected_files = [
+                        file_options[selected_file_label]
+                        for selected_file_label in selected_file_labels
+                    ]
 
-                    for selected_file_label in selected_file_labels:
-                        selected_file = file_options[selected_file_label]
-
-                        try:
-                            stage_result = request_onedrive_file_stage(selected_file)
-                        except requests.exceptions.HTTPError as error:
-                            stage_results.append(
-                                {
-                                    "File": selected_file["name"],
-                                    "Path": selected_file["connector_path"],
-                                    "Status": "Rejected",
-                                    "Message": error.response.text,
-                                }
-                            )
-                        except requests.exceptions.RequestException as error:
-                            stage_results.append(
-                                {
-                                    "File": selected_file["name"],
-                                    "Path": selected_file["connector_path"],
-                                    "Status": "Error",
-                                    "Message": str(error),
-                                }
-                            )
-                        else:
-                            stage_results.append(
-                                {
-                                    "File": selected_file["name"],
-                                    "Path": selected_file["connector_path"],
-                                    "Status": "Staged",
-                                    "Message": stage_result["message"],
-                                }
-                            )
-
-                    st.session_state["onedrive_stage_results"] = stage_results
-                    st.rerun()
+                    try:
+                        job = submit_onedrive_stage_job(selected_files)
+                    except requests.exceptions.HTTPError as error:
+                        st.error(f"OneDrive staging rejected by backend: {error.response.text}")
+                    except requests.exceptions.RequestException as error:
+                        st.error(f"Could not submit OneDrive staging job: {error}")
+                    else:
+                        st.session_state["active_onedrive_stage_job_id"] = job["job_id"]
+                        st.session_state["onedrive_stage_message"] = job["message"]
+                        st.session_state["onedrive_stage_status"] = "info"
+                        st.rerun()
 
                 if st.session_state.get("onedrive_stage_results"):
                     st.dataframe(
@@ -2322,6 +2394,33 @@ elif selected_page in ["KB Management", "KB Status"]:
                         st.error(f"Could not approve connector document: {error}")
                     else:
                         st.success(approval_result["message"])
+                        st.rerun()
+            with st.expander("Reject Staged Document", expanded=False):
+                st.warning(
+                    "Rejecting removes this connector import from pending review. "
+                    "The record is kept inactive for audit history and will not be indexed."
+                )
+
+                confirm_reject = st.checkbox(
+                    f"I understand this will reject {selected_review_document['title']}.",
+                    key=f"confirm_reject_{selected_review_document['document_id']}",
+                )
+
+                if st.button(
+                    "Reject Staged Document",
+                    key=f"reject_staged_{selected_review_document['document_id']}",
+                    disabled=not confirm_reject,
+                ):
+                    try:
+                        rejection_result = request_staged_document_rejection(
+                            selected_review_document["document_id"]
+                        )
+                    except requests.exceptions.HTTPError as error:
+                        st.error(f"Rejection rejected by backend: {error.response.text}")
+                    except requests.exceptions.RequestException as error:
+                        st.error(f"Could not reject staged document: {error}")
+                    else:
+                        st.success(rejection_result["message"])
                         st.rerun()
 
     st.divider()

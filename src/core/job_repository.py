@@ -17,6 +17,7 @@ JOB_TYPE_REINDEX = "reindex"
 JOB_TYPE_INDEX_UPDATE = "index_update"
 JOB_TYPE_CHAT_QUERY = "chat_query"
 
+JOB_TYPE_ONEDRIVE_STAGE = "onedrive_stage"
 
 def now_text() -> str:
     """Return a consistent timestamp string for local job records."""

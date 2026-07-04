@@ -49,6 +49,7 @@ from src.core.job_repository import (
     JOB_TYPE_CHAT_QUERY,
     JOB_TYPE_REINDEX,
     JOB_TYPE_INDEX_UPDATE,
+    JOB_TYPE_ONEDRIVE_STAGE,
     create_job,
     get_job,
     get_latest_job,
@@ -143,6 +144,22 @@ class StageOneDriveFileResponse(BaseModel):
     storage_uri: str
     chunk_id: str
     message: str
+
+
+class OneDriveStageFileItem(BaseModel):
+    """Represent one OneDrive file selected for batch staging."""
+
+    item_id: str
+    name: str
+    connector_path: str
+
+
+class StageOneDriveFilesJobRequest(BaseModel):
+    """Represent a durable batch OneDrive staging request."""
+
+    role: str
+    user: str
+    files: list[OneDriveStageFileItem]
 
 
 class ReindexRequest(BaseModel):
@@ -334,6 +351,14 @@ class ApproveDocumentResponse(BaseModel):
     document_id: str
     chunk_id: str
     message: str
+
+
+class RejectStagedDocumentRequest(BaseModel):
+    """Represent an admin request to reject a pending-review connector document."""
+
+    role: str
+    user_department: str
+    document_id: str
 
 
 def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
@@ -1534,11 +1559,39 @@ def stage_onedrive_file(
         document_id = build_graph_document_id("GRAPH-OD", request.item_id)
 
         existing_documents = load_document_metadata(include_inactive=True)
-        if any(document["document_id"] == document_id for document in existing_documents):
+        base_document_id = build_graph_document_id("GRAPH-OD", request.item_id)
+
+        matching_documents = [
+            document
+            for document in existing_documents
+            if (
+                document["document_id"] == base_document_id
+                or document["document_id"].startswith(f"{base_document_id}-R")
+            )
+        ]
+
+        blocking_document = next(
+            (
+                document
+                for document in matching_documents
+                if document.get("chunk_id") != "rejected"
+            ),
+            None,
+        )
+
+        if blocking_document:
             raise HTTPException(
                 status_code=409,
-                detail="This OneDrive file has already been staged.",
+                detail="This OneDrive file has already been staged or approved.",
             )
+
+        document_id = base_document_id
+        attempt_suffix = ""
+
+        if matching_documents:
+            next_attempt_number = len(matching_documents) + 1
+            document_id = f"{base_document_id}-R{next_attempt_number}"
+            attempt_suffix = f"_r{next_attempt_number}"
 
         content_bytes = download_onedrive_file_by_item_id(request.item_id)
 
@@ -1550,7 +1603,7 @@ def stage_onedrive_file(
 
         stored_filename = build_graph_storage_filename(
             source_type="onedrive",
-            item_id=request.item_id,
+            item_id=f"{request.item_id}{attempt_suffix}",
             original_filename=request.name,
         )
 
@@ -1584,3 +1637,217 @@ def stage_onedrive_file(
         message="OneDrive file downloaded and staged for metadata review.",
     )
 
+
+@app.post("/admin/reject-staged-document")
+def reject_staged_document(request: RejectStagedDocumentRequest) -> dict:
+    """Reject a staged connector document before it enters active indexing."""
+    if request.role == GENERAL_EMPLOYEE_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="General Employee cannot reject connector documents.",
+        )
+
+    try:
+        from src.metadata.repository import (
+            load_document_metadata,
+            reject_pending_review_document,
+        )
+
+        all_documents = load_document_metadata(include_inactive=True)
+
+        target_document = next(
+            (
+                document
+                for document in all_documents
+                if document["document_id"] == request.document_id
+            ),
+            None,
+        )
+
+        if target_document is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Document not found.",
+            )
+
+        if target_document.get("chunk_id") != "pending_review":
+            raise HTTPException(
+                status_code=400,
+                detail="Only pending-review documents can be rejected.",
+            )
+
+        if request.role == PROJECT_MANAGER_ROLE:
+            if target_document["department"] != request.user_department:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Project Manager can only reject own-department documents.",
+                )
+
+        reject_pending_review_document(
+            document_id=request.document_id,
+            rejected_at=datetime.now().isoformat(timespec="minutes"),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Document rejection failed: {error}",
+        ) from error
+
+    return {
+        "status": "rejected",
+        "document_id": request.document_id,
+        "message": "Staged connector document rejected and removed from pending review.",
+    }
+
+
+def stage_onedrive_file_item(
+    item_id: str,
+    name: str,
+    connector_path: str,
+    user: str,
+) -> dict:
+    """Download and stage one OneDrive file item for pending metadata review."""
+    from src.connectors.graph_client import download_onedrive_file_by_item_id
+    from src.connectors.graph_connector import (
+        build_graph_document_id,
+        build_graph_storage_filename,
+        stage_graph_file_for_review,
+    )
+    from src.metadata.repository import load_document_metadata
+
+    existing_documents = load_document_metadata(include_inactive=True)
+    base_document_id = build_graph_document_id("GRAPH-OD", item_id)
+
+    matching_documents = [
+        document
+        for document in existing_documents
+        if (
+            document["document_id"] == base_document_id
+            or document["document_id"].startswith(f"{base_document_id}-R")
+        )
+    ]
+
+    blocking_document = next(
+        (
+            document
+            for document in matching_documents
+            if document.get("chunk_id") != "rejected"
+        ),
+        None,
+    )
+
+    if blocking_document:
+        raise ValueError("This OneDrive file has already been staged or approved.")
+
+    document_id = base_document_id
+    attempt_suffix = ""
+
+    if matching_documents:
+        next_attempt_number = len(matching_documents) + 1
+        document_id = f"{base_document_id}-R{next_attempt_number}"
+        attempt_suffix = f"_r{next_attempt_number}"
+
+    content_bytes = download_onedrive_file_by_item_id(item_id)
+
+    if not content_bytes:
+        raise ValueError("Downloaded OneDrive file is empty.")
+
+    stored_filename = build_graph_storage_filename(
+        source_type="onedrive",
+        item_id=f"{item_id}{attempt_suffix}",
+        original_filename=name,
+    )
+
+    return stage_graph_file_for_review(
+        document_id=document_id,
+        title=name,
+        original_filename=stored_filename,
+        content_bytes=content_bytes,
+        source_path=connector_path,
+        source_type="onedrive",
+        uploaded_by=user,
+    )
+
+
+def run_onedrive_stage_job(job_id: str, request: StageOneDriveFilesJobRequest) -> None:
+    """Stage selected OneDrive files in the background and store per-file results."""
+    update_job(
+        job_id,
+        JOB_STATUS_RUNNING,
+        f"Staging {len(request.files)} OneDrive file(s).",
+    )
+
+    results = []
+
+    for file_item in request.files:
+        try:
+            metadata = stage_onedrive_file_item(
+                item_id=file_item.item_id,
+                name=file_item.name,
+                connector_path=file_item.connector_path,
+                user=request.user,
+            )
+        except Exception as error:
+            results.append(
+                {
+                    "File": file_item.name,
+                    "Path": file_item.connector_path,
+                    "Status": "Rejected",
+                    "Message": str(error),
+                }
+            )
+        else:
+            results.append(
+                {
+                    "File": file_item.name,
+                    "Path": file_item.connector_path,
+                    "Status": "Staged",
+                    "Message": f"Staged {metadata['document_id']} for review.",
+                }
+            )
+
+    staged_count = sum(1 for result in results if result["Status"] == "Staged")
+
+    update_job(
+        job_id,
+        JOB_STATUS_SUCCEEDED,
+        f"OneDrive staging finished: {staged_count}/{len(results)} file(s) staged.",
+        result={
+            "results": results,
+            "staged_count": staged_count,
+            "total_count": len(results),
+            "message": f"OneDrive staging finished: {staged_count}/{len(results)} file(s) staged.",
+        },
+    )
+
+
+@app.post("/admin/graph/onedrive/stage-files-job", response_model=JobResponse)
+def create_onedrive_stage_job(
+    request: StageOneDriveFilesJobRequest,
+    background_tasks: BackgroundTasks,
+) -> JobResponse:
+    """Create a durable job for batch OneDrive file staging."""
+    if request.role != SYSTEM_ADMIN_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="Only System Admin can batch stage OneDrive connector files.",
+        )
+
+    if not request.files:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one OneDrive file is required.",
+        )
+
+    job = create_job(
+        job_type=JOB_TYPE_ONEDRIVE_STAGE,
+        created_by=request.user,
+        message=f"OneDrive staging queued for {len(request.files)} file(s).",
+    )
+
+    background_tasks.add_task(run_onedrive_stage_job, job["job_id"], request)
+
+    return JobResponse(**job)
