@@ -2171,7 +2171,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                 "Scans the configured OneDrive knowledge-base root only. "
                 "Selected files are staged for metadata and ACL review before indexing."
             )
-
+           
             if st.button(
                 "Scan OneDrive Root",
                 use_container_width=True,
@@ -2194,9 +2194,11 @@ elif selected_page in ["KB Management", "KB Status"]:
                     [
                         {
                             "Name": file_item["name"],
+                            "State": file_item.get("connector_state", "New"),
                             "Path": file_item["connector_path"],
-                            "Size (KB)": file_item.get("size"),
+                            "Size (KB)": round((file_item.get("size") or 0) / 1024, 1),
                             "Modified": file_item.get("last_modified_datetime"),
+                            "KB Record": file_item.get("staged_document_id") or "",
                         }
                         for file_item in onedrive_files
                     ],
@@ -2204,17 +2206,25 @@ elif selected_page in ["KB Management", "KB Status"]:
                     hide_index=True,
                     height=260,
                 )
-
+                stageable_count = sum(
+                    1
+                    for file_item in onedrive_files
+                    if file_item.get("connector_state", "New") in ["New", "Rejected"]
+                )
+                st.caption(
+                    f"{len(onedrive_files)} discovered file(s), "
+                    f"{stageable_count} stageable"
+                )
                 file_options = {
                     f"{file_item['name']} - {file_item['connector_path']}": file_item
                     for file_item in onedrive_files
                 }
 
-                selection_columns = st.columns(3)
+                selection_columns = st.columns(4)
 
                 with selection_columns[0]:
                     if st.button(
-                        "Select All Files",
+                        "Select All",
                         use_container_width=True,
                         key="select_all_onedrive_files_button",
                     ):
@@ -2223,6 +2233,19 @@ elif selected_page in ["KB Management", "KB Status"]:
 
                 with selection_columns[1]:
                     if st.button(
+                        "Select New/Rejected",
+                        use_container_width=True,
+                        key="select_stageable_onedrive_files_button",
+                    ):
+                        st.session_state["selected_onedrive_files_to_stage"] = [
+                            label
+                            for label, file_item in file_options.items()
+                            if file_item.get("connector_state", "New") in ["New", "Rejected"]
+                        ]
+                        st.rerun()
+
+                with selection_columns[2]:
+                    if st.button(
                         "Clear Selection",
                         use_container_width=True,
                         key="clear_onedrive_selection_button",
@@ -2230,7 +2253,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                         st.session_state["selected_onedrive_files_to_stage"] = []
                         st.rerun()
 
-                with selection_columns[2]:
+                with selection_columns[3]:
                     st.caption(f"{len(onedrive_files)} discovered file(s)")
 
                 selected_file_labels = st.multiselect(

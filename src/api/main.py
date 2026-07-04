@@ -115,6 +115,8 @@ class OneDriveFileSummary(BaseModel):
     connector_path: str
     size: int | None = None
     last_modified_datetime: str | None = None
+    connector_state: str = "New"
+    staged_document_id: str | None = None
 
 
 class OneDriveFilesResponse(BaseModel):
@@ -1499,6 +1501,45 @@ def approve_pending_document(
     )
 
 
+def get_onedrive_connector_state(item_id: str, documents: list[dict]) -> dict:
+    """Return current review/index state for a discovered OneDrive file."""
+    from src.connectors.graph_connector import build_graph_document_id
+
+    base_document_id = build_graph_document_id("GRAPH-OD", item_id)
+
+    matching_documents = [
+        document
+        for document in documents
+        if (
+            document["document_id"] == base_document_id
+            or document["document_id"].startswith(f"{base_document_id}-R")
+        )
+    ]
+
+    if not matching_documents:
+        return {
+            "connector_state": "New",
+            "staged_document_id": None,
+        }
+
+    latest_document = matching_documents[-1]
+    chunk_id = latest_document.get("chunk_id")
+
+    state_by_chunk_id = {
+        "pending_review": "Pending Review",
+        "rejected": "Rejected",
+        "pending_index": "Pending Index",
+        "pending": "Pending Index",
+        "indexed": "Indexed",
+        "archived": "Archived",
+    }
+
+    return {
+        "connector_state": state_by_chunk_id.get(chunk_id, "Other"),
+        "staged_document_id": latest_document["document_id"],
+    }
+
+
 @app.post("/admin/graph/onedrive/files", response_model=OneDriveFilesResponse)
 def list_graph_onedrive_files(
     request: GraphConnectorListRequest,
@@ -1512,8 +1553,10 @@ def list_graph_onedrive_files(
 
     try:
         from src.connectors.graph_client import list_onedrive_files_recursive
+        from src.metadata.repository import load_document_metadata
 
         discovered_files = list_onedrive_files_recursive()
+        all_documents = load_document_metadata(include_inactive=True)
 
     except RuntimeError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
@@ -1523,16 +1566,25 @@ def list_graph_onedrive_files(
             detail=f"OneDrive scan failed: {error}",
         ) from error
 
-    files = [
-        OneDriveFileSummary(
-            id=file_item["id"],
-            name=file_item["name"],
-            connector_path=file_item["connector_path"],
-            size=file_item.get("size"),
-            last_modified_datetime=file_item.get("lastModifiedDateTime"),
+    files = []
+
+    for file_item in discovered_files:
+        connector_state = get_onedrive_connector_state(
+            item_id=file_item["id"],
+            documents=all_documents,
         )
-        for file_item in discovered_files
-    ]
+
+        files.append(
+            OneDriveFileSummary(
+                id=file_item["id"],
+                name=file_item["name"],
+                connector_path=file_item["connector_path"],
+                size=file_item.get("size"),
+                last_modified_datetime=file_item.get("lastModifiedDateTime"),
+                connector_state=connector_state["connector_state"],
+                staged_document_id=connector_state["staged_document_id"],
+            )
+        )
 
     return OneDriveFilesResponse(status="success", files=files)
 
