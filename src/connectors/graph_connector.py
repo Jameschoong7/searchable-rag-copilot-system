@@ -95,7 +95,7 @@ def build_pending_review_metadata(
         "source": source_type,
         "department": department,
         "category": "Connector Import",
-        "tags": ["graph", source_type, "pending-review"],
+        "tags": ["graph", source_type],
         "allowed_roles": allowed_roles,
         "allowed_departments": allowed_departments,
         "uploaded_by": uploaded_by,

@@ -1032,6 +1032,70 @@ def get_version_label(document: dict) -> str:
     return f"v{version_number}"
 
 
+def render_status_card(label: str, value: int | str, tone: str = "neutral") -> None:
+    """Render a compact status card with stronger attention colors than st.metric."""
+    tones = {
+        "neutral": {
+            "background": "#ffffff",
+            "border": "#d0d5dd",
+            "label": "#667085",
+            "value": "#101828",
+            "bar": "#98a2b3",
+        },
+        "attention": {
+            "background": "#fff7ed",
+            "border": "#fdba74",
+            "label": "#9a3412",
+            "value": "#7c2d12",
+            "bar": "#f97316",
+        },
+        "danger": {
+            "background": "#fff1f0",
+            "border": "#f6b3ae",
+            "label": "#b42318",
+            "value": "#7a271a",
+            "bar": "#e63329",
+        },
+        "success": {
+            "background": "#f0fdf4",
+            "border": "#86efac",
+            "label": "#166534",
+            "value": "#14532d",
+            "bar": "#22c55e",
+        },
+    }
+    selected_tone = tones.get(tone, tones["neutral"])
+
+    st.markdown(
+        f"""
+        <div style="
+            background:{selected_tone['background']};
+            border:1px solid {selected_tone['border']};
+            border-left:4px solid {selected_tone['bar']};
+            border-radius:8px;
+            padding:0.75rem 0.9rem;
+            box-shadow:0 1px 2px rgba(16,24,40,0.05);
+        ">
+            <div style="
+                color:{selected_tone['label']};
+                font-size:0.75rem;
+                font-weight:750;
+                text-transform:uppercase;
+                letter-spacing:0.02em;
+            ">{escape(str(label))}</div>
+            <div style="
+                color:{selected_tone['value']};
+                font-size:1.55rem;
+                font-weight:800;
+                line-height:1.2;
+                margin-top:0.15rem;
+            ">{escape(str(value))}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def normalise_uploaded_filename(filename: str) -> str:
     """Return the local filename used for uploaded simulated documents."""
     return filename.replace(" ", "_")
@@ -1087,14 +1151,36 @@ api_online = is_api_online()
 api_status_label = "API Online" if api_online else "API Offline"
 api_status_color = "#166534" if api_online else "#991b1b"
 api_status_background = "#dcfce7" if api_online else "#fee2e2"
+brand_red = "#e63329"
+brand_red_hover = "#c42820"
+brand_red_soft = "#fff1f0"
+brand_red_border = "#f6b3ae"
 
-# Global CSS updates for polished dashboard cards
+# Global CSS updates 
 st.markdown(
     f"""
     <style>
+    header[data-testid="stHeader"],
+    div[data-testid="stToolbar"],
+    div[data-testid="stDecoration"],
+    div[data-testid="stActionButton"],
+    .stAppDeployButton {{
+        display: none !important;
+    }}
+
+    .stApp {{
+        background-color: #f6f7f9;
+        color: #101828;
+    }}
+
+    .block-container {{
+        padding-top: 0.8rem;
+        max-width: 1480px;
+    }}
+
     [data-testid="stSidebar"] {{
-        background-color: #f8fafc;
-        border-right: 1px solid #e2e8f0;
+        background-color: #ffffff;
+        border-right: 1px solid #d0d5dd;
     }}
 
     [data-testid="stSidebar"] [role="radiogroup"] {{
@@ -1110,12 +1196,21 @@ st.markdown(
     }}
 
     [data-testid="stSidebar"] [role="radiogroup"] label:hover {{
-        background-color: #eef2f7;
+        background-color: {brand_red_soft};
     }}
 
     [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {{
-        background-color: #e2e8f0;
+        background-color: {brand_red};
+        color: #ffffff !important;
         font-weight: 600;
+    }}
+
+    [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) * {{
+        color: #ffffff !important;
+    }}
+
+    [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked):hover {{
+        background-color: {brand_red_hover};
     }}
 
     [data-testid="stSidebar"] [role="radiogroup"] > label
@@ -1130,13 +1225,147 @@ st.markdown(
     [data-testid="stForm"] [data-testid="InputInstructions"] {{
         display: none;
     }}
+
+    div[data-testid="stVerticalBlockBorderWrapper"] {{
+        border-color: #cbd5e1 !important;
+        box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+    }}
+
+    div[data-testid="stTabs"] button {{
+        font-weight: 650;
+    }}
+
+    div[data-testid="stTabs"] button[aria-selected="true"] {{
+        color: {brand_red} !important;
+        border-bottom-color: {brand_red} !important;
+    }}
+
+    div[data-testid="stDataFrame"] {{
+        border: 1px solid #d0d5dd;
+        border-radius: 8px;
+        overflow: hidden;
+    }}
+
+    .stButton > button {{
+        border-radius: 7px;
+        border-color: #98a2b3;
+        font-weight: 650;
+    }}
+
+    .stButton > button[kind="primary"],
+    .stFormSubmitButton > button[kind="primary"] {{
+        background-color: {brand_red};
+        border-color: {brand_red};
+        color: #ffffff;
+    }}
+
+    .stButton > button[kind="primary"]:hover,
+    .stFormSubmitButton > button[kind="primary"]:hover {{
+        background-color: {brand_red_hover};
+        border-color: {brand_red_hover};
+        color: #ffffff;
+    }}
+
+    .stButton > button:focus,
+    .stFormSubmitButton > button:focus,
+    div[data-baseweb="select"] > div:focus-within,
+    div[data-baseweb="input"] > div:focus-within,
+    div[data-baseweb="textarea"] > div:focus-within {{
+        border-color: {brand_red} !important;
+        box-shadow: 0 0 0 1px {brand_red_border} !important;
+    }}
+
+    div[data-baseweb="input"] > div,
+    div[data-baseweb="textarea"] > div,
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="base-input"] {{
+        background-color: #ffffff !important;
+        border-color: #98a2b3 !important;
+    }}
+
+    input,
+    textarea {{
+        color: #101828 !important;
+    }}
+
+    input::placeholder,
+    textarea::placeholder {{
+        color: #667085 !important;
+        opacity: 1 !important;
+    }}
+
+    div[data-baseweb="input"][aria-disabled="true"] > div,
+    input:disabled,
+    textarea:disabled {{
+        background-color: #f2f4f7 !important;
+        color: #475467 !important;
+        -webkit-text-fill-color: #475467 !important;
+    }}
     
     div[data-testid="stMetric"] {{
         background-color: #ffffff;
-        border: 1px solid #e2e8f0;
-        padding: 15px;
+        border: 1px solid #d0d5dd;
+        padding: 14px;
         border-radius: 8px;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+    }}
+
+    .compact-section-title {{
+        margin: 0.25rem 0 0.5rem 0;
+        font-size: 1rem;
+        font-weight: 750;
+        color: #101828;
+    }}
+
+    .muted-note {{
+        color: #667085;
+        font-size: 0.84rem;
+    }}
+
+    .status-pill {{
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 0.18rem 0.55rem;
+        font-size: 0.74rem;
+        font-weight: 750;
+        border: 1px solid transparent;
+    }}
+
+    .typing-indicator {{
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        color: #475467;
+        font-size: 0.92rem;
+        line-height: 1.5;
+    }}
+
+    .typing-dot {{
+        width: 0.38rem;
+        height: 0.38rem;
+        border-radius: 999px;
+        background: {brand_red};
+        animation: typingPulse 1.1s infinite ease-in-out;
+    }}
+
+    .typing-dot:nth-child(2) {{
+        animation-delay: 0.16s;
+    }}
+
+    .typing-dot:nth-child(3) {{
+        animation-delay: 0.32s;
+    }}
+
+    @keyframes typingPulse {{
+        0%, 80%, 100% {{
+            opacity: 0.28;
+            transform: translateY(0);
+        }}
+        40% {{
+            opacity: 1;
+            transform: translateY(-3px);
+        }}
     }}
     </style>
     <div style="
@@ -1793,14 +2022,24 @@ if selected_page == "Performance":
 
 
 elif selected_page in ["KB Management", "KB Status"]:
-    st.header(selected_page)
+    title_columns = st.columns([2.6, 1])
 
-    if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-        st.caption("Global knowledge base management for all departments.")
-    elif st.session_state["role"] == PROJECT_MANAGER_ROLE:
-        st.caption("Department-scoped knowledge base management.")
-    else:
-        st.caption("Department-scoped knowledge base status.")
+    with title_columns[0]:
+        st.header(selected_page)
+
+    with title_columns[1]:
+        st.markdown(
+            f"""
+            <div style="text-align:right; padding-top:0.35rem;">
+                <span class="status-pill" style="
+                    color:#344054;
+                    background:#ffffff;
+                    border-color:#d0d5dd;
+                ">{escape(st.session_state["role"])} / {escape(st.session_state["department"])}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     documents = load_document_metadata()
     visible_documents = [
@@ -1814,637 +2053,613 @@ elif selected_page in ["KB Management", "KB Status"]:
         if document.get("chunk_id") == "pending_review"
     ]
 
-    summary_columns = st.columns(3)
+    visible_pending_index_count = sum(
+        1
+        for document in visible_documents
+        if get_index_status_label(document) == "Pending Index"
+    )
+    visible_indexed_count = sum(
+        1
+        for document in visible_documents
+        if get_index_status_label(document) == "Indexed"
+    )
+    reviewable_count = sum(
+        1
+        for document in pending_review_documents
+        if (
+            st.session_state["role"] == SYSTEM_ADMIN_ROLE
+            or document["department"] == st.session_state["department"]
+        )
+    )
+
+    summary_columns = st.columns(4)
 
     with summary_columns[0]:
-        with st.container(border=True):
-            st.markdown("**Source Connectors**")
-            st.markdown(
-                """
-                <span style="
-                    color: #1d4ed8;
-                    background: #dbeafe;
-                    border-radius: 0.3rem;
-                    padding: 0.2rem 0.45rem;
-                    font-size: 0.7rem;
-                    font-weight: 700;
-                ">DEMO CONNECTORS</span>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.caption("Integration direction:\n- SharePoint\n- OneNote\n- Manual Upload\n- Batch ZIP")
+        render_status_card("Visible Docs", len(visible_documents))
 
     with summary_columns[1]:
-        with st.container(border=True):
-            st.markdown("**Document Metadata & ACL**")
-            st.markdown(
-                """
-                <span style="
-                    color: #166534;
-                    background: #dcfce7;
-                    border-radius: 0.3rem;
-                    padding: 0.2rem 0.45rem;
-                    font-size: 0.7rem;
-                    font-weight: 700;
-                ">ACTIVE</span>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.caption(
-                f"Role: {escape(st.session_state['role'])}\n"
-                f"- Visible docs: {len(visible_documents)}"
-            )
+        render_status_card(
+            "Pending Review",
+            reviewable_count,
+            "danger" if reviewable_count else "neutral",
+        )
 
     with summary_columns[2]:
-        with st.container(border=True):
-            st.markdown("**Visual Content Handling**")
-            st.markdown(
-                """
-                <span style="
-                    color: #92400e;
-                    background: #fef3c7;
-                    border-radius: 0.3rem;
-                    padding: 0.2rem 0.45rem;
-                    font-size: 0.7rem;
-                    font-weight: 700;
-                ">PARTIAL SUPPORT</span>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.caption(
-                "Active: Text extract\n"
-                "Roadmap: OCR, Diagram extract"
-            )
+        render_status_card(
+            "Pending Index",
+            visible_pending_index_count,
+            "attention" if visible_pending_index_count else "neutral",
+        )
+
+    with summary_columns[3]:
+        render_status_card("Indexed", visible_indexed_count, "success")
     
     if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
+        if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+            upload_tab, onedrive_tab, review_tab, index_tab = st.tabs(
+                ["Upload", "OneDrive", "Review Queue", "Index Sync"]
+            )
+        else:
+            upload_tab, review_tab = st.tabs(["Upload", "Review Queue"])
+            onedrive_tab = None
+            index_tab = None
 
-        st.subheader("Document Ingestion & Indexing")
+        with upload_tab:
+            if "upload_message" not in st.session_state:
+                st.session_state["upload_message"] = ""
 
-        if "upload_message" not in st.session_state:
-            st.session_state["upload_message"] = ""
-
-        if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
-            with st.container(border=True):
-                new_document_tab, new_version_tab = st.tabs(
-                    ["Upload New Document", "Upload New Version"]
-                )
-                with new_document_tab:
-                    st.markdown("**1. Upload & Categorize Document**")
-                    st.caption(
-                        "Upload captures document title, department, category, tags, and access scope. "
-                        "File identity, storage location, version, uploader, timestamp, index status, and extraction status are assigned by the system."
+            if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
+                with st.container(border=True):
+                    new_document_tab, new_version_tab = st.tabs(
+                        ["Upload New Document", "Upload New Version"]
                     )
+                    with new_document_tab:
+                        st.markdown("**Upload & Categorize**")
 
-                    if "upload_form_version" not in st.session_state:
-                        st.session_state["upload_form_version"] = 0
+                        if "upload_form_version" not in st.session_state:
+                            st.session_state["upload_form_version"] = 0
 
-                    upload_form_version = st.session_state["upload_form_version"]
+                        upload_form_version = st.session_state["upload_form_version"]
 
-                    uploaded_file = st.file_uploader(
-                        "Upload TXT, PDF, or DOCX",
-                        type=["txt", "pdf", "docx"],
-                        key=f"upload_file{upload_form_version}",
-                    )
-
-                    title_key = prepare_upload_title_state(uploaded_file, upload_form_version)
-
-                    with st.form(f"real_txt_upload_form_{upload_form_version}"):
-                        
-                        # Grouping form inputs into a grid layout to save vertical space
-                        col1, col2 = st.columns(2)
-
-                        with col1:
-                            title = st.text_input(
-                                "Document title",
-                                key=title_key,
-                                help="Auto-filled from the uploaded filename. Admin may edit it.",
-                            )
-                            if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-                                department = st.selectbox(
-                                    "Department",
-                                    DEPARTMENT_OPTIONS,
-                                    key=f"txt_upload_department_{upload_form_version}",
-                                )
-                            else:
-                                department = st.text_input(
-                                    "Department",
-                                    value=st.session_state["department"],
-                                    disabled=True,
-                                    key=f"txt_upload_department_{upload_form_version}",
-                                )
-                            category = st.text_input(
-                                "Category",
-                                value="General",
-                                key=f"txt_upload_category_{upload_form_version}",
-                            )
-
-                        with col2:
-                            tags_text = st.text_input(
-                                "Tags",
-                                value="policy, internal",
-                                help="Separate tags with commas.",
-                                key=f"txt_upload_tags_{upload_form_version}",
-                            )
-                            if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-                                allowed_roles = st.multiselect(
-                                    "Allowed roles",
-                                    ROLE_OPTIONS,
-                                    default=[SYSTEM_ADMIN_ROLE],
-                                    key=f"txt_upload_roles_{upload_form_version}",
-                                )
-                                allowed_departments = st.multiselect(
-                                    "Allowed departments",
-                                    DEPARTMENT_OPTIONS,
-                                    default=[department],
-                                    key=f"txt_upload_departments_{upload_form_version}",
-                                )
-                            else:
-                                allowed_roles = st.multiselect(
-                                    "Allowed roles",
-                                    [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE],
-                                    default=[PROJECT_MANAGER_ROLE],
-                                    key=f"txt_upload_roles_{upload_form_version}",
-                                )
-                                allowed_departments = st.multiselect(
-                                    "Allowed departments",
-                                    [st.session_state["department"]],
-                                    default=[st.session_state["department"]],
-                                    key=f"txt_upload_departments_{upload_form_version}",
-                                )
-
-                        submitted_upload = st.form_submit_button("Save File + Metadata", type="primary")
-
-                        if submitted_upload:
-                            if uploaded_file is None:
-                                st.error("Please choose a supported file before saving.")
-                            elif not title.strip():
-                                st.error("Please enter a document title.")
-                            elif not allowed_roles:
-                                st.error("Please select at least one allowed role.")
-                            elif not allowed_departments:
-                                st.error("Please select at least one allowed department.")
-                            else:
-                                tags = [
-                                    tag.strip()
-                                    for tag in tags_text.split(",")
-                                    if tag.strip()
-                                ]
-
-                                try:
-                                    upload_result = request_backend_document_upload(
-                                        uploaded_file=uploaded_file,
-                                        title=title.strip(),
-                                        document_department=department,
-                                        category=category.strip() or "General",
-                                        tags=tags,
-                                        allowed_roles=allowed_roles,
-                                        allowed_departments=allowed_departments,
-                                    )
-                                except requests.exceptions.HTTPError as error:
-                                    st.error(f"Upload rejected by backend: {error.response.text}")
-                                    st.stop()
-                                except requests.exceptions.RequestException as error:
-                                    st.error(f"Could not upload document through backend: {error}")
-                                    st.stop()
-
-                                index_owner_message = (
-                                    "Run Update for Pending Documents so the latest approved content is available in chat."
-                                    if st.session_state["role"] == SYSTEM_ADMIN_ROLE
-                                    else "System Admin action is required to update the search index before this content is available in chat."
-                                )
-
-                                st.session_state["upload_message"] = (
-                                    f"{upload_result['message']} {index_owner_message}"
-                                )
-                                st.session_state["upload_form_version"] += 1
-                                st.rerun()
-
-                with new_version_tab:
-                    st.markdown("**Upload Replacement As New Version**")
-                    st.caption(
-                        "Select an active document and upload its replacement. "
-                        "The system archives the previous version, creates the next version record, and marks it for search index update."
-                    )
-
-                    manageable_documents = [
-                        document for document in visible_documents
-                        if (
-                            st.session_state["role"] == SYSTEM_ADMIN_ROLE
-                            or document["department"] == st.session_state["department"]
-                        )
-                    ]
-
-                    if not manageable_documents:
-                        st.info("No manageable documents are available for version replacement.")
-                    else:
-                        document_options = {
-                            f"{document['title']} ({document['document_id']}, v{document.get('version_number') or 1})": document
-                            for document in manageable_documents
-                        }
-
-                        selected_version_label = st.selectbox(
-                            "Existing document",
-                            list(document_options.keys()),
-                            key=f"version_replace_document_{upload_form_version}",
-                        )
-
-                        selected_version_document = document_options[selected_version_label]
-                        previous_version_number = selected_version_document.get("version_number") or 1
-                        next_version_number = previous_version_number + 1
-
-                        st.caption(
-                            f"Current version: v{previous_version_number} -> New version: v{next_version_number}"
-                        )
-
-                        uploaded_version_file = st.file_uploader(
-                            "Upload replacement TXT, PDF, or DOCX",
+                        uploaded_file = st.file_uploader(
+                            "Upload TXT, PDF, or DOCX",
                             type=["txt", "pdf", "docx"],
-                            key=f"version_upload_file_{upload_form_version}",
+                            key=f"upload_file{upload_form_version}",
                         )
 
-                        with st.form(f"version_upload_form_{upload_form_version}"):
-                            submitted_version_upload = st.form_submit_button(
-                                "Create New Version",
-                                type="primary",
-                            )
+                        title_key = prepare_upload_title_state(uploaded_file, upload_form_version)
 
-                            if submitted_version_upload:
-                                if uploaded_version_file is None:
-                                    st.error("Please choose a replacement file before saving.")
+                        with st.form(f"real_txt_upload_form_{upload_form_version}"):
+                        
+                            # Grouping form inputs into a grid layout to save vertical space
+                            col1, col2 = st.columns(2)
+
+                            with col1:
+                                title = st.text_input(
+                                    "Document title",
+                                    key=title_key,
+                                    help="Auto-filled from the uploaded filename. Admin may edit it.",
+                                )
+                                if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+                                    department = st.selectbox(
+                                        "Department",
+                                        DEPARTMENT_OPTIONS,
+                                        key=f"txt_upload_department_{upload_form_version}",
+                                    )
                                 else:
+                                    department = st.text_input(
+                                        "Department",
+                                        value=st.session_state["department"],
+                                        disabled=True,
+                                        key=f"txt_upload_department_{upload_form_version}",
+                                    )
+                                category = st.text_input(
+                                    "Category",
+                                    value="General",
+                                    key=f"txt_upload_category_{upload_form_version}",
+                                )
+
+                            with col2:
+                                tags_text = st.text_input(
+                                    "Tags",
+                                    value="policy, internal",
+                                    help="Separate tags with commas.",
+                                    key=f"txt_upload_tags_{upload_form_version}",
+                                )
+                                if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+                                    allowed_roles = st.multiselect(
+                                        "Allowed roles",
+                                        ROLE_OPTIONS,
+                                        default=[SYSTEM_ADMIN_ROLE],
+                                        key=f"txt_upload_roles_{upload_form_version}",
+                                    )
+                                    allowed_departments = st.multiselect(
+                                        "Allowed departments",
+                                        DEPARTMENT_OPTIONS,
+                                        default=[department],
+                                        key=f"txt_upload_departments_{upload_form_version}",
+                                    )
+                                else:
+                                    allowed_roles = st.multiselect(
+                                        "Allowed roles",
+                                        [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE],
+                                        default=[PROJECT_MANAGER_ROLE],
+                                        key=f"txt_upload_roles_{upload_form_version}",
+                                    )
+                                    allowed_departments = st.multiselect(
+                                        "Allowed departments",
+                                        [st.session_state["department"]],
+                                        default=[st.session_state["department"]],
+                                        key=f"txt_upload_departments_{upload_form_version}",
+                                    )
+
+                            submitted_upload = st.form_submit_button("Save File + Metadata", type="primary")
+
+                            if submitted_upload:
+                                if uploaded_file is None:
+                                    st.error("Please choose a supported file before saving.")
+                                elif not title.strip():
+                                    st.error("Please enter a document title.")
+                                elif not allowed_roles:
+                                    st.error("Please select at least one allowed role.")
+                                elif not allowed_departments:
+                                    st.error("Please select at least one allowed department.")
+                                else:
+                                    tags = [
+                                        tag.strip()
+                                        for tag in tags_text.split(",")
+                                        if tag.strip()
+                                    ]
+
                                     try:
-                                        version_result = request_backend_document_version_upload(
-                                            uploaded_file=uploaded_version_file,
-                                            previous_document_id=selected_version_document["document_id"],
+                                        upload_result = request_backend_document_upload(
+                                            uploaded_file=uploaded_file,
+                                            title=title.strip(),
+                                            document_department=department,
+                                            category=category.strip() or "General",
+                                            tags=tags,
+                                            allowed_roles=allowed_roles,
+                                            allowed_departments=allowed_departments,
                                         )
                                     except requests.exceptions.HTTPError as error:
-                                        st.error(f"Version upload rejected by backend: {error.response.text}")
+                                        st.error(f"Upload rejected by backend: {error.response.text}")
                                         st.stop()
                                     except requests.exceptions.RequestException as error:
-                                        st.error(f"Could not upload replacement version through backend: {error}")
+                                        st.error(f"Could not upload document through backend: {error}")
                                         st.stop()
 
                                     index_owner_message = (
-                                        "Run Update for Pending Documents to replace old search vectors and activate the new version in chat."
+                                        "Run Update for Pending Documents so the latest approved content is available in chat."
                                         if st.session_state["role"] == SYSTEM_ADMIN_ROLE
-                                        else "System Admin action is required to replace old search vectors and activate the new version in chat."
+                                        else "System Admin action is required to update the search index before this content is available in chat."
                                     )
 
                                     st.session_state["upload_message"] = (
-                                        f"{version_result['message']} {index_owner_message}"
+                                        f"{upload_result['message']} {index_owner_message}"
                                     )
                                     st.session_state["upload_form_version"] += 1
                                     st.rerun()
 
-        if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-            with st.container(border=True):
-                st.markdown("**2. Vector Index Sync**")
-                st.caption(
-                    "Use incremental update for pending document changes. Use full rebuild "
-                    "when you want to reconstruct the active index from scratch."
-                )
+                    with new_version_tab:
+                        st.markdown("**Upload New Version**")
 
-                if st.session_state.get("index_update_job_message"):
-                    index_update_status = st.session_state.get("index_update_job_status", "info")
-
-                    if index_update_status == "success":
-                        st.success(st.session_state["index_update_job_message"])
-                    elif index_update_status == "error":
-                        st.error(st.session_state["index_update_job_message"])
-                    else:
-                        st.info(st.session_state["index_update_job_message"])
-
-                if st.session_state.get("reindex_job_message"):
-                    reindex_status = st.session_state.get("reindex_job_status", "info")
-
-                    if reindex_status == "success":
-                        st.success(st.session_state["reindex_job_message"])
-                    elif reindex_status == "error":
-                        st.error(st.session_state["reindex_job_message"])
-                    else:
-                        st.info(st.session_state["reindex_job_message"])
-
-                index_action_columns = st.columns(2)
-
-                with index_action_columns[0]:
-                    if st.button(
-                        "Run Update for Pending Documents",
-                        use_container_width=True,
-                        disabled=bool(st.session_state.get("active_index_update_job_id")),
-                    ):
-                        try:
-                            job = submit_index_update_job()
-                        except requests.exceptions.RequestException as error:
-                            st.error(f"Could not submit index update job: {error}")
-                        else:
-                            st.session_state["active_index_update_job_id"] = job["job_id"]
-                            st.session_state["index_update_job_message"] = "Pending document index update queued."
-                            st.session_state["index_update_job_status"] = "info"
-                            st.rerun()
-
-                with index_action_columns[1]:
-                   if st.button(
-                        "Rebuild Full Active Index",
-                        use_container_width=True,
-                        disabled=bool(st.session_state.get("active_reindex_job_id")),
-                    ):
-                        try:
-                            job = submit_reindex_job()
-                        except requests.exceptions.RequestException as error:
-                            st.error(f"Could not submit rebuild job: {error}")
-                        else:
-                            st.session_state["active_reindex_job_id"] = job["job_id"]
-                            st.session_state["reindex_job_message"] = "Search index rebuild queued."
-                            st.session_state["reindex_job_status"] = "info"
-                            st.rerun()
-
-        if st.session_state["upload_message"]:
-            st.warning(st.session_state["upload_message"])
-
-    st.divider()
-
-    if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-        st.subheader("OneDrive Connector")
-
-        with st.container(border=True):
-            st.caption(
-                "Scans the configured OneDrive knowledge-base root only. "
-                "Selected files are staged for metadata and ACL review before indexing."
-            )
-           
-            if st.button(
-                "Scan OneDrive Root",
-                use_container_width=True,
-                key="scan_onedrive_root_button",
-            ):
-                try:
-                    scan_result = request_onedrive_file_scan()
-                except requests.exceptions.HTTPError as error:
-                    st.error(f"OneDrive scan rejected by backend: {error.response.text}")
-                except requests.exceptions.RequestException as error:
-                    st.error(f"Could not scan OneDrive connector: {error}")
-                else:
-                    st.session_state["onedrive_files"] = scan_result["files"]
-                    st.success(f"Found {len(scan_result['files'])} file(s).")
-
-            onedrive_files = st.session_state.get("onedrive_files", [])
-
-            if onedrive_files:
-                st.dataframe(
-                    [
-                        {
-                            "Name": file_item["name"],
-                            "State": file_item.get("connector_state", "New"),
-                            "Path": file_item["connector_path"],
-                            "Size (KB)": round((file_item.get("size") or 0) / 1024, 1),
-                            "Modified": file_item.get("last_modified_datetime"),
-                            "KB Record": file_item.get("staged_document_id") or "",
-                        }
-                        for file_item in onedrive_files
-                    ],
-                    use_container_width=True,
-                    hide_index=True,
-                    height=260,
-                )
-                stageable_count = sum(
-                    1
-                    for file_item in onedrive_files
-                    if file_item.get("connector_state", "New") in ["New", "Rejected"]
-                )
-                st.caption(
-                    f"{len(onedrive_files)} discovered file(s), "
-                    f"{stageable_count} stageable"
-                )
-                file_options = {
-                    f"{file_item['name']} - {file_item['connector_path']}": file_item
-                    for file_item in onedrive_files
-                }
-
-                selection_columns = st.columns(4)
-
-                with selection_columns[0]:
-                    if st.button(
-                        "Select All",
-                        use_container_width=True,
-                        key="select_all_onedrive_files_button",
-                    ):
-                        st.session_state["selected_onedrive_files_to_stage"] = list(file_options.keys())
-                        st.rerun()
-
-                with selection_columns[1]:
-                    if st.button(
-                        "Select New/Rejected",
-                        use_container_width=True,
-                        key="select_stageable_onedrive_files_button",
-                    ):
-                        st.session_state["selected_onedrive_files_to_stage"] = [
-                            label
-                            for label, file_item in file_options.items()
-                            if file_item.get("connector_state", "New") in ["New", "Rejected"]
+                        manageable_documents = [
+                            document for document in visible_documents
+                            if (
+                                st.session_state["role"] == SYSTEM_ADMIN_ROLE
+                                or document["department"] == st.session_state["department"]
+                            )
                         ]
-                        st.rerun()
 
-                with selection_columns[2]:
-                    if st.button(
-                        "Clear Selection",
-                        use_container_width=True,
-                        key="clear_onedrive_selection_button",
-                    ):
-                        st.session_state["selected_onedrive_files_to_stage"] = []
-                        st.rerun()
+                        if not manageable_documents:
+                            st.info("No manageable documents are available for version replacement.")
+                        else:
+                            document_options = {
+                                f"{document['title']} ({document['document_id']}, v{document.get('version_number') or 1})": document
+                                for document in manageable_documents
+                            }
 
-                with selection_columns[3]:
-                    st.caption(f"{len(onedrive_files)} discovered file(s)")
+                            selected_version_label = st.selectbox(
+                                "Existing document",
+                                list(document_options.keys()),
+                                key=f"version_replace_document_{upload_form_version}",
+                            )
 
-                selected_file_labels = st.multiselect(
-                    "Select OneDrive files to stage",
-                    list(file_options.keys()),
-                    key="selected_onedrive_files_to_stage",
+                            selected_version_document = document_options[selected_version_label]
+                            previous_version_number = selected_version_document.get("version_number") or 1
+                            next_version_number = previous_version_number + 1
+
+                            st.caption(
+                                f"Current version: v{previous_version_number} -> New version: v{next_version_number}"
+                            )
+
+                            uploaded_version_file = st.file_uploader(
+                                "Upload replacement TXT, PDF, or DOCX",
+                                type=["txt", "pdf", "docx"],
+                                key=f"version_upload_file_{upload_form_version}",
+                            )
+
+                            with st.form(f"version_upload_form_{upload_form_version}"):
+                                submitted_version_upload = st.form_submit_button(
+                                    "Create New Version",
+                                    type="primary",
+                                )
+
+                                if submitted_version_upload:
+                                    if uploaded_version_file is None:
+                                        st.error("Please choose a replacement file before saving.")
+                                    else:
+                                        try:
+                                            version_result = request_backend_document_version_upload(
+                                                uploaded_file=uploaded_version_file,
+                                                previous_document_id=selected_version_document["document_id"],
+                                            )
+                                        except requests.exceptions.HTTPError as error:
+                                            st.error(f"Version upload rejected by backend: {error.response.text}")
+                                            st.stop()
+                                        except requests.exceptions.RequestException as error:
+                                            st.error(f"Could not upload replacement version through backend: {error}")
+                                            st.stop()
+
+                                        index_owner_message = (
+                                            "Run Update for Pending Documents to replace old search vectors and activate the new version in chat."
+                                            if st.session_state["role"] == SYSTEM_ADMIN_ROLE
+                                            else "System Admin action is required to replace old search vectors and activate the new version in chat."
+                                        )
+
+                                        st.session_state["upload_message"] = (
+                                            f"{version_result['message']} {index_owner_message}"
+                                        )
+                                        st.session_state["upload_form_version"] += 1
+                                        st.rerun()
+        if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+            with onedrive_tab:
+                st.markdown('<div class="compact-section-title">OneDrive Connector</div>', unsafe_allow_html=True)
+
+                with st.container(border=True):
+                    connector_action_columns = st.columns([1, 2])
+
+                    with connector_action_columns[0]:
+                        if st.button(
+                            "Scan OneDrive",
+                            use_container_width=True,
+                            key="scan_onedrive_root_button",
+                        ):
+                            try:
+                                scan_result = request_onedrive_file_scan()
+                            except requests.exceptions.HTTPError as error:
+                                st.error(f"OneDrive scan rejected by backend: {error.response.text}")
+                            except requests.exceptions.RequestException as error:
+                                st.error(f"Could not scan OneDrive connector: {error}")
+                            else:
+                                st.session_state["onedrive_files"] = scan_result["files"]
+                                st.success(f"Found {len(scan_result['files'])} file(s).")
+
+                    with connector_action_columns[1]:
+                        if st.session_state.get("onedrive_stage_message"):
+                            stage_status = st.session_state.get("onedrive_stage_status", "info")
+
+                            if stage_status == "success":
+                                st.success(st.session_state["onedrive_stage_message"])
+                            elif stage_status == "error":
+                                st.error(st.session_state["onedrive_stage_message"])
+                            else:
+                                st.info(st.session_state["onedrive_stage_message"])
+
+                    onedrive_files = st.session_state.get("onedrive_files", [])
+
+                    if onedrive_files:
+                        st.dataframe(
+                            [
+                                {
+                                    "Name": file_item["name"],
+                                    "State": file_item.get("connector_state", "New"),
+                                    "Path": file_item["connector_path"],
+                                    "Size (KB)": round((file_item.get("size") or 0) / 1024, 1),
+                                    "Modified": file_item.get("last_modified_datetime"),
+                                    "KB Record": file_item.get("staged_document_id") or "",
+                                }
+                                for file_item in onedrive_files
+                            ],
+                            use_container_width=True,
+                            hide_index=True,
+                            height=260,
+                        )
+                        stageable_count = sum(
+                            1
+                            for file_item in onedrive_files
+                            if file_item.get("connector_state", "New") in ["New", "Rejected"]
+                        )
+                        st.caption(
+                            f"{len(onedrive_files)} discovered file(s), "
+                            f"{stageable_count} stageable"
+                        )
+                        file_options = {
+                            f"{file_item['name']} - {file_item['connector_path']}": file_item
+                            for file_item in onedrive_files
+                        }
+
+                        selection_columns = st.columns(3)
+
+                        with selection_columns[0]:
+                            if st.button(
+                                "Select All",
+                                use_container_width=True,
+                                key="select_all_onedrive_files_button",
+                            ):
+                                st.session_state["selected_onedrive_files_to_stage"] = list(file_options.keys())
+                                st.rerun()
+
+                        with selection_columns[1]:
+                            if st.button(
+                                "Select New/Rejected",
+                                use_container_width=True,
+                                key="select_stageable_onedrive_files_button",
+                            ):
+                                st.session_state["selected_onedrive_files_to_stage"] = [
+                                    label
+                                    for label, file_item in file_options.items()
+                                    if file_item.get("connector_state", "New") in ["New", "Rejected"]
+                                ]
+                                st.rerun()
+
+                        with selection_columns[2]:
+                            if st.button(
+                                "Clear Selection",
+                                use_container_width=True,
+                                key="clear_onedrive_selection_button",
+                            ):
+                                st.session_state["selected_onedrive_files_to_stage"] = []
+                                st.rerun()
+
+                        selected_file_labels = st.multiselect(
+                            "Select OneDrive files to stage",
+                            list(file_options.keys()),
+                            key="selected_onedrive_files_to_stage",
+                        )
+
+                        if st.button(
+                            "Stage Selected Files for Review",
+                            use_container_width=True,
+                            disabled=(
+                                not selected_file_labels
+                                or bool(st.session_state.get("active_onedrive_stage_job_id"))
+                            ),
+                            key="submit_onedrive_stage_job_button",
+                        ):
+                            selected_files = [
+                                file_options[selected_file_label]
+                                for selected_file_label in selected_file_labels
+                            ]
+
+                            try:
+                                job = submit_onedrive_stage_job(selected_files)
+                            except requests.exceptions.HTTPError as error:
+                                st.error(f"OneDrive staging rejected by backend: {error.response.text}")
+                            except requests.exceptions.RequestException as error:
+                                st.error(f"Could not submit OneDrive staging job: {error}")
+                            else:
+                                st.session_state["active_onedrive_stage_job_id"] = job["job_id"]
+                                st.session_state["onedrive_stage_message"] = job["message"]
+                                st.session_state["onedrive_stage_status"] = "info"
+                                st.rerun()
+
+                        if st.session_state.get("onedrive_stage_results"):
+                            st.dataframe(
+                                st.session_state["onedrive_stage_results"],
+                                use_container_width=True,
+                                hide_index=True,
+                                height=220,
+                            )
+
+
+        with review_tab:
+            st.markdown('<div class="compact-section-title">Review Queue</div>', unsafe_allow_html=True)
+
+            reviewable_documents = [
+                document
+                for document in pending_review_documents
+                if (
+                    st.session_state["role"] == "System Admin"
+                    or document["department"] == st.session_state["department"]
                 )
-
-                if st.button(
-                    "Stage Selected Files for Review",
-                    use_container_width=True,
-                    disabled=(
-                        not selected_file_labels
-                        or bool(st.session_state.get("active_onedrive_stage_job_id"))
-                    ),
-                    key="submit_onedrive_stage_job_button",
-                ):
-                    selected_files = [
-                        file_options[selected_file_label]
-                        for selected_file_label in selected_file_labels
-                    ]
-
-                    try:
-                        job = submit_onedrive_stage_job(selected_files)
-                    except requests.exceptions.HTTPError as error:
-                        st.error(f"OneDrive staging rejected by backend: {error.response.text}")
-                    except requests.exceptions.RequestException as error:
-                        st.error(f"Could not submit OneDrive staging job: {error}")
-                    else:
-                        st.session_state["active_onedrive_stage_job_id"] = job["job_id"]
-                        st.session_state["onedrive_stage_message"] = job["message"]
-                        st.session_state["onedrive_stage_status"] = "info"
-                        st.rerun()
-
-                if st.session_state.get("onedrive_stage_results"):
-                    st.dataframe(
-                        st.session_state["onedrive_stage_results"],
-                        use_container_width=True,
-                        hide_index=True,
-                        height=260,
-                    )
-
-        st.divider()
-
-    if st.session_state["role"] in ["System Admin", "Project Manager"]:
-        st.subheader("Pending Connector Review")
-
-        reviewable_documents = [
-            document
-            for document in pending_review_documents
-            if (
-                st.session_state["role"] == "System Admin"
-                or document["department"] == st.session_state["department"]
-            )
-        ]
-
-        if not reviewable_documents:
-            st.caption("No connector documents are waiting for your review.")
-        else:
-            review_rows = [
-                {
-                    "Document ID": document["document_id"],
-                    "Title": document["title"],
-                    "Source": document["source"],
-                    "Suggested Department": document["department"],
-                    "Storage URI": document.get("storage_uri", ""),
-                    "Uploaded At": document.get("uploaded_at", ""),
-                }
-                for document in reviewable_documents
             ]
 
-            st.dataframe(
-                review_rows,
-                use_container_width=True,
-                hide_index=True,
-            )
+            if not reviewable_documents:
+                st.info("No connector documents are waiting for review.")
+            else:
+                review_rows = [
+                    {
+                        "Document ID": document["document_id"],
+                        "Title": document["title"],
+                        "Source": document["source"],
+                        "Department": document["department"],
+                        "Uploaded At": document.get("uploaded_at", ""),
+                    }
+                    for document in reviewable_documents
+                ]
 
-            document_options = {
-                f"{document['title']} ({document['document_id']})": document
-                for document in reviewable_documents
-            }
-
-            selected_review_label = st.selectbox(
-                "Select connector document to review",
-                list(document_options.keys()),
-                key="selected_connector_review_document",
-            )
-
-            selected_review_document = document_options[selected_review_label]
-
-            with st.form(f"approve_connector_{selected_review_document['document_id']}"):
-                edited_title = st.text_input(
-                    "Title",
-                    value=selected_review_document["title"],
-                    key=f"approve_title_{selected_review_document['document_id']}",
+                st.dataframe(
+                    review_rows,
+                    use_container_width=True,
+                    hide_index=True,
+                    height=220,
                 )
 
-                edited_department = st.selectbox(
-                    "Department",
-                    DEPARTMENT_OPTIONS,
-                    index=DEPARTMENT_OPTIONS.index(selected_review_document["department"])
-                    if selected_review_document["department"] in DEPARTMENT_OPTIONS
-                    else 0,
-                    key=f"approve_department_{selected_review_document['document_id']}",
+                document_options = {
+                    f"{document['title']} ({document['document_id']})": document
+                    for document in reviewable_documents
+                }
+
+                selected_review_label = st.selectbox(
+                    "Select connector document to review",
+                    list(document_options.keys()),
+                    key="selected_connector_review_document",
                 )
 
-                edited_category = st.text_input(
-                    "Category",
-                    value=selected_review_document["category"],
-                    key=f"approve_category_{selected_review_document['document_id']}",
-                )
+                selected_review_document = document_options[selected_review_label]
 
-                edited_tags_text = st.text_input(
-                    "Tags",
-                    value=", ".join(selected_review_document["tags"]),
-                    key=f"approve_tags_{selected_review_document['document_id']}",
-                )
+                with st.form(f"approve_connector_{selected_review_document['document_id']}"):
+                    edited_title = st.text_input(
+                        "Title",
+                        value=selected_review_document["title"],
+                        key=f"approve_title_{selected_review_document['document_id']}",
+                    )
 
-                edited_allowed_roles = st.multiselect(
-                    "Allowed roles",
-                    ROLE_OPTIONS,
-                    default=[
-                        role
-                        for role in selected_review_document["allowed_roles"]
-                        if role in ROLE_OPTIONS
-                    ],
-                    key=f"approve_roles_{selected_review_document['document_id']}",
-                )
+                    edited_department = st.selectbox(
+                        "Department",
+                        DEPARTMENT_OPTIONS,
+                        index=DEPARTMENT_OPTIONS.index(selected_review_document["department"])
+                        if selected_review_document["department"] in DEPARTMENT_OPTIONS
+                        else 0,
+                        key=f"approve_department_{selected_review_document['document_id']}",
+                    )
 
-                edited_allowed_departments = st.multiselect(
-                    "Allowed departments",
-                    DEPARTMENT_OPTIONS,
-                    default=[
-                        department
-                        for department in selected_review_document["allowed_departments"]
-                        if department in DEPARTMENT_OPTIONS
-                    ],
-                    key=f"approve_departments_{selected_review_document['document_id']}",
-                )
+                    edited_category = st.text_input(
+                        "Category",
+                        value=selected_review_document["category"],
+                        key=f"approve_category_{selected_review_document['document_id']}",
+                    )
 
-                submitted_approval = st.form_submit_button("Approve for Indexing")
+                    edited_tags_text = st.text_input(
+                        "Tags",
+                        value=", ".join(selected_review_document["tags"]),
+                        key=f"approve_tags_{selected_review_document['document_id']}",
+                    )
 
-                if submitted_approval:
-                    try:
-                        approval_result = request_document_approval(
-                            document_id=selected_review_document["document_id"],
-                            title=edited_title,
-                            department=edited_department,
-                            category=edited_category,
-                            tags=[
-                                tag.strip()
-                                for tag in edited_tags_text.split(",")
-                                if tag.strip()
-                            ],
-                            allowed_roles=edited_allowed_roles,
-                            allowed_departments=edited_allowed_departments,
-                        )
-                    except requests.exceptions.HTTPError as error:
-                        st.error(f"Approval rejected by backend: {error.response.text}")
-                    except requests.exceptions.RequestException as error:
-                        st.error(f"Could not approve connector document: {error}")
-                    else:
-                        st.success(approval_result["message"])
-                        st.rerun()
-            with st.expander("Reject Staged Document", expanded=False):
-                st.warning(
-                    "Rejecting removes this connector import from pending review. "
-                    "The record is kept inactive for audit history and will not be indexed."
-                )
+                    edited_allowed_roles = st.multiselect(
+                        "Allowed roles",
+                        ROLE_OPTIONS,
+                        default=[
+                            role
+                            for role in selected_review_document["allowed_roles"]
+                            if role in ROLE_OPTIONS
+                        ],
+                        key=f"approve_roles_{selected_review_document['document_id']}",
+                    )
 
-                confirm_reject = st.checkbox(
-                    f"I understand this will reject {selected_review_document['title']}.",
-                    key=f"confirm_reject_{selected_review_document['document_id']}",
-                )
+                    edited_allowed_departments = st.multiselect(
+                        "Allowed departments",
+                        DEPARTMENT_OPTIONS,
+                        default=[
+                            department
+                            for department in selected_review_document["allowed_departments"]
+                            if department in DEPARTMENT_OPTIONS
+                        ],
+                        key=f"approve_departments_{selected_review_document['document_id']}",
+                    )
 
-                if st.button(
-                    "Reject Staged Document",
-                    key=f"reject_staged_{selected_review_document['document_id']}",
-                    disabled=not confirm_reject,
-                ):
-                    try:
-                        rejection_result = request_staged_document_rejection(
-                            selected_review_document["document_id"]
-                        )
-                    except requests.exceptions.HTTPError as error:
-                        st.error(f"Rejection rejected by backend: {error.response.text}")
-                    except requests.exceptions.RequestException as error:
-                        st.error(f"Could not reject staged document: {error}")
-                    else:
-                        st.success(rejection_result["message"])
-                        st.rerun()
+                    submitted_approval = st.form_submit_button("Approve for Indexing")
+
+                    if submitted_approval:
+                        try:
+                            approval_result = request_document_approval(
+                                document_id=selected_review_document["document_id"],
+                                title=edited_title,
+                                department=edited_department,
+                                category=edited_category,
+                                tags=[
+                                    tag.strip()
+                                    for tag in edited_tags_text.split(",")
+                                    if tag.strip()
+                                ],
+                                allowed_roles=edited_allowed_roles,
+                                allowed_departments=edited_allowed_departments,
+                            )
+                        except requests.exceptions.HTTPError as error:
+                            st.error(f"Approval rejected by backend: {error.response.text}")
+                        except requests.exceptions.RequestException as error:
+                            st.error(f"Could not approve connector document: {error}")
+                        else:
+                            st.success(approval_result["message"])
+                            st.rerun()
+                with st.expander("Reject Staged Document", expanded=False):
+                    st.warning(
+                        "Rejecting removes this connector import from pending review. "
+                        "The record is kept inactive for audit history and will not be indexed."
+                    )
+
+                    confirm_reject = st.checkbox(
+                        f"I understand this will reject {selected_review_document['title']}.",
+                        key=f"confirm_reject_{selected_review_document['document_id']}",
+                    )
+
+                    if st.button(
+                        "Reject Staged Document",
+                        key=f"reject_staged_{selected_review_document['document_id']}",
+                        disabled=not confirm_reject,
+                    ):
+                        try:
+                            rejection_result = request_staged_document_rejection(
+                                selected_review_document["document_id"]
+                            )
+                        except requests.exceptions.HTTPError as error:
+                            st.error(f"Rejection rejected by backend: {error.response.text}")
+                        except requests.exceptions.RequestException as error:
+                            st.error(f"Could not reject staged document: {error}")
+                        else:
+                            st.success(rejection_result["message"])
+                            st.rerun()
+
+        if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+            with index_tab:
+                with st.container(border=True):
+                    st.markdown("**Index Sync**")
+
+                    if st.session_state.get("index_update_job_message"):
+                        index_update_status = st.session_state.get("index_update_job_status", "info")
+
+                        if index_update_status == "success":
+                            st.success(st.session_state["index_update_job_message"])
+                        elif index_update_status == "error":
+                            st.error(st.session_state["index_update_job_message"])
+                        else:
+                            st.info(st.session_state["index_update_job_message"])
+
+                    if st.session_state.get("reindex_job_message"):
+                        reindex_status = st.session_state.get("reindex_job_status", "info")
+
+                        if reindex_status == "success":
+                            st.success(st.session_state["reindex_job_message"])
+                        elif reindex_status == "error":
+                            st.error(st.session_state["reindex_job_message"])
+                        else:
+                            st.info(st.session_state["reindex_job_message"])
+
+                    st.caption("Full rebuild is long-running and reconstructs the active index from scratch.")
+                    index_action_columns = st.columns(2)
+
+                    with index_action_columns[0]:
+                        if st.button(
+                            "Run Update for Pending Documents",
+                            use_container_width=True,
+                            disabled=bool(st.session_state.get("active_index_update_job_id")),
+                        ):
+                            try:
+                                job = submit_index_update_job()
+                            except requests.exceptions.RequestException as error:
+                                st.error(f"Could not submit index update job: {error}")
+                            else:
+                                st.session_state["active_index_update_job_id"] = job["job_id"]
+                                st.session_state["index_update_job_message"] = "Pending document index update queued."
+                                st.session_state["index_update_job_status"] = "info"
+                                st.rerun()
+
+                    with index_action_columns[1]:
+                        if st.button(
+                            "Full Rebuild",
+                            use_container_width=True,
+                            disabled=bool(st.session_state.get("active_reindex_job_id")),
+                        ):
+                            try:
+                                job = submit_reindex_job()
+                            except requests.exceptions.RequestException as error:
+                                st.error(f"Could not submit rebuild job: {error}")
+                            else:
+                                st.session_state["active_reindex_job_id"] = job["job_id"]
+                                st.session_state["reindex_job_message"] = "Search index rebuild queued."
+                                st.session_state["reindex_job_status"] = "info"
+                                st.rerun()
 
     st.divider()
     if not visible_documents:
@@ -2469,66 +2684,25 @@ elif selected_page in ["KB Management", "KB Status"]:
         filtered_documents = visible_documents
 
         if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
-            indexed_count = sum(
-                1 for document in visible_documents
-                if get_index_status_label(document) == "Indexed"
-            )
-
             pending_index_count = sum(
                 1 for document in visible_documents
                 if get_index_status_label(document) == "Pending Index"
             )
 
-            versioned_count = sum(
-                1 for document in visible_documents
-                if (document.get("version_number") or 1) > 1
-            )
-
-            with st.container(border=True):
-                st.markdown("**Index & Version Overview**")
-                st.caption(
-                    "Operational view for documents that may need incremental indexing "
-                    "after upload, metadata update, or version replacement."
-                )
-
-                if pending_index_count:
-                    if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-                        st.warning(
-                            f"{pending_index_count} document(s) require search index update before chat can use the latest content. "
-                            "Use Run Update for Pending Documents in Document Ingestion & Indexing."
-                        )
-                    else:
-                        st.warning(
-                            f"{pending_index_count} document(s) are waiting for System Admin search index update before chat can use the latest content."
-                        )
+            if pending_index_count:
+                if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+                    st.warning(
+                        f"{pending_index_count} visible document(s) need index update before chat uses the latest content."
+                    )
                 else:
-                    st.success("All visible active documents are indexed.")
-
-                status_columns = st.columns(4)
-
-                with status_columns[0]:
-                    st.metric("Visible Documents", len(visible_documents))
-
-                with status_columns[1]:
-                    st.metric(
-                        "Pending Index",
-                        pending_index_count,
-                        "Action required" if pending_index_count else "No action needed",
+                    st.warning(
+                        f"{pending_index_count} visible document(s) are waiting for System Admin index update."
                     )
 
-                with status_columns[2]:
-                    st.metric("Indexed", indexed_count)
-
-                with status_columns[3]:
-                    st.metric("Updated Versions", versioned_count)
-
         if st.session_state["role"] == GENERAL_EMPLOYEE_ROLE:
-            st.subheader("Available Knowledge Base Documents")
-            st.caption(
-                "Documents shown here are limited to your department and ACL-permitted shared sources."
-            )
+            st.subheader("Knowledge Library")
         else:
-            st.subheader("Document Index & Filter")
+            st.subheader("Knowledge Library")
             
         with st.container(border=True):
             filter_columns = st.columns(4 if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE else 3)
@@ -2619,198 +2793,245 @@ elif selected_page in ["KB Management", "KB Status"]:
         )
 
         if filtered_documents:
-            st.subheader("Selected Document Details")
-            selected_title = st.selectbox(
-                "Select document to view details",
-                [document["title"] for document in filtered_documents],
-            )
+            with st.expander("Selected Document", expanded=True):
+                selected_title = st.selectbox(
+                    "Document",
+                    [document["title"] for document in filtered_documents],
+                    key="selected_library_document",
+                )
 
-            selected_document = next(
-                document for document in filtered_documents
-                if document["title"] == selected_title
-            )
+                selected_document = next(
+                    document for document in filtered_documents
+                    if document["title"] == selected_title
+                )
 
-            detail_columns = st.columns(2)
+                overview_tab, storage_tab, edit_tab, archive_tab = st.tabs([
+                    "Overview",
+                    "Storage",
+                    "Edit Metadata",
+                    "Archive",
+                ])
 
-            with detail_columns[0]:
-                with st.container(border=True):
-                    st.markdown("**File Metadata**")
-                    st.write(f"**ID:** {selected_document['document_id']}")
-                    st.write(f"**File:** {selected_document['filename']} | **Type:** {selected_document['file_type']}")
+                with overview_tab:
+                    overview_columns = st.columns(3)
+
+                    with overview_columns[0]:
+                        st.markdown("**Identity**")
+                        st.write(f"**ID:** {selected_document['document_id']}")
+                        st.write(f"**File:** {selected_document['filename']}")
+                        st.write(f"**Type:** {selected_document['file_type']}")
+                        if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
+                            st.write(f"**Version:** {get_version_label(selected_document)}")
+
+                    with overview_columns[1]:
+                        st.markdown("**Governance**")
+                        st.write(f"**Department:** {selected_document['department']}")
+                        st.write(f"**Category:** {selected_document['category']}")
+                        st.write(f"**Tags:** {', '.join(selected_document['tags'])}")
+                        if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
+                            st.write(f"**Status:** {get_index_status_label(selected_document)}")
+
+                    with overview_columns[2]:
+                        st.markdown("**Access**")
+                        if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
+                            st.write(f"**Roles:** {', '.join(selected_document['allowed_roles'])}")
+                            st.write(f"**Departments:** {', '.join(selected_document['allowed_departments'])}")
+                            st.write(f"**Index marker:** {selected_document['chunk_id']}")
+                        st.write(f"**Visuals:** {selected_document['visual_extraction_status']}")
+
+                with storage_tab:
                     st.write(f"**Storage backend:** {selected_document.get('storage_backend', 'local')}")
-                    st.code(selected_document.get("storage_uri", f"data/simulated/{selected_document['filename']}"), language=None)
-                    st.write(f"**Uploaded by:** {selected_document['uploaded_by']} at {selected_document['uploaded_at']}")
-                    if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
-                        st.write(f"**Source document ID:** {selected_document.get('source_document_id')}")
-                        st.write(f"**Version:** {get_version_label(selected_document)}")
-                        st.write(f"**Status:** {get_index_status_label(selected_document)}")
-
-            with detail_columns[1]:
-                with st.container(border=True):
-                    st.markdown("**Access & Extraction**")
-                    st.write(f"**Tags:** {', '.join(selected_document['tags'])}")
-                    if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
-                        st.write(
-                            "**Allowed roles:** "
-                            f"{', '.join(selected_document['allowed_roles'])}"
-                        )
-                        st.write(
-                            "**Allowed departments:** "
-                            f"{', '.join(selected_document['allowed_departments'])}"
-                        )
-                        st.write(f"**Index marker:** {selected_document['chunk_id']}")
+                    st.code(
+                        selected_document.get(
+                            "storage_uri",
+                            f"data/simulated/{selected_document['filename']}",
+                        ),
+                        language=None,
+                    )
                     st.write(
-                        "**Visual extraction status:** "
-                        f"{selected_document['visual_extraction_status']}"
+                        f"**Uploaded by:** {selected_document['uploaded_by']} "
+                        f"at {selected_document['uploaded_at']}"
                     )
-
-            if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
-                with st.expander("Archive Document", expanded=False):
-                    st.warning(
-                        "Archiving removes this document from active retrieval and deletes its vector/index records from the configured backend. "
-                        "Use this for retired, duplicate, or outdated documents without a replacement."
-                    )
-
-                    can_archive_selected_document = (
-                        st.session_state["role"] == SYSTEM_ADMIN_ROLE
-                        or selected_document["department"] == st.session_state["department"]
-                    )
-
-                    if not can_archive_selected_document:
-                        st.info("Project Manager can only archive own-department documents.")
-                    else:
-                        confirm_archive = st.checkbox(
-                            f"I understand this will archive {selected_document['title']}.",
-                            key=f"confirm_archive_{selected_document['document_id']}",
+                    if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
+                        st.write(
+                            f"**Source document ID:** "
+                            f"{selected_document.get('source_document_id')}"
                         )
 
-                        if st.button(
-                            "Archive Selected Document",
-                            key=f"archive_document_{selected_document['document_id']}",
-                            disabled=not confirm_archive,
-                        ):
-                            try:
-                                archive_result = request_document_archive(
-                                    selected_document["document_id"]
+                with edit_tab:
+                    if st.session_state["role"] not in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
+                        st.info("Metadata editing is not available for your role.")
+                    else:
+                        with st.form(f"metadata_edit_form_{selected_document['document_id']}"):
+                            edit_col1, edit_col2 = st.columns(2)
+
+                            with edit_col1:
+                                edited_title = st.text_input(
+                                    "Title",
+                                    value=selected_document["title"],
                                 )
-                            except requests.exceptions.HTTPError as error:
-                                st.error(f"Archive rejected by backend: {error.response.text}")
-                            except requests.exceptions.RequestException as error:
-                                st.error(f"Could not archive document: {error}")
-                            else:
-                                st.success(archive_result["message"])
-                                st.rerun()
-                with st.expander("Edit Metadata & Access", expanded=False):
-                    with st.form(f"metadata_edit_form_{selected_document['document_id']}"):
-                        edit_col1, edit_col2 = st.columns(2)
-                        
-                        with edit_col1:
-                            edited_title = st.text_input(
-                                "Title",
-                                value=selected_document["title"],
+
+                                if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+                                    edited_department = st.selectbox(
+                                        "Department",
+                                        DEPARTMENT_OPTIONS,
+                                        index=DEPARTMENT_OPTIONS.index(selected_document["department"]),
+                                    )
+                                else:
+                                    edited_department = st.text_input(
+                                        "Department",
+                                        value=st.session_state["department"],
+                                        disabled=True,
+                                    )
+
+                                edited_category = st.text_input(
+                                    "Category",
+                                    value=selected_document["category"],
+                                )
+
+                            with edit_col2:
+                                edited_tags_text = st.text_input(
+                                    "Tags",
+                                    value=", ".join(selected_document["tags"]),
+                                    help="Separate tags with commas.",
+                                )
+
+                                if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+                                    edited_allowed_roles = st.multiselect(
+                                        "Allowed roles",
+                                        ROLE_OPTIONS,
+                                        default=selected_document["allowed_roles"],
+                                    )
+                                    edited_allowed_departments = st.multiselect(
+                                        "Allowed departments",
+                                        [FILTER_ALL] + DEPARTMENT_OPTIONS,
+                                        default=selected_document["allowed_departments"],
+                                    )
+                                else:
+                                    edited_allowed_roles = st.multiselect(
+                                        "Allowed roles",
+                                        [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE],
+                                        default=[
+                                            role for role in selected_document["allowed_roles"]
+                                            if role in [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE]
+                                        ] or [PROJECT_MANAGER_ROLE],
+                                    )
+                                    st.text_input(
+                                        "Allowed departments",
+                                        value=st.session_state["department"],
+                                        disabled=True,
+                                        help="Project Manager metadata edits are limited to their own department.",
+                                    )
+                                    edited_allowed_departments = [st.session_state["department"]]
+
+                            submitted_metadata_update = st.form_submit_button(
+                                "Save Metadata",
+                                type="primary",
                             )
 
-                            if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-                                edited_department = st.selectbox(
-                                    "Department",
-                                    DEPARTMENT_OPTIONS,
-                                    index=DEPARTMENT_OPTIONS.index(selected_document["department"]),
-                                )
-                            else:
-                                edited_department = st.text_input(
-                                    "Department",
-                                    value=st.session_state["department"],
-                                    disabled=True,
-                                )
+                            if submitted_metadata_update:
+                                if not edited_title.strip():
+                                    st.error("Please enter a document title.")
+                                elif not edited_allowed_roles:
+                                    st.error("Please select at least one allowed role.")
+                                elif not edited_allowed_departments:
+                                    st.error("Please select at least one allowed department.")
+                                else:
+                                    try:
+                                        approved_metadata = request_metadata_update_validation(
+                                            document_department=edited_department,
+                                            allowed_roles=edited_allowed_roles,
+                                            allowed_departments=edited_allowed_departments,
+                                        )
+                                    except requests.exceptions.HTTPError as error:
+                                        st.error(f"Metadata update rejected by backend: {error.response.text}")
+                                    except requests.exceptions.RequestException as error:
+                                        st.error(f"Could not validate metadata update: {error}")
+                                    else:
+                                        updated_document = selected_document.copy()
+                                        updated_document.update(
+                                            {
+                                                "title": edited_title.strip(),
+                                                "department": approved_metadata["document_department"],
+                                                "category": edited_category.strip() or "General",
+                                                "tags": [
+                                                    tag.strip()
+                                                    for tag in edited_tags_text.split(",")
+                                                    if tag.strip()
+                                                ],
+                                                "allowed_roles": approved_metadata["allowed_roles"],
+                                                "allowed_departments": approved_metadata["allowed_departments"],
+                                            }
+                                        )
 
-                            edited_category = st.text_input(
-                                "Category",
-                                value=selected_document["category"],
+                                        update_document_metadata(
+                                            selected_document["document_id"],
+                                            updated_document,
+                                        )
+
+                                        st.success("Metadata updated. ACL changes apply to chat immediately.")
+                                        st.rerun()
+
+                with archive_tab:
+                    if st.session_state["role"] not in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
+                        st.info("Archiving is not available for your role.")
+                    else:
+                        can_archive_selected_document = (
+                            st.session_state["role"] == SYSTEM_ADMIN_ROLE
+                            or selected_document["department"] == st.session_state["department"]
+                        )
+
+                        if not can_archive_selected_document:
+                            st.info("Project Manager can only archive own-department documents.")
+                        else:
+                            st.warning(
+                                "Archiving removes this document from active retrieval "
+                                "and deletes its vector/index records from the configured backend."
                             )
 
-                        with edit_col2:
-                            edited_tags_text = st.text_input(
-                                "Tags",
-                                value=", ".join(selected_document["tags"]),
-                                help="Separate tags with commas.",
+                            confirm_archive = st.checkbox(
+                                f"I understand this will archive {selected_document['title']}.",
+                                key=f"confirm_archive_{selected_document['document_id']}",
                             )
 
-                            if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-                                edited_allowed_roles = st.multiselect(
-                                    "Allowed roles",
-                                    ROLE_OPTIONS,
-                                    default=selected_document["allowed_roles"],
-                                )
-                                edited_allowed_departments = st.multiselect(
-                                    "Allowed departments",
-                                    [FILTER_ALL] + DEPARTMENT_OPTIONS,
-                                    default=selected_document["allowed_departments"],
-                                )
-                            else:
-                                edited_allowed_roles = st.multiselect(
-                                    "Allowed roles",
-                                    [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE],
-                                    default=[
-                                        role for role in selected_document["allowed_roles"]
-                                        if role in [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE]
-                                    ] or [PROJECT_MANAGER_ROLE],
-                                )
-                                st.text_input(
-                                    "Allowed departments",
-                                    value=st.session_state["department"],
-                                    disabled=True,
-                                    help="Project Manager metadata edits are limited to their own department.",
-                                )
-                                edited_allowed_departments = [st.session_state["department"]]
-
-                        submitted_metadata_update = st.form_submit_button("Save Metadata", type="primary")
-
-                        if submitted_metadata_update:
-                            if not edited_title.strip():
-                                st.error("Please enter a document title.")
-                            elif not edited_allowed_roles:
-                                st.error("Please select at least one allowed role.")
-                            elif not edited_allowed_departments:
-                                st.error("Please select at least one allowed department.")
-                            else:
+                            if st.button(
+                                "Archive Selected Document",
+                                key=f"archive_document_{selected_document['document_id']}",
+                                disabled=not confirm_archive,
+                            ):
                                 try:
-                                    approved_metadata = request_metadata_update_validation(
-                                        document_department=edited_department,
-                                        allowed_roles=edited_allowed_roles,
-                                        allowed_departments=edited_allowed_departments,
+                                    archive_result = request_document_archive(
+                                        selected_document["document_id"]
                                     )
                                 except requests.exceptions.HTTPError as error:
-                                    st.error(f"Metadata update rejected by backend: {error.response.text}")
+                                    st.error(f"Archive rejected by backend: {error.response.text}")
                                 except requests.exceptions.RequestException as error:
-                                    st.error(f"Could not validate metadata update: {error}")
+                                    st.error(f"Could not archive document: {error}")
                                 else:
-                                    updated_document = selected_document.copy()
-                                    updated_document.update(
-                                        {
-                                            "title": edited_title.strip(),
-                                            "department": approved_metadata["document_department"],
-                                            "category": edited_category.strip() or "General",
-                                            "tags": [
-                                                tag.strip()
-                                                for tag in edited_tags_text.split(",")
-                                                if tag.strip()
-                                            ],
-                                            "allowed_roles": approved_metadata["allowed_roles"],
-                                            "allowed_departments": approved_metadata["allowed_departments"],
-                                        }
-                                    )
-
-                                    update_document_metadata(
-                                        selected_document["document_id"],
-                                        updated_document,
-                                    )
-
-                                    st.success("Metadata updated. ACL changes apply to chat immediately.")
+                                    st.success(archive_result["message"])
                                     st.rerun()
-                    
+
 
 elif selected_page == "Chat":
-    st.header("Copilot Chat")
+    chat_title_columns = st.columns([2.6, 1])
+
+    with chat_title_columns[0]:
+        st.header("Copilot Chat")
+
+    with chat_title_columns[1]:
+        st.markdown(
+            f"""
+            <div style="text-align:right; padding-top:0.35rem;">
+                <span class="status-pill" style="
+                    color:#344054;
+                    background:#ffffff;
+                    border-color:#d0d5dd;
+                ">{escape(st.session_state["role"])} / {escape(st.session_state["department"])}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
     if "chat_messages" not in st.session_state:
         st.session_state["chat_messages"] = []
 
@@ -2827,9 +3048,8 @@ elif selected_page == "Chat":
         {document["file_type"] for document in visible_documents}
     )
 
-    st.caption("Ask questions grounded in the enterprise knowledge base.")
-
-    with st.expander("Search Scope & Filters", expanded=False):
+    with st.container(border=True):
+        st.markdown('<div class="compact-section-title">Search Scope</div>', unsafe_allow_html=True)
         filter_columns = st.columns([1, 1, 2])
         if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
             with filter_columns[0]:
@@ -2903,13 +3123,15 @@ elif selected_page == "Chat":
                 disabled=True,
             )
 
-    chat_container = st.container(height=450, border=True)
+    chat_container = st.container(height=520, border=True)
 
     with chat_container:
         if not st.session_state["chat_messages"]:
             st.markdown(
-                f"<div style='text-align: center; color: #94a3b8; margin-top: 2rem;'>"
-                f"Hello {st.session_state['user']}, how can I help you today?"
+                f"<div style='text-align: center; color: #667085; margin-top: 2.5rem;'>"
+                f"<div style='font-weight:750; color:#101828; margin-bottom:0.25rem;'>"
+                f"Hello {escape(st.session_state['user'])}</div>"
+                f"<div>Ask a grounded question from your permitted knowledge scope.</div>"
                 f"</div>",
                 unsafe_allow_html=True,
             )
@@ -2928,13 +3150,13 @@ elif selected_page == "Chat":
                     meta_col1, meta_col2 = st.columns(2)
                     if message.get("sources"):
                         with meta_col1:
-                            with st.expander("📑 View Sources"):
+                            with st.expander("Sources"):
                                 for source in message["sources"]:
                                     st.code(source, language=None)
                     
                     if message.get("context"):
                         with meta_col2:
-                            with st.expander("🔍 Query Context"):
+                            with st.expander("Query Context"):
                                 st.caption(message["context"])
                 if (
                     message["role"] == "assistant"
@@ -2968,6 +3190,20 @@ elif selected_page == "Chat":
 
                 elif message["role"] == "assistant" and message.get("feedback") == "reported_issue":
                     st.caption("Feedback recorded: reported issue")
+
+        if st.session_state.get("active_chat_job_id"):
+            with st.chat_message("assistant"):
+                st.markdown(
+                    """
+                    <div class="typing-indicator">
+                        <span class="typing-dot"></span>
+                        <span class="typing-dot"></span>
+                        <span class="typing-dot"></span>
+                        <span>Drafting an answer from permitted knowledge-base content.</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
     chat_is_processing = st.session_state.get("chat_is_processing", False)
 
@@ -3022,7 +3258,7 @@ elif selected_page == "Chat":
             )
 
     with example_columns[-1]:
-        if st.button("🧹 Clear", use_container_width=True, disabled=chat_is_processing):
+        if st.button("Clear", use_container_width=True, disabled=chat_is_processing):
             st.session_state["chat_messages"] = []
             st.rerun()
 
