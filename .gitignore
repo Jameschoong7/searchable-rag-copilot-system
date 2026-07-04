@@ -1,10 +1,12 @@
 .env                                                                                                              
 .venv/                                 
 data/raw/
+data/simulated/onedrive_*
 data/chroma_db/
 data/metadata/
 data/evaluation/retrieval_eval_results.json
 data/logs/
+data/auth/
 __pycache__/
 *.pyc
 *.pyo

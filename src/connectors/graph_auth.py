@@ -113,3 +113,4 @@ def run_device_login() -> dict:
         "account": result.get("id_token_claims", {}).get("preferred_username"),
         "scopes": get_graph_scopes(),
     }
+
