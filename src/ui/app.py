@@ -92,6 +92,7 @@ REINDEX_JOBS_URL = f"{API_BASE_URL}/admin/reindex-jobs"
 INDEX_UPDATE_JOBS_URL = f"{API_BASE_URL}/admin/index-update-jobs"
 METADATA_UPDATE_VALIDATE_URL = f"{API_BASE_URL}/admin/validate-metadata-update"
 ARCHIVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/archive-document"
+UNARCHIVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/unarchive-document"
 SETTINGS_URL = f"{API_BASE_URL}/admin/settings"
 UPLOAD_DOCUMENT_URL = f"{API_BASE_URL}/admin/upload-document"
 UPLOAD_DOCUMENT_VERSION_URL = f"{API_BASE_URL}/admin/upload-document-version"
@@ -328,6 +329,22 @@ def request_document_archive(document_id: str) -> dict:
             "document_id": document_id,
         },
         timeout=120,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_document_unarchive(document_id: str) -> dict:
+    """Ask FastAPI to restore one manually archived document."""
+    response = requests.post(
+        UNARCHIVE_DOCUMENT_URL,
+        json={
+            "role": st.session_state["role"],
+            "user_department": st.session_state["department"],
+            "document_id": document_id,
+        },
+        timeout=60,
     )
 
     response.raise_for_status()
@@ -1086,6 +1103,9 @@ def can_view_document(document: dict) -> bool:
 def get_index_status_label(document: dict) -> str:
     """Return a readable indexing status for KB Management."""
     chunk_id = document.get("chunk_id")
+
+    if document.get("chunk_id") == "rejected":
+        return "Rejected"
 
     if document.get("is_active") == 0:
         return "Archived"
@@ -2126,10 +2146,24 @@ elif selected_page in ["KB Management", "KB Status"]:
             unsafe_allow_html=True,
         )
 
-    documents = load_document_metadata()
+    active_documents = load_document_metadata()
+    all_documents = load_document_metadata(include_inactive=True)
+
     visible_documents = [
-        document for document in documents
+        document for document in active_documents
         if can_view_document(document)
+    ]
+
+
+    restorable_archived_documents = [
+        document
+        for document in all_documents
+        if (
+            document.get("is_active") == 0
+            and document.get("chunk_id") == "archived"
+            and not document.get("replaced_by_document_id")
+            and can_view_document(document)
+        )
     ]
 
     pending_review_documents = [
@@ -2917,6 +2951,7 @@ elif selected_page in ["KB Management", "KB Status"]:
             st.subheader("Knowledge Library")
             
         with st.container(border=True):
+
             filter_columns = st.columns(4 if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE else 3)
 
             with filter_columns[0]:
@@ -3186,7 +3221,8 @@ elif selected_page in ["KB Management", "KB Status"]:
 
                 with archive_tab:
                     if st.session_state["role"] not in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
-                        st.info("Archiving is not available for your role.")
+                        st.info("Archive and restore actions are not available for your role.")
+
                     else:
                         can_archive_selected_document = (
                             st.session_state["role"] == SYSTEM_ADMIN_ROLE
@@ -3223,6 +3259,69 @@ elif selected_page in ["KB Management", "KB Status"]:
                                     st.success(archive_result["message"])
                                     st.rerun()
 
+    if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
+        with st.expander("Archived Documents", expanded=False):
+            st.caption(
+                "Only manually archived documents are shown here. "
+                "Old versions replaced by newer documents are kept as history and cannot be restored."
+            )
+
+            if not restorable_archived_documents:
+                st.info("No manually archived documents can be restored.")
+            else:
+                archived_rows = [
+                    {
+                        "Document": document["title"],
+                        "Document ID": document["document_id"],
+                        "Department": document["department"],
+                        "Source": document["source"],
+                        "Archived At": document.get("archived_at") or "",
+                    }
+                    for document in restorable_archived_documents
+                ]
+
+                st.dataframe(
+                    archived_rows,
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+                archived_options = {
+                    f"{document['title']} ({document['document_id']})": document
+                    for document in restorable_archived_documents
+                }
+
+                selected_archived_label = st.selectbox(
+                    "Select archived document to restore",
+                    list(archived_options.keys()),
+                    key="selected_archived_document_to_restore",
+                )
+
+                selected_archived_document = archived_options[selected_archived_label]
+
+                confirm_restore = st.checkbox(
+                    f"I understand this will restore {selected_archived_document['title']}.",
+                    key=f"confirm_restore_{selected_archived_document['document_id']}",
+                )
+
+                if st.button(
+                    "Restore Archived Document",
+                    key=f"restore_document_{selected_archived_document['document_id']}",
+                    disabled=not confirm_restore,
+                ):
+                    try:
+                        restore_result = request_document_unarchive(
+                            selected_archived_document["document_id"]
+                        )
+                    except requests.exceptions.HTTPError as error:
+                        st.error(f"Restore rejected by backend: {error.response.text}")
+                    except requests.exceptions.RequestException as error:
+                        st.error(f"Could not restore archived document: {error}")
+                    else:
+                        st.success(
+                            f"{restore_result['message']} Run Update for Pending Documents to make it searchable."
+                        )
+                        st.rerun()                
 
 elif selected_page == "Chat":
     chat_title_columns = st.columns([2.6, 1])
