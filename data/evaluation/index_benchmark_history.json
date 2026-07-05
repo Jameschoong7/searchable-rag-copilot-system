@@ -831,5 +831,539 @@
       "index_size_mb": null
     },
     "updated_by": "admin_jc"
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 2,
+    "updated_sources": [
+      "data/simulated/DOC-UPLOAD-005_v11_Incident_Response_Policy.docx",
+      "data/simulated/onenote_0-5e888c35f60d4d54be28828c0601a7ff-14-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_r2_Leave_Policy_Notes.txt"
+    ],
+    "cleanup_sources": [
+      "data/simulated/DOC-UPLOAD-005_v10_Incident_Response_Policy.docx",
+      "data/simulated/DOC-UPLOAD-005_v11_Incident_Response_Policy.docx",
+      "data/simulated/onenote_0-5e888c35f60d4d54be28828c0601a7ff-14-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_r2_Leave_Policy_Notes.txt"
+    ],
+    "elapsed_seconds": 71.017,
+    "before": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 17,
+      "simulated_source_files": 39,
+      "indexed_chunk_count": 96,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/DOC-UPLOAD-005_v11_Incident_Response_Policy.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 14
+      },
+      {
+        "source": "data/simulated/onenote_0-5e888c35f60d4d54be28828c0601a7ff-14-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_r2_Leave_Policy_Notes.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      }
+    ],
+    "cleanup_results": [
+      {
+        "source": "data/simulated/DOC-UPLOAD-005_v10_Incident_Response_Policy.docx",
+        "deleted_vector_count": 14
+      },
+      {
+        "source": "data/simulated/DOC-UPLOAD-005_v11_Incident_Response_Policy.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onenote_0-5e888c35f60d4d54be28828c0601a7ff-14-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_r2_Leave_Policy_Notes.txt",
+        "deleted_vector_count": 0
+      }
+    ],
+    "total_deleted_vectors": 14,
+    "total_document_objects_loaded": 2,
+    "total_chunks_indexed": 16,
+    "estimated_unchanged_chunks_avoided": 80,
+    "after": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 17,
+      "simulated_source_files": 39,
+      "indexed_chunk_count": 98,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "delta": {
+      "indexed_chunk_count": 2,
+      "index_size_bytes": null,
+      "index_size_mb": null
+    },
+    "updated_by": "admin_jc"
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 1,
+    "updated_sources": [
+      "data/simulated/onenote_0-5e888c35f60d4d54be28828c0601a7ff-14-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_r2_Leave_Policy_Notes.txt"
+    ],
+    "cleanup_sources": [
+      "data/simulated/onenote_0-5e888c35f60d4d54be28828c0601a7ff-14-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_r2_Leave_Policy_Notes.txt"
+    ],
+    "elapsed_seconds": 11.942,
+    "before": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 17,
+      "simulated_source_files": 39,
+      "indexed_chunk_count": 96,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/onenote_0-5e888c35f60d4d54be28828c0601a7ff-14-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_r2_Leave_Policy_Notes.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      }
+    ],
+    "cleanup_results": [
+      {
+        "source": "data/simulated/onenote_0-5e888c35f60d4d54be28828c0601a7ff-14-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_r2_Leave_Policy_Notes.txt",
+        "deleted_vector_count": 0
+      }
+    ],
+    "total_deleted_vectors": 0,
+    "total_document_objects_loaded": 1,
+    "total_chunks_indexed": 2,
+    "estimated_unchanged_chunks_avoided": 94,
+    "after": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 17,
+      "simulated_source_files": 39,
+      "indexed_chunk_count": 96,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "delta": {
+      "indexed_chunk_count": 0,
+      "index_size_bytes": null,
+      "index_size_mb": null
+    },
+    "updated_by": "admin_jc"
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 3,
+    "updated_sources": [
+      "data/simulated/Engineering_Coding_Standards.txt",
+      "data/simulated/HR_Leave_Policy_2026.txt",
+      "data/simulated/DOC-IT-001_v5_IT_Policy_Password.txt"
+    ],
+    "cleanup_sources": [
+      "data/simulated/DOC-IT-001_v4_IT_Policy_Password.txt",
+      "data/simulated/Engineering_Coding_Standards.txt",
+      "data/simulated/HR_Leave_Policy_2026.txt",
+      "data/simulated/DOC-IT-001_v5_IT_Policy_Password.txt"
+    ],
+    "elapsed_seconds": 46.563,
+    "before": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 18,
+      "simulated_source_files": 39,
+      "indexed_chunk_count": 90,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/Engineering_Coding_Standards.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/HR_Leave_Policy_2026.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/DOC-IT-001_v5_IT_Policy_Password.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 6
+      }
+    ],
+    "cleanup_results": [
+      {
+        "source": "data/simulated/DOC-IT-001_v4_IT_Policy_Password.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/Engineering_Coding_Standards.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/HR_Leave_Policy_2026.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/DOC-IT-001_v5_IT_Policy_Password.txt",
+        "deleted_vector_count": 0
+      }
+    ],
+    "total_deleted_vectors": 0,
+    "total_document_objects_loaded": 3,
+    "total_chunks_indexed": 10,
+    "estimated_unchanged_chunks_avoided": 80,
+    "after": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 18,
+      "simulated_source_files": 39,
+      "indexed_chunk_count": 94,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "delta": {
+      "indexed_chunk_count": 4,
+      "index_size_bytes": null,
+      "index_size_mb": null
+    },
+    "updated_by": "admin_jc"
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 1,
+    "updated_sources": [
+      "data/simulated/Engineering_Development_Workflow.txt"
+    ],
+    "cleanup_sources": [
+      "data/simulated/Engineering_Development_Workflow.txt"
+    ],
+    "elapsed_seconds": 10.86,
+    "before": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 18,
+      "simulated_source_files": 39,
+      "indexed_chunk_count": 98,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/Engineering_Development_Workflow.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      }
+    ],
+    "cleanup_results": [
+      {
+        "source": "data/simulated/Engineering_Development_Workflow.txt",
+        "deleted_vector_count": 0
+      }
+    ],
+    "total_deleted_vectors": 0,
+    "total_document_objects_loaded": 1,
+    "total_chunks_indexed": 2,
+    "estimated_unchanged_chunks_avoided": 96,
+    "after": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 18,
+      "simulated_source_files": 39,
+      "indexed_chunk_count": 98,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "delta": {
+      "indexed_chunk_count": 0,
+      "index_size_bytes": null,
+      "index_size_mb": null
+    },
+    "updated_by": "admin_jc"
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 1,
+    "updated_sources": [
+      "data/simulated/Engineering_Development_Workflow.txt"
+    ],
+    "cleanup_sources": [
+      "data/simulated/Engineering_Development_Workflow.txt"
+    ],
+    "elapsed_seconds": 10.946,
+    "before": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 18,
+      "simulated_source_files": 39,
+      "indexed_chunk_count": 98,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/Engineering_Development_Workflow.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      }
+    ],
+    "cleanup_results": [
+      {
+        "source": "data/simulated/Engineering_Development_Workflow.txt",
+        "deleted_vector_count": 0
+      }
+    ],
+    "total_deleted_vectors": 0,
+    "total_document_objects_loaded": 1,
+    "total_chunks_indexed": 2,
+    "estimated_unchanged_chunks_avoided": 96,
+    "after": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 18,
+      "simulated_source_files": 39,
+      "indexed_chunk_count": 98,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "delta": {
+      "indexed_chunk_count": 0,
+      "index_size_bytes": null,
+      "index_size_mb": null
+    },
+    "updated_by": "admin_jc"
+  },
+  {
+    "vector_backend": "azure_search",
+    "active_metadata_records": 18,
+    "simulated_source_files": 39,
+    "indexed_chunk_count": 100,
+    "index_size_bytes": null,
+    "index_size_mb": null,
+    "index_size_available": false,
+    "chroma_vector_count": null,
+    "chroma_db_size_bytes": null,
+    "chroma_db_size_mb": null,
+    "benchmark_type": "snapshot",
+    "updated_by": "admin_jc",
+    "message": "Saved index snapshot with 100 indexed chunk(s)."
+  },
+  {
+    "vector_backend": "azure_search",
+    "active_metadata_records": 18,
+    "simulated_source_files": 39,
+    "indexed_chunk_count": 100,
+    "index_size_bytes": null,
+    "index_size_mb": null,
+    "index_size_available": false,
+    "chroma_vector_count": null,
+    "chroma_db_size_bytes": null,
+    "chroma_db_size_mb": null,
+    "benchmark_type": "snapshot",
+    "updated_by": "admin_jc",
+    "message": "Saved index snapshot with 100 indexed chunk(s)."
+  },
+  {
+    "vector_backend": "azure_search",
+    "active_metadata_records": 18,
+    "simulated_source_files": 39,
+    "indexed_chunk_count": 100,
+    "index_size_bytes": null,
+    "index_size_mb": null,
+    "index_size_available": false,
+    "chroma_vector_count": null,
+    "chroma_db_size_bytes": null,
+    "chroma_db_size_mb": null,
+    "benchmark_type": "snapshot",
+    "updated_by": "admin_jc",
+    "message": "Saved index snapshot with 100 indexed chunk(s)."
+  },
+  {
+    "vector_backend": "azure_search",
+    "active_metadata_records": 18,
+    "simulated_source_files": 39,
+    "indexed_chunk_count": 100,
+    "index_size_bytes": null,
+    "index_size_mb": null,
+    "index_size_available": false,
+    "chroma_vector_count": null,
+    "chroma_db_size_bytes": null,
+    "chroma_db_size_mb": null,
+    "benchmark_type": "snapshot",
+    "updated_by": "admin_jc",
+    "message": "Saved index snapshot with 100 indexed chunk(s)."
+  },
+  {
+    "vector_backend": "azure_search",
+    "active_metadata_records": 18,
+    "simulated_source_files": 39,
+    "indexed_chunk_count": 100,
+    "index_size_bytes": null,
+    "index_size_mb": null,
+    "index_size_available": false,
+    "chroma_vector_count": null,
+    "chroma_db_size_bytes": null,
+    "chroma_db_size_mb": null,
+    "benchmark_type": "snapshot",
+    "updated_by": "admin_jc",
+    "message": "Saved index snapshot with 100 indexed chunk(s)."
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 1,
+    "updated_sources": [
+      "data/simulated/Engineering_Development_Workflow.txt"
+    ],
+    "cleanup_sources": [
+      "data/simulated/Engineering_Development_Workflow.txt"
+    ],
+    "elapsed_seconds": 14.838,
+    "before": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 18,
+      "simulated_source_files": 39,
+      "indexed_chunk_count": 98,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/Engineering_Development_Workflow.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      }
+    ],
+    "cleanup_results": [
+      {
+        "source": "data/simulated/Engineering_Development_Workflow.txt",
+        "deleted_vector_count": 0
+      }
+    ],
+    "total_deleted_vectors": 0,
+    "total_document_objects_loaded": 1,
+    "total_chunks_indexed": 2,
+    "estimated_unchanged_chunks_avoided": 96,
+    "after": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 18,
+      "simulated_source_files": 39,
+      "indexed_chunk_count": 100,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "delta": {
+      "indexed_chunk_count": 2,
+      "index_size_bytes": null,
+      "index_size_mb": null
+    },
+    "updated_by": "admin_jc"
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 1,
+    "updated_sources": [
+      "data/simulated/HR_Leave_Policy_2026.txt"
+    ],
+    "cleanup_sources": [
+      "data/simulated/HR_Leave_Policy_2026.txt"
+    ],
+    "elapsed_seconds": 10.395,
+    "before": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 17,
+      "simulated_source_files": 39,
+      "indexed_chunk_count": 96,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/HR_Leave_Policy_2026.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      }
+    ],
+    "cleanup_results": [
+      {
+        "source": "data/simulated/HR_Leave_Policy_2026.txt",
+        "deleted_vector_count": 0
+      }
+    ],
+    "total_deleted_vectors": 0,
+    "total_document_objects_loaded": 1,
+    "total_chunks_indexed": 2,
+    "estimated_unchanged_chunks_avoided": 94,
+    "after": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 17,
+      "simulated_source_files": 39,
+      "indexed_chunk_count": 96,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "delta": {
+      "indexed_chunk_count": 0,
+      "index_size_bytes": null,
+      "index_size_mb": null
+    },
+    "updated_by": "admin_jc"
   }
 ]

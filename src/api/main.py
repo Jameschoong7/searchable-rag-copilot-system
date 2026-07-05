@@ -53,6 +53,7 @@ from src.core.job_repository import (
     JOB_TYPE_ONENOTE_STAGE,
     JOB_TYPE_DOCUMENT_ARCHIVE,
     JOB_TYPE_DOCUMENT_UNARCHIVE,
+    JOB_TYPE_INDEX_SNAPSHOT,
     create_job,
     get_job,
     get_latest_job,
@@ -256,6 +257,13 @@ class IndexUpdatesRequest(BaseModel):
 class IndexUpdatesJobRequest(IndexUpdatesRequest):
     """Represent a durable pending-index update request submitted as a backend job."""
 
+    user: str
+
+
+class IndexSnapshotJobRequest(BaseModel):
+    """Represent an admin request to refresh the saved index snapshot."""
+
+    role: str
     user: str
 
 
@@ -570,6 +578,46 @@ def run_index_update_job(job_id: str, request: IndexUpdatesJobRequest) -> None:
                 "total_deleted_vectors": 0,
                 "total_chunks_indexed": 0,
                 "elapsed_seconds": 0,
+                "message": str(error),
+            },
+        )
+
+
+def run_index_snapshot_job(job_id: str, request: IndexSnapshotJobRequest) -> None:
+    """Refresh the saved index snapshot without rebuilding or changing vectors."""
+    update_job(
+        job_id,
+        JOB_STATUS_RUNNING,
+        "Refreshing saved index snapshot.",
+    )
+
+    try:
+        from src.evaluation.index_benchmark import (
+            build_index_benchmark_snapshot,
+            save_benchmark_result,
+        )
+
+        snapshot = build_index_benchmark_snapshot()
+        snapshot["benchmark_type"] = "snapshot"
+        snapshot["updated_by"] = request.user
+        snapshot["message"] = (
+            f"Saved index snapshot with {snapshot['indexed_chunk_count']} indexed chunk(s)."
+        )
+        save_benchmark_result(snapshot)
+
+        update_job(
+            job_id,
+            JOB_STATUS_SUCCEEDED,
+            snapshot["message"],
+            snapshot,
+        )
+    except Exception as error:
+        update_job(
+            job_id,
+            JOB_STATUS_FAILED,
+            f"Index snapshot refresh failed: {error}",
+            {
+                "status": "failed",
                 "message": str(error),
             },
         )
@@ -1662,6 +1710,29 @@ def create_index_update_job(
     )
 
     background_tasks.add_task(run_index_update_job, job["job_id"], request)
+
+    return JobResponse(**job)
+
+
+@app.post("/admin/index-snapshot-jobs", response_model=JobResponse)
+def create_index_snapshot_job(
+    request: IndexSnapshotJobRequest,
+    background_tasks: BackgroundTasks,
+) -> JobResponse:
+    """Create a durable job that refreshes the saved index snapshot."""
+    if request.role != SYSTEM_ADMIN_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="Only System Admin can refresh the index snapshot.",
+        )
+
+    job = create_job(
+        job_type=JOB_TYPE_INDEX_SNAPSHOT,
+        created_by=request.user,
+        message="Index snapshot refresh queued.",
+    )
+
+    background_tasks.add_task(run_index_snapshot_job, job["job_id"], request)
 
     return JobResponse(**job)
 

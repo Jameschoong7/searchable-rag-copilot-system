@@ -1058,6 +1058,27 @@ def get_status_label(status: str) -> str:
     return labels.get(status, "System Response")
 
 
+def format_logged_sources(status: str, sources_json: str) -> str:
+    """Format logged source paths according to whether they supported the answer."""
+    try:
+        sources = json.loads(sources_json)
+    except json.JSONDecodeError:
+        sources = []
+
+    if status == "permission_block":
+        return "No sources used"
+
+    if not sources:
+        return "None"
+
+    source_text = ", ".join(sources)
+
+    if status == "not_found":
+        return f"Checked: {source_text}"
+
+    return f"Sources: {source_text}"
+
+
 def show_status_message(status: str) -> None:
     """Render a visible chat result state for the current assistant answer."""
     label = get_status_label(status)
@@ -1170,13 +1191,39 @@ def read_query_log_summary() -> dict:
             SELECT
                 COUNT(*) AS total_queries,
                 COALESCE(AVG(latency_seconds), 0) AS average_latency,
+                SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END)
+                    AS grounded_answers,
+                SUM(CASE WHEN status = 'not_found' THEN 1 ELSE 0 END)
+                    AS not_found_queries,
                 SUM(CASE WHEN status = 'permission_block' THEN 1 ELSE 0 END)
                     AS permission_blocks,
-                SUM(CASE WHEN status IN ('not_found', 'error') THEN 1 ELSE 0 END)
-                    AS unresolved_queries
+                SUM(CASE WHEN status IN ('api_error', 'connection_error', 'error') THEN 1 ELSE 0 END)
+                    AS error_queries
             FROM query_logs
             """
         ).fetchone()
+
+        recent_outcome_rows = connection.execute(
+             """
+            SELECT
+                timestamp,
+                user,
+                role,
+                department,
+                question,
+                department_filter,
+                file_type_filter,
+                status,
+                sources_json,
+                latency_seconds,
+                feedback,
+                feedback_note
+            FROM query_logs
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (QUERY_HISTORY_LIMIT,),
+        ).fetchall()
 
         recent_rows = connection.execute(
              """
@@ -1210,39 +1257,18 @@ def read_query_log_summary() -> dict:
             """
         ).fetchall()
 
-        review_rows = connection.execute(
-            """
-            SELECT
-                id,
-                timestamp,
-                user,
-                role,
-                department,
-                question,
-                status,
-                sources_json,
-                latency_seconds,
-                feedback,
-                feedback_note
-            FROM query_logs
-            WHERE
-                status != 'success'
-                OR feedback = 'reported_issue'
-            ORDER BY id DESC
-            LIMIT ?
-            """,
-            (QUERY_HISTORY_LIMIT,),
-        ).fetchall()
-
         return {
             "total_queries": summary_row[0],
             "average_latency": summary_row[1],
-            "permission_blocks": summary_row[2] or 0,
-            "unresolved_queries": summary_row[3] or 0,
+            "grounded_answers": summary_row[2] or 0,
+            "not_found_queries": summary_row[3] or 0,
+            "permission_blocks": summary_row[4] or 0,
+            "error_queries": summary_row[5] or 0,
+            "unresolved_queries": (summary_row[3] or 0) + (summary_row[5] or 0),
+            "recent_outcome_rows": recent_outcome_rows,
             "recent_queries": recent_rows,
             "daily_latency_rows": daily_latency_rows,
             "query_history_limit": QUERY_HISTORY_LIMIT,
-            "review_rows": review_rows,
         }
 
 
@@ -1826,25 +1852,55 @@ if selected_page == "Performance":
     with st.container(border=True):
         st.subheader("Live Query Signals")
 
-        live_metric_columns = st.columns(3)
+        live_metric_columns = st.columns(4)
 
         with live_metric_columns[0]:
             st.metric(
-                "Logged Queries",
-                query_log_summary["total_queries"]
+                "Grounded Answers",
+                query_log_summary["grounded_answers"],
             )
 
         with live_metric_columns[1]:
+            st.metric(
+                "Not Found",
+                query_log_summary["not_found_queries"],
+            )
+
+        with live_metric_columns[2]:
             st.metric(
                 "Permission Blocks",
                 query_log_summary["permission_blocks"],
             )
 
-        with live_metric_columns[2]:
+        with live_metric_columns[3]:
             st.metric(
-                "Not Found / Errors",
-                query_log_summary["unresolved_queries"],
+                "API / Connection Errors",
+                query_log_summary["error_queries"],
             )
+
+        recent_outcome_rows = [
+            {
+                "Time": row[0],
+                "User": row[1],
+                "Role": row[2],
+                "Department": row[3],
+                "Question": row[4],
+                "Status": get_status_label(row[7]),
+                "Sources / Checked": format_logged_sources(row[7], row[8]),
+                "Latency (s)": row[9],
+                "Feedback": row[10] or "none",
+            }
+            for row in query_log_summary["recent_outcome_rows"]
+        ]
+
+        if recent_outcome_rows:
+            st.dataframe(
+                recent_outcome_rows,
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("No logged chat outcomes yet. Submit a Chat query to populate this table.")
 
     index_status_columns = st.columns([3, 1])
 
@@ -2227,60 +2283,37 @@ if selected_page == "Performance":
             else:
                 st.info(threshold_interpretation["recommendation"])
 
-    with st.expander("Admin Review Queue - Live Issues & Benchmark Misses", expanded=False):
-        st.markdown("**Live Query Issues / User Feedback**")
-        live_review_rows = [
-            {
-                "Log ID": row[0],
-                "Timestamp": row[1],
-                "User": row[2],
-                "Role": row[3],
-                "Department": row[4],
-                "Question": row[5],
-                "Status": row[6],
-                "Sources": ", ".join(json.loads(row[7])),
-                "Latency (s)": row[8],
-                "Feedback": row[9],
-                "Note": row[10],
-            }
-            for row in query_log_summary["review_rows"]
-        ]
+    if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+        with st.expander("Admin Review Queue - Benchmark Misses", expanded=False):
+            st.markdown("**Labelled Benchmark Misses**")
+            if evaluation_results and evaluation_results["miss_rows"]:
+                real_miss_rows = [
+                    {
+                        "Query ID": row["query_id"],
+                        "Suite": row["suite"],
+                        "Question": row["question"],
+                        "Expected Source": row["expected_source"],
+                        "Retrieved Sources": ", ".join(row["retrieved_sources"]),
+                        "Issue": row["issue"],
+                        "Next Enhancement": "Review metadata, chunking, filters, or Top-K ranking",
+                    }
+                    for row in evaluation_results["miss_rows"]
+                ]
 
-        if live_review_rows:
-            st.dataframe(live_review_rows, use_container_width=True, hide_index=True)
-        else:
-            st.success("No live query issues or reported feedback in the latest logged queries.")
+                st.dataframe(
+                    real_miss_rows,
+                    use_container_width=True,
+                    hide_index=True,
+                )
 
-        st.divider()
-        st.markdown("**Labelled Benchmark Misses**")
-        if evaluation_results and evaluation_results["miss_rows"]:
-            real_miss_rows = [
-                {
-                    "Query ID": row["query_id"],
-                    "Suite": row["suite"],
-                    "Question": row["question"],
-                    "Expected Source": row["expected_source"],
-                    "Retrieved Sources": ", ".join(row["retrieved_sources"]),
-                    "Issue": row["issue"],
-                    "Next Enhancement": "Review metadata, chunking, filters, or Top-K ranking",
-                }
-                for row in evaluation_results["miss_rows"]
-            ]
+            elif evaluation_results:
+                st.success("No retrieval misses in the latest labelled retrieval evaluation.")
 
-            st.dataframe(
-                real_miss_rows,
-                use_container_width=True,
-                hide_index=True,
-            )
-
-        elif evaluation_results:
-            st.success("No retrieval misses in the latest labelled retrieval evaluation.")
-
-        else:
-            st.info(
-                "No retrieval evaluation result found yet. Run "
-                "`python -m src.evaluation.retrieval_eval` to generate miss review data."
-            )
+            else:
+                st.info(
+                    "No retrieval evaluation result found yet. Run "
+                    "`python -m src.evaluation.retrieval_eval` to generate miss review data."
+                )
 
     with st.expander(
         f"Query History - Latest {query_log_summary['query_history_limit']} Logged Queries",

@@ -2,18 +2,17 @@
   "benchmark_type": "batch_incremental_update",
   "changed_document_count": 1,
   "updated_sources": [
-    "data/simulated/DOC-UPLOAD-005_v10_Incident_Response_Policy.docx"
+    "data/simulated/HR_Leave_Policy_2026.txt"
   ],
   "cleanup_sources": [
-    "data/simulated/DOC-UPLOAD-005_v9_Incident_Response_Policy.docx",
-    "data/simulated/DOC-UPLOAD-005_v10_Incident_Response_Policy.docx"
+    "data/simulated/HR_Leave_Policy_2026.txt"
   ],
-  "elapsed_seconds": 74.369,
+  "elapsed_seconds": 10.395,
   "before": {
     "vector_backend": "azure_search",
     "active_metadata_records": 17,
-    "simulated_source_files": 30,
-    "indexed_chunk_count": 98,
+    "simulated_source_files": 39,
+    "indexed_chunk_count": 96,
     "index_size_bytes": null,
     "index_size_mb": null,
     "index_size_available": false,
@@ -23,31 +22,27 @@
   },
   "update_results": [
     {
-      "source": "data/simulated/DOC-UPLOAD-005_v10_Incident_Response_Policy.docx",
+      "source": "data/simulated/HR_Leave_Policy_2026.txt",
       "deleted_vector_count": 0,
       "document_objects_loaded": 1,
-      "chunks_indexed": 14
+      "chunks_indexed": 2
     }
   ],
   "cleanup_results": [
     {
-      "source": "data/simulated/DOC-UPLOAD-005_v9_Incident_Response_Policy.docx",
-      "deleted_vector_count": 14
-    },
-    {
-      "source": "data/simulated/DOC-UPLOAD-005_v10_Incident_Response_Policy.docx",
+      "source": "data/simulated/HR_Leave_Policy_2026.txt",
       "deleted_vector_count": 0
     }
   ],
-  "total_deleted_vectors": 14,
+  "total_deleted_vectors": 0,
   "total_document_objects_loaded": 1,
-  "total_chunks_indexed": 14,
-  "estimated_unchanged_chunks_avoided": 84,
+  "total_chunks_indexed": 2,
+  "estimated_unchanged_chunks_avoided": 94,
   "after": {
     "vector_backend": "azure_search",
     "active_metadata_records": 17,
-    "simulated_source_files": 30,
-    "indexed_chunk_count": 98,
+    "simulated_source_files": 39,
+    "indexed_chunk_count": 96,
     "index_size_bytes": null,
     "index_size_mb": null,
     "index_size_available": false,
