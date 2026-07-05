@@ -333,6 +333,27 @@ def archive_document_version(
         )
 
 
+def unarchive_document_version(document_id: str) -> None:
+    """Restore a manually archived document and mark it for reindexing."""
+    initialise_metadata_database()
+
+    with sqlite3.connect(METADATA_DB_PATH) as connection:
+        connection.execute(
+            """
+            UPDATE document_metadata
+            SET
+                is_active = 1,
+                chunk_id = 'pending_index',
+                archived_at = NULL,
+                replaced_by_document_id = NULL
+            WHERE document_id = ?
+            AND is_active = 0
+            AND replaced_by_document_id IS NULL
+            """,
+            (document_id,),
+        )
+
+
 def create_new_document_version(
     previous_document_id: str,
     new_document: dict,

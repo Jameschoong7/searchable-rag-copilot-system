@@ -296,6 +296,23 @@ class UploadValidationRequest(BaseModel):
     allowed_departments: list[str]
 
 
+class UnarchiveDocumentRequest(BaseModel):
+    """Represent an admin request to restore one manually archived document."""
+
+    role: str
+    user_department: str
+    document_id: str
+
+
+class UnarchiveDocumentResponse(BaseModel):
+    """Represent the result of restoring one archived document."""
+
+    status: str
+    document_id: str
+    chunk_id: str
+    message: str
+
+
 class UploadValidationResponse(BaseModel):
     """Represent backend-approved upload metadata scope."""
 
@@ -1326,6 +1343,77 @@ def archive_document(request: ArchiveDocumentRequest) -> ArchiveDocumentResponse
     )
 
 
+@app.post("/admin/unarchive-document", response_model=UnarchiveDocumentResponse)
+def unarchive_document(
+    request: UnarchiveDocumentRequest,
+) -> UnarchiveDocumentResponse:
+    """Restore a manually archived document and mark it pending index."""
+    if request.role == GENERAL_EMPLOYEE_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="General Employee cannot restore archived documents.",
+        )
+
+    try:
+        from src.metadata.repository import (
+            load_document_metadata,
+            unarchive_document_version,
+        )
+
+        all_documents = load_document_metadata(include_inactive=True)
+
+        target_document = next(
+            (
+                document
+                for document in all_documents
+                if document["document_id"] == request.document_id
+            ),
+            None,
+        )
+
+        if target_document is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Document not found.",
+            )
+
+        if target_document.get("is_active") != 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Only archived documents can be restored.",
+            )
+
+        if target_document.get("replaced_by_document_id"):
+            raise HTTPException(
+                status_code=400,
+                detail="Replaced old versions cannot be restored because a newer version exists.",
+            )
+
+        if request.role == PROJECT_MANAGER_ROLE:
+            if target_document["department"] != request.user_department:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Project Manager can only restore own-department documents.",
+                )
+
+        unarchive_document_version(request.document_id)
+
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Document restore failed: {error}",
+        ) from error
+
+    return UnarchiveDocumentResponse(
+        status="restored",
+        document_id=request.document_id,
+        chunk_id="pending_index",
+        message="Document restored and marked pending index.",
+    )
+
+
 @app.post("/admin/validate-metadata-update", response_model=MetadataUpdateValidationResponse)
 def validate_metadata_update(
     request: MetadataUpdateValidationRequest,
@@ -1528,6 +1616,13 @@ def approve_pending_document(
         )
 
         updated_document = target_document.copy()
+        visual_status = get_visual_extraction_status(target_document["file_type"])
+
+        if target_document.get("source") == "onenote":
+            visual_status = "Text extracted from OneNote page"
+        elif target_document.get("source") == "onedrive":
+            visual_status = get_visual_extraction_status(target_document["file_type"])
+
         updated_document.update(
             {
                 "title": request.title.strip(),
@@ -1536,6 +1631,7 @@ def approve_pending_document(
                 "tags": request.tags,
                 "allowed_roles": approved_metadata.allowed_roles,
                 "allowed_departments": approved_metadata.allowed_departments,
+                "visual_extraction_status": visual_status,
             }
         )
 
