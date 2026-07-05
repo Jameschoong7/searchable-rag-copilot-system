@@ -51,6 +51,8 @@ from src.core.job_repository import (
     JOB_TYPE_INDEX_UPDATE,
     JOB_TYPE_ONEDRIVE_STAGE,
     JOB_TYPE_ONENOTE_STAGE,
+    JOB_TYPE_DOCUMENT_ARCHIVE,
+    JOB_TYPE_DOCUMENT_UNARCHIVE,
     create_job,
     get_job,
     get_latest_job,
@@ -277,6 +279,12 @@ class ArchiveDocumentRequest(BaseModel):
     document_id: str
 
 
+class ArchiveDocumentJobRequest(ArchiveDocumentRequest):
+    """Represent a durable archive request submitted as a backend job."""
+
+    user: str
+
+
 class ArchiveDocumentResponse(BaseModel):
     """Represent the result of archiving one document and deleting its vectors."""
 
@@ -302,6 +310,12 @@ class UnarchiveDocumentRequest(BaseModel):
     role: str
     user_department: str
     document_id: str
+
+
+class UnarchiveDocumentJobRequest(UnarchiveDocumentRequest):
+    """Represent a durable restore request submitted as a backend job."""
+
+    user: str
 
 
 class UnarchiveDocumentResponse(BaseModel):
@@ -1263,8 +1277,7 @@ async def upload_document_version(
     )
 
 
-@app.post("/admin/archive-document", response_model=ArchiveDocumentResponse)
-def archive_document(request: ArchiveDocumentRequest) -> ArchiveDocumentResponse:
+def run_archive_document_action(request: ArchiveDocumentRequest) -> dict:
     """Archive one document and remove its vectors from the active index."""
     if request.role == GENERAL_EMPLOYEE_ROLE:
         raise HTTPException(
@@ -1332,21 +1345,18 @@ def archive_document(request: ArchiveDocumentRequest) -> ArchiveDocumentResponse
             detail=f"Document archive failed: {error}",
         ) from error
 
-    return ArchiveDocumentResponse(
-        status="success",
-        document_id=request.document_id,
-        deleted_vector_count=deleted_vector_count,
-        message=(
+    return {
+        "status": "success",
+        "document_id": request.document_id,
+        "deleted_vector_count": deleted_vector_count,
+        "message": (
             f"Archived {target_document['title']} and removed "
             f"{deleted_vector_count} vector/index record(s) from the configured backend."
         ),
-    )
+    }
 
 
-@app.post("/admin/unarchive-document", response_model=UnarchiveDocumentResponse)
-def unarchive_document(
-    request: UnarchiveDocumentRequest,
-) -> UnarchiveDocumentResponse:
+def run_unarchive_document_action(request: UnarchiveDocumentRequest) -> dict:
     """Restore a manually archived document and mark it pending index."""
     if request.role == GENERAL_EMPLOYEE_ROLE:
         raise HTTPException(
@@ -1406,12 +1416,108 @@ def unarchive_document(
             detail=f"Document restore failed: {error}",
         ) from error
 
-    return UnarchiveDocumentResponse(
-        status="restored",
-        document_id=request.document_id,
-        chunk_id="pending_index",
-        message="Document restored and marked pending index.",
+    return {
+        "status": "restored",
+        "document_id": request.document_id,
+        "chunk_id": "pending_index",
+        "message": "Document restored and marked pending index.",
+    }
+
+
+def run_archive_document_job(job_id: str, request: ArchiveDocumentJobRequest) -> None:
+    """Run document archive as a backend job and persist the outcome."""
+    update_job(
+        job_id,
+        JOB_STATUS_RUNNING,
+        "Archiving document and removing search index records.",
     )
+
+    try:
+        result = run_archive_document_action(request)
+    except HTTPException as error:
+        update_job(
+            job_id,
+            JOB_STATUS_FAILED,
+            f"Document archive failed: {error.detail}",
+            {
+                "status": "failed",
+                "document_id": request.document_id,
+                "message": str(error.detail),
+            },
+        )
+    except Exception as error:
+        update_job(
+            job_id,
+            JOB_STATUS_FAILED,
+            f"Document archive failed: {error}",
+            {
+                "status": "failed",
+                "document_id": request.document_id,
+                "message": str(error),
+            },
+        )
+    else:
+        update_job(
+            job_id,
+            JOB_STATUS_SUCCEEDED,
+            result["message"],
+            result,
+        )
+
+
+def run_unarchive_document_job(job_id: str, request: UnarchiveDocumentJobRequest) -> None:
+    """Run document restore as a backend job and persist the outcome."""
+    update_job(
+        job_id,
+        JOB_STATUS_RUNNING,
+        "Restoring document and marking it pending index.",
+    )
+
+    try:
+        result = run_unarchive_document_action(request)
+    except HTTPException as error:
+        update_job(
+            job_id,
+            JOB_STATUS_FAILED,
+            f"Document restore failed: {error.detail}",
+            {
+                "status": "failed",
+                "document_id": request.document_id,
+                "message": str(error.detail),
+            },
+        )
+    except Exception as error:
+        update_job(
+            job_id,
+            JOB_STATUS_FAILED,
+            f"Document restore failed: {error}",
+            {
+                "status": "failed",
+                "document_id": request.document_id,
+                "message": str(error),
+            },
+        )
+    else:
+        update_job(
+            job_id,
+            JOB_STATUS_SUCCEEDED,
+            result["message"],
+            result,
+        )
+
+
+@app.post("/admin/archive-document", response_model=ArchiveDocumentResponse)
+def archive_document(request: ArchiveDocumentRequest) -> ArchiveDocumentResponse:
+    """Synchronously archive one document for compatibility/testing."""
+    return ArchiveDocumentResponse(**run_archive_document_action(request))
+
+
+@app.post("/admin/unarchive-document", response_model=UnarchiveDocumentResponse)
+def unarchive_document(
+    request: UnarchiveDocumentRequest,
+) -> UnarchiveDocumentResponse:
+    """Synchronously restore one manually archived document for compatibility/testing."""
+    return UnarchiveDocumentResponse(**run_unarchive_document_action(request))
 
 
 @app.post("/admin/validate-metadata-update", response_model=MetadataUpdateValidationResponse)
@@ -1556,6 +1662,52 @@ def create_index_update_job(
     )
 
     background_tasks.add_task(run_index_update_job, job["job_id"], request)
+
+    return JobResponse(**job)
+
+
+@app.post("/admin/archive-document-jobs", response_model=JobResponse)
+def create_archive_document_job(
+    request: ArchiveDocumentJobRequest,
+    background_tasks: BackgroundTasks,
+) -> JobResponse:
+    """Create a durable archive job so Streamlit reruns do not interrupt cleanup."""
+    if request.role == GENERAL_EMPLOYEE_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="General Employee cannot archive knowledge base documents.",
+        )
+
+    job = create_job(
+        job_type=JOB_TYPE_DOCUMENT_ARCHIVE,
+        created_by=request.user,
+        message="Document archive queued.",
+    )
+
+    background_tasks.add_task(run_archive_document_job, job["job_id"], request)
+
+    return JobResponse(**job)
+
+
+@app.post("/admin/unarchive-document-jobs", response_model=JobResponse)
+def create_unarchive_document_job(
+    request: UnarchiveDocumentJobRequest,
+    background_tasks: BackgroundTasks,
+) -> JobResponse:
+    """Create a durable restore job so Streamlit reruns do not interrupt updates."""
+    if request.role == GENERAL_EMPLOYEE_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="General Employee cannot restore archived documents.",
+        )
+
+    job = create_job(
+        job_type=JOB_TYPE_DOCUMENT_UNARCHIVE,
+        created_by=request.user,
+        message="Document restore queued.",
+    )
+
+    background_tasks.add_task(run_unarchive_document_job, job["job_id"], request)
 
     return JobResponse(**job)
 

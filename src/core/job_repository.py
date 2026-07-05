@@ -19,6 +19,8 @@ JOB_TYPE_CHAT_QUERY = "chat_query"
 
 JOB_TYPE_ONEDRIVE_STAGE = "onedrive_stage"
 JOB_TYPE_ONENOTE_STAGE = "onenote_stage"
+JOB_TYPE_DOCUMENT_ARCHIVE = "document_archive"
+JOB_TYPE_DOCUMENT_UNARCHIVE = "document_unarchive"
 
 def now_text() -> str:
     """Return a consistent timestamp string for local job records."""

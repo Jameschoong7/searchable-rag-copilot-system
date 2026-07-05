@@ -93,6 +93,8 @@ INDEX_UPDATE_JOBS_URL = f"{API_BASE_URL}/admin/index-update-jobs"
 METADATA_UPDATE_VALIDATE_URL = f"{API_BASE_URL}/admin/validate-metadata-update"
 ARCHIVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/archive-document"
 UNARCHIVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/unarchive-document"
+ARCHIVE_DOCUMENT_JOB_URL = f"{API_BASE_URL}/admin/archive-document-jobs"
+UNARCHIVE_DOCUMENT_JOB_URL = f"{API_BASE_URL}/admin/unarchive-document-jobs"
 SETTINGS_URL = f"{API_BASE_URL}/admin/settings"
 UPLOAD_DOCUMENT_URL = f"{API_BASE_URL}/admin/upload-document"
 UPLOAD_DOCUMENT_VERSION_URL = f"{API_BASE_URL}/admin/upload-document-version"
@@ -320,15 +322,16 @@ def request_settings_update(settings: dict[str, str]) -> dict:
 
 
 def request_document_archive(document_id: str) -> dict:
-    """Ask FastAPI to archive one document and remove its vectors."""
+    """Submit a durable archive job for one document."""
     response = requests.post(
-        ARCHIVE_DOCUMENT_URL,
+        ARCHIVE_DOCUMENT_JOB_URL,
         json={
             "role": st.session_state["role"],
+            "user": st.session_state["user"],
             "user_department": st.session_state["department"],
             "document_id": document_id,
         },
-        timeout=120,
+        timeout=10,
     )
 
     response.raise_for_status()
@@ -336,15 +339,16 @@ def request_document_archive(document_id: str) -> dict:
 
 
 def request_document_unarchive(document_id: str) -> dict:
-    """Ask FastAPI to restore one manually archived document."""
+    """Submit a durable restore job for one manually archived document."""
     response = requests.post(
-        UNARCHIVE_DOCUMENT_URL,
+        UNARCHIVE_DOCUMENT_JOB_URL,
         json={
             "role": st.session_state["role"],
+            "user": st.session_state["user"],
             "user_department": st.session_state["department"],
             "document_id": document_id,
         },
-        timeout=60,
+        timeout=10,
     )
 
     response.raise_for_status()
@@ -729,6 +733,47 @@ def poll_active_onenote_stage_job() -> None:
         st.session_state["onenote_stage_status"] = "error"
 
     st.session_state.pop("active_onenote_stage_job_id", None)
+    st.rerun()
+
+
+@st.fragment(run_every="2s")
+def poll_active_document_lifecycle_job() -> None:
+    """Poll active archive/restore jobs without blocking Streamlit navigation."""
+    active_job_id = st.session_state.get("active_document_lifecycle_job_id")
+
+    if not active_job_id:
+        return
+
+    try:
+        job = get_backend_job(active_job_id)
+    except requests.exceptions.RequestException as error:
+        st.warning(f"Document lifecycle job status unavailable: {error}")
+        return
+
+    if job["status"] in ["queued", "running"]:
+        st.info(job["message"])
+        return
+
+    if job["status"] == "succeeded":
+        result = job["result"]
+        lifecycle_message = result.get(
+            "message",
+            job["message"],
+        )
+
+        if job.get("job_type") == "document_unarchive":
+            lifecycle_message = (
+                f"{lifecycle_message} Run Update for Pending Documents to make it searchable."
+            )
+
+        st.session_state["document_lifecycle_message"] = lifecycle_message
+        st.session_state["document_lifecycle_status"] = "success"
+
+    elif job["status"] == "failed":
+        st.session_state["document_lifecycle_message"] = job["message"]
+        st.session_state["document_lifecycle_status"] = "error"
+
+    st.session_state.pop("active_document_lifecycle_job_id", None)
     st.rerun()
 
 
@@ -1523,6 +1568,7 @@ poll_active_reindex_job()
 poll_active_index_update_job()
 poll_active_onedrive_stage_job()
 poll_active_onenote_stage_job()
+poll_active_document_lifecycle_job()
 
 kb_page_label = get_kb_page_label()
 
@@ -2145,6 +2191,16 @@ elif selected_page in ["KB Management", "KB Status"]:
             """,
             unsafe_allow_html=True,
         )
+
+    if st.session_state.get("document_lifecycle_message"):
+        lifecycle_status = st.session_state.get("document_lifecycle_status", "info")
+
+        if lifecycle_status == "success":
+            st.success(st.session_state["document_lifecycle_message"])
+        elif lifecycle_status == "error":
+            st.error(st.session_state["document_lifecycle_message"])
+        else:
+            st.info(st.session_state["document_lifecycle_message"])
 
     active_documents = load_document_metadata()
     all_documents = load_document_metadata(include_inactive=True)
@@ -3245,19 +3301,31 @@ elif selected_page in ["KB Management", "KB Status"]:
                             if st.button(
                                 "Archive Selected Document",
                                 key=f"archive_document_{selected_document['document_id']}",
-                                disabled=not confirm_archive,
+                                disabled=(
+                                    not confirm_archive
+                                    or bool(st.session_state.get("active_document_lifecycle_job_id"))
+                                ),
                             ):
                                 try:
-                                    archive_result = request_document_archive(
+                                    job = request_document_archive(
                                         selected_document["document_id"]
                                     )
                                 except requests.exceptions.HTTPError as error:
-                                    st.error(f"Archive rejected by backend: {error.response.text}")
+                                    st.session_state["document_lifecycle_message"] = (
+                                        f"Archive rejected by backend: {error.response.text}"
+                                    )
+                                    st.session_state["document_lifecycle_status"] = "error"
                                 except requests.exceptions.RequestException as error:
-                                    st.error(f"Could not archive document: {error}")
+                                    st.session_state["document_lifecycle_message"] = (
+                                        f"Could not submit archive job: {error}"
+                                    )
+                                    st.session_state["document_lifecycle_status"] = "error"
                                 else:
-                                    st.success(archive_result["message"])
-                                    st.rerun()
+                                    st.session_state["active_document_lifecycle_job_id"] = job["job_id"]
+                                    st.session_state["document_lifecycle_message"] = job["message"]
+                                    st.session_state["document_lifecycle_status"] = "info"
+
+                                st.rerun()
 
     if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
         with st.expander("Archived Documents", expanded=False):
@@ -3307,21 +3375,31 @@ elif selected_page in ["KB Management", "KB Status"]:
                 if st.button(
                     "Restore Archived Document",
                     key=f"restore_document_{selected_archived_document['document_id']}",
-                    disabled=not confirm_restore,
+                    disabled=(
+                        not confirm_restore
+                        or bool(st.session_state.get("active_document_lifecycle_job_id"))
+                    ),
                 ):
                     try:
-                        restore_result = request_document_unarchive(
+                        job = request_document_unarchive(
                             selected_archived_document["document_id"]
                         )
                     except requests.exceptions.HTTPError as error:
-                        st.error(f"Restore rejected by backend: {error.response.text}")
-                    except requests.exceptions.RequestException as error:
-                        st.error(f"Could not restore archived document: {error}")
-                    else:
-                        st.success(
-                            f"{restore_result['message']} Run Update for Pending Documents to make it searchable."
+                        st.session_state["document_lifecycle_message"] = (
+                            f"Restore rejected by backend: {error.response.text}"
                         )
-                        st.rerun()                
+                        st.session_state["document_lifecycle_status"] = "error"
+                    except requests.exceptions.RequestException as error:
+                        st.session_state["document_lifecycle_message"] = (
+                            f"Could not submit restore job: {error}"
+                        )
+                        st.session_state["document_lifecycle_status"] = "error"
+                    else:
+                        st.session_state["active_document_lifecycle_job_id"] = job["job_id"]
+                        st.session_state["document_lifecycle_message"] = job["message"]
+                        st.session_state["document_lifecycle_status"] = "info"
+
+                    st.rerun()                
 
 elif selected_page == "Chat":
     chat_title_columns = st.columns([2.6, 1])
