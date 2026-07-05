@@ -182,6 +182,28 @@ class OneNotePagesResponse(BaseModel):
     pages: list[OneNotePageSummary]
 
 
+class StageOneNotePageRequest(BaseModel):
+    """Represent an admin request to stage one OneNote page for metadata review."""
+
+    role: str
+    user: str
+    page_id: str
+    title: str
+    connector_path: str
+
+
+class StageOneNotePageResponse(BaseModel):
+    """Represent a OneNote page staged as a pending-review KB document."""
+
+    status: str
+    document_id: str
+    filename: str
+    storage_backend: str
+    storage_uri: str
+    chunk_id: str
+    message: str
+
+
 class ReindexRequest(BaseModel):
     """Represent an admin reindex request from a frontend client."""
 
@@ -1961,3 +1983,79 @@ def create_onedrive_stage_job(
     background_tasks.add_task(run_onedrive_stage_job, job["job_id"], request)
 
     return JobResponse(**job)
+
+
+@app.post("/admin/graph/onenote/stage-page", response_model=StageOneNotePageResponse)
+def stage_onenote_page(
+    request: StageOneNotePageRequest,
+) -> StageOneNotePageResponse:
+    """Download one OneNote page and stage it for admin metadata review."""
+    if request.role != SYSTEM_ADMIN_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="Only System Admin can stage OneNote connector pages.",
+        )
+
+    try:
+        from src.connectors.graph_client import download_onenote_page_content_by_id
+        from src.connectors.graph_connector import (
+            build_graph_document_id,
+            build_graph_storage_filename,
+            normalize_onenote_html_to_text,
+            stage_graph_file_for_review,
+        )
+        from src.metadata.repository import load_document_metadata
+
+        existing_documents = load_document_metadata(include_inactive=True)
+        document_id = build_graph_document_id("GRAPH-ON", request.page_id)
+
+        if any(document["document_id"] == document_id for document in existing_documents):
+            raise HTTPException(
+                status_code=409,
+                detail="This OneNote page has already been staged.",
+            )
+
+        html_content = download_onenote_page_content_by_id(request.page_id)
+        text_content = normalize_onenote_html_to_text(html_content)
+
+        if not text_content.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="OneNote page did not contain extractable text.",
+            )
+
+        stored_filename = build_graph_storage_filename(
+            source_type="onenote",
+            item_id=request.page_id,
+            original_filename=f"{request.title or 'untitled_onenote_page'}.txt",
+        )
+
+        metadata = stage_graph_file_for_review(
+            document_id=document_id,
+            title=request.title or "Untitled OneNote Page",
+            original_filename=stored_filename,
+            content_bytes=text_content.encode("utf-8"),
+            source_path=request.connector_path,
+            source_type="onenote",
+            uploaded_by=request.user,
+        )
+
+    except HTTPException:
+        raise
+    except RuntimeError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(
+            status_code=502,
+            detail=f"OneNote staging failed: {error}",
+        ) from error
+
+    return StageOneNotePageResponse(
+        status="staged",
+        document_id=metadata["document_id"],
+        filename=metadata["filename"],
+        storage_backend=metadata["storage_backend"],
+        storage_uri=metadata["storage_uri"],
+        chunk_id=metadata["chunk_id"],
+        message="OneNote page downloaded and staged for metadata review.",
+    )

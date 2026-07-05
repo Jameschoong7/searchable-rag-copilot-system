@@ -5,6 +5,7 @@ import re
 from src.core.constants import SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE
 from src.metadata.repository import append_document_metadata
 from src.storage.document_storage import save_document_bytes
+from bs4 import BeautifulSoup
 
 
 DEPARTMENT_PATH_KEYWORDS = {
@@ -151,3 +152,21 @@ def build_graph_storage_filename(source_type: str, item_id: str, original_filena
     suffix = original_path.suffix
 
     return f"{source_type}_{safe_item_id}_{safe_stem}{suffix}"
+
+
+def normalize_onenote_html_to_text(html_content: bytes) -> str:
+    """Convert OneNote page HTML into simple searchable text."""
+    soup = BeautifulSoup(html_content, "html.parser")
+
+    for element in soup(["script", "style"]):
+        element.decompose()
+
+    text = soup.get_text(separator="\n")
+    lines = [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip()
+    ]
+
+    return "\n".join(lines)
+

@@ -26,6 +26,7 @@ annotated-types
 anyio
 attrs
 bcrypt
+beautifulsoup4
 build
 certifi
 charset-normalizer

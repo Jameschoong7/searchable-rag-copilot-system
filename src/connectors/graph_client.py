@@ -188,3 +188,9 @@ def list_onenote_pages_recursive() -> list[dict]:
                 discovered_pages.append(page_item)
 
     return discovered_pages
+
+
+def download_onenote_page_content_by_id(page_id: str) -> bytes:
+    """Download raw HTML content for one OneNote page."""
+    encoded_page_id = graph_path_id(page_id)
+    return graph_get_bytes(f"/me/onenote/pages/{encoded_page_id}/content")
