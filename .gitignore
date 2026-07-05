@@ -2,6 +2,7 @@
 .venv/                                 
 data/raw/
 data/simulated/onedrive_*
+data/simulated/onenote_*
 data/chroma_db/
 data/metadata/
 data/evaluation/retrieval_eval_results.json
