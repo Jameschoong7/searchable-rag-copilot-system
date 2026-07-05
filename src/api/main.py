@@ -174,6 +174,8 @@ class OneNotePageSummary(BaseModel):
     section_name: str
     connector_path: str
     last_modified_datetime: str | None = None
+    connector_state: str = "New"
+    staged_document_id: str | None = None
 
 
 class OneNotePagesResponse(BaseModel):
@@ -1597,6 +1599,45 @@ def get_onedrive_connector_state(item_id: str, documents: list[dict]) -> dict:
     }
 
 
+def get_onenote_connector_state(page_id: str, documents: list[dict]) -> dict:
+    """Return current review/index state for a discovered OneNote page."""
+    from src.connectors.graph_connector import build_graph_document_id
+
+    base_document_id = build_graph_document_id("GRAPH-ON", page_id)
+
+    matching_documents = [
+        document
+        for document in documents
+        if (
+            document["document_id"] == base_document_id
+            or document["document_id"].startswith(f"{base_document_id}-R")
+        )
+    ]
+
+    if not matching_documents:
+        return {
+            "connector_state": "New",
+            "staged_document_id": None,
+        }
+
+    latest_document = matching_documents[-1]
+    chunk_id = latest_document.get("chunk_id")
+
+    state_by_chunk_id = {
+        "pending_review": "Pending Review",
+        "rejected": "Rejected",
+        "pending_index": "Pending Index",
+        "pending": "Pending Index",
+        "indexed": "Indexed",
+        "archived": "Archived",
+    }
+
+    return {
+        "connector_state": state_by_chunk_id.get(chunk_id, "Other"),
+        "staged_document_id": latest_document["document_id"],
+    }
+
+
 @app.post("/admin/graph/onedrive/files", response_model=OneDriveFilesResponse)
 def list_graph_onedrive_files(
     request: GraphConnectorListRequest,
@@ -1659,8 +1700,10 @@ def list_graph_onenote_pages(
 
     try:
         from src.connectors.graph_client import list_onenote_pages_recursive
+        from src.metadata.repository import load_document_metadata
 
         discovered_pages = list_onenote_pages_recursive()
+        all_documents = load_document_metadata(include_inactive=True)
 
     except RuntimeError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
@@ -1670,17 +1713,26 @@ def list_graph_onenote_pages(
             detail=f"OneNote scan failed: {error}",
         ) from error
 
-    pages = [
-        OneNotePageSummary(
-            id=page["id"],
-            title=page.get("title", "Untitled Page"),
-            notebook_name=page.get("notebook_name", "Untitled Notebook"),
-            section_name=page.get("section_name", "Untitled Section"),
-            connector_path=page["connector_path"],
-            last_modified_datetime=page.get("lastModifiedDateTime"),
+    pages = []
+
+    for page in discovered_pages:
+        connector_state = get_onenote_connector_state(
+            page_id=page["id"],
+            documents=all_documents,
         )
-        for page in discovered_pages
-    ]
+
+        pages.append(
+            OneNotePageSummary(
+                id=page["id"],
+                title=page.get("title", "Untitled Page"),
+                notebook_name=page.get("notebook_name", "Untitled Notebook"),
+                section_name=page.get("section_name", "Untitled Section"),
+                connector_path=page["connector_path"],
+                last_modified_datetime=page.get("lastModifiedDateTime"),
+                connector_state=connector_state["connector_state"],
+                staged_document_id=connector_state["staged_document_id"],
+            )
+        )
 
     return OneNotePagesResponse(status="success", pages=pages)
 

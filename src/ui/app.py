@@ -1517,7 +1517,17 @@ if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
 if can_access_settings():
     page_options.append("Settings")
 
-selected_page = st.sidebar.radio("Navigation", page_options)
+if "selected_navigation_page" not in st.session_state:
+    st.session_state["selected_navigation_page"] = kb_page_label
+
+if st.session_state["selected_navigation_page"] not in page_options:
+    st.session_state["selected_navigation_page"] = kb_page_label
+
+selected_page = st.sidebar.radio(
+    "Navigation",
+    page_options,
+    key="selected_navigation_page",
+)
 
 st.sidebar.divider()
 
@@ -2550,10 +2560,12 @@ elif selected_page in ["KB Management", "KB Status"]:
                         [
                             {
                                 "Title": page["title"] or "Untitled Page",
+                                "State": page.get("connector_state", "New"),
                                 "Notebook": page["notebook_name"],
                                 "Section": page["section_name"],
                                 "Path": page["connector_path"],
                                 "Modified": page.get("last_modified_datetime"),
+                                "KB Record": page.get("staged_document_id") or "",
                             }
                             for page in onenote_pages
                         ],
@@ -2567,7 +2579,7 @@ elif selected_page in ["KB Management", "KB Status"]:
                         for page in onenote_pages
                     }
 
-                    selection_columns = st.columns(2)
+                    selection_columns = st.columns(3)
 
                     with selection_columns[0]:
                         if st.button(
@@ -2579,6 +2591,19 @@ elif selected_page in ["KB Management", "KB Status"]:
                             st.rerun()
 
                     with selection_columns[1]:
+                        if st.button(
+                            "Select New/Rejected",
+                            use_container_width=True,
+                            key="select_stageable_onenote_pages_button",
+                        ):
+                            st.session_state["selected_onenote_pages_to_stage"] = [
+                                label
+                                for label, page in page_options.items()
+                                if page.get("connector_state", "New") in ["New", "Rejected"]
+                            ]
+                            st.rerun()
+
+                    with selection_columns[2]:
                         if st.button(
                             "Clear Page Selection",
                             use_container_width=True,
