@@ -102,6 +102,7 @@ ONEDRIVE_FILES_URL = f"{API_BASE_URL}/admin/graph/onedrive/files"
 ONEDRIVE_STAGE_FILE_URL = f"{API_BASE_URL}/admin/graph/onedrive/stage-file"
 ONEDRIVE_STAGE_FILES_JOB_URL = f"{API_BASE_URL}/admin/graph/onedrive/stage-files-job"
 ONENOTE_PAGES_URL = f"{API_BASE_URL}/admin/graph/onenote/pages"
+ONENOTE_STAGE_PAGES_JOB_URL = f"{API_BASE_URL}/admin/graph/onenote/stage-pages-job"
 EVALUATION_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/retrieval_eval_results.json"
 INDEX_BENCHMARK_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_results.json"
 INDEX_BENCHMARK_HISTORY_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_history.json"
@@ -217,6 +218,29 @@ def request_onenote_page_scan() -> dict:
             "role": st.session_state["role"],
         },
         timeout=60,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def submit_onenote_stage_job(page_items: list[dict]) -> dict:
+    """Submit selected OneNote pages as one durable backend staging job."""
+    response = requests.post(
+        ONENOTE_STAGE_PAGES_JOB_URL,
+        json={
+            "role": st.session_state["role"],
+            "user": st.session_state["user"],
+            "pages": [
+                {
+                    "page_id": page_item["id"],
+                    "title": page_item.get("title") or "Untitled Page",
+                    "connector_path": page_item["connector_path"],
+                }
+                for page_item in page_items
+            ],
+        },
+        timeout=10,
     )
 
     response.raise_for_status()
@@ -653,6 +677,41 @@ def poll_active_onedrive_stage_job() -> None:
         st.session_state["onedrive_stage_status"] = "error"
 
     st.session_state.pop("active_onedrive_stage_job_id", None)
+    st.rerun()
+
+
+@st.fragment(run_every="2s")
+def poll_active_onenote_stage_job() -> None:
+    """Poll the active OneNote staging job without blocking Streamlit navigation."""
+    active_job_id = st.session_state.get("active_onenote_stage_job_id")
+
+    if not active_job_id:
+        return
+
+    try:
+        job = get_backend_job(active_job_id)
+    except requests.exceptions.RequestException as error:
+        st.warning(f"OneNote staging job status unavailable: {error}")
+        return
+
+    if job["status"] in ["queued", "running"]:
+        st.info(job["message"])
+        return
+
+    if job["status"] == "succeeded":
+        result = job["result"]
+        st.session_state["onenote_stage_results"] = result.get("results", [])
+        st.session_state["onenote_stage_message"] = result.get(
+            "message",
+            job["message"],
+        )
+        st.session_state["onenote_stage_status"] = "success"
+
+    elif job["status"] == "failed":
+        st.session_state["onenote_stage_message"] = job["message"]
+        st.session_state["onenote_stage_status"] = "error"
+
+    st.session_state.pop("active_onenote_stage_job_id", None)
     st.rerun()
 
 
@@ -1443,6 +1502,7 @@ st.sidebar.divider()
 poll_active_reindex_job()
 poll_active_index_update_job()
 poll_active_onedrive_stage_job()
+poll_active_onenote_stage_job()
 
 kb_page_label = get_kb_page_label()
 
@@ -2501,6 +2561,82 @@ elif selected_page in ["KB Management", "KB Status"]:
                         hide_index=True,
                         height=260,
                     )
+
+                    page_options = {
+                        f"{page.get('title') or 'Untitled Page'} - {page['connector_path']}": page
+                        for page in onenote_pages
+                    }
+
+                    selection_columns = st.columns(2)
+
+                    with selection_columns[0]:
+                        if st.button(
+                            "Select All Pages",
+                            use_container_width=True,
+                            key="select_all_onenote_pages_button",
+                        ):
+                            st.session_state["selected_onenote_pages_to_stage"] = list(page_options.keys())
+                            st.rerun()
+
+                    with selection_columns[1]:
+                        if st.button(
+                            "Clear Page Selection",
+                            use_container_width=True,
+                            key="clear_onenote_selection_button",
+                        ):
+                            st.session_state["selected_onenote_pages_to_stage"] = []
+                            st.rerun()
+
+                    selected_page_labels = st.multiselect(
+                        "Select OneNote pages to stage",
+                        list(page_options.keys()),
+                        key="selected_onenote_pages_to_stage",
+                    )
+
+                    if st.session_state.get("onenote_stage_message"):
+                        stage_status = st.session_state.get("onenote_stage_status", "info")
+
+                        if stage_status == "success":
+                            st.success(st.session_state["onenote_stage_message"])
+                        elif stage_status == "error":
+                            st.error(st.session_state["onenote_stage_message"])
+                        else:
+                            st.info(st.session_state["onenote_stage_message"])
+
+                    if st.button(
+                        "Stage Selected Pages for Review",
+                        use_container_width=True,
+                        disabled=(
+                            not selected_page_labels
+                            or bool(st.session_state.get("active_onenote_stage_job_id"))
+                        ),
+                        key="submit_onenote_stage_job_button",
+                    ):
+                        selected_pages = [
+                            page_options[selected_page_label]
+                            for selected_page_label in selected_page_labels
+                        ]
+
+                        try:
+                            job = submit_onenote_stage_job(selected_pages)
+                        except requests.exceptions.HTTPError as error:
+                            st.error(f"OneNote staging rejected by backend: {error.response.text}")
+                        except requests.exceptions.RequestException as error:
+                            st.error(f"Could not submit OneNote staging job: {error}")
+                        else:
+                            st.session_state["active_onenote_stage_job_id"] = job["job_id"]
+                            st.session_state["onenote_stage_message"] = job["message"]
+                            st.session_state["onenote_stage_status"] = "info"
+                            st.rerun()
+
+                    if st.session_state.get("onenote_stage_results"):
+                        st.dataframe(
+                            st.session_state["onenote_stage_results"],
+                            use_container_width=True,
+                            hide_index=True,
+                            height=220,
+                        )
+
                 else:
                     st.caption("No OneNote pages loaded from the configured notebook scope.")
 

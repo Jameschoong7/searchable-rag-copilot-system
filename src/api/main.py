@@ -50,6 +50,7 @@ from src.core.job_repository import (
     JOB_TYPE_REINDEX,
     JOB_TYPE_INDEX_UPDATE,
     JOB_TYPE_ONEDRIVE_STAGE,
+    JOB_TYPE_ONENOTE_STAGE,
     create_job,
     get_job,
     get_latest_job,
@@ -202,6 +203,22 @@ class StageOneNotePageResponse(BaseModel):
     storage_uri: str
     chunk_id: str
     message: str
+
+
+class OneNoteStagePageItem(BaseModel):
+    """Represent one OneNote page selected for batch staging."""
+
+    page_id: str
+    title: str
+    connector_path: str
+
+
+class StageOneNotePagesJobRequest(BaseModel):
+    """Represent a durable batch OneNote staging request."""
+
+    role: str
+    user: str
+    pages: list[OneNoteStagePageItem]
 
 
 class ReindexRequest(BaseModel):
@@ -2059,3 +2076,155 @@ def stage_onenote_page(
         chunk_id=metadata["chunk_id"],
         message="OneNote page downloaded and staged for metadata review.",
     )
+
+
+def stage_onenote_page_item(
+    page_id: str,
+    title: str,
+    connector_path: str,
+    user: str,
+) -> dict:
+    """Download and stage one OneNote page item for pending metadata review."""
+    from src.connectors.graph_client import download_onenote_page_content_by_id
+    from src.connectors.graph_connector import (
+        build_graph_document_id,
+        build_graph_storage_filename,
+        normalize_onenote_html_to_text,
+        stage_graph_file_for_review,
+    )
+    from src.metadata.repository import load_document_metadata
+
+    existing_documents = load_document_metadata(include_inactive=True)
+    base_document_id = build_graph_document_id("GRAPH-ON", page_id)
+
+    matching_documents = [
+        document
+        for document in existing_documents
+        if (
+            document["document_id"] == base_document_id
+            or document["document_id"].startswith(f"{base_document_id}-R")
+        )
+    ]
+
+    blocking_document = next(
+        (
+            document
+            for document in matching_documents
+            if document.get("chunk_id") != "rejected"
+        ),
+        None,
+    )
+
+    if blocking_document:
+        raise ValueError("This OneNote page has already been staged or approved.")
+
+    document_id = base_document_id
+    attempt_suffix = ""
+
+    if matching_documents:
+        next_attempt_number = len(matching_documents) + 1
+        document_id = f"{base_document_id}-R{next_attempt_number}"
+        attempt_suffix = f"_r{next_attempt_number}"
+
+    html_content = download_onenote_page_content_by_id(page_id)
+    text_content = normalize_onenote_html_to_text(html_content)
+
+    if not text_content.strip():
+        raise ValueError("OneNote page did not contain extractable text.")
+
+    stored_filename = build_graph_storage_filename(
+        source_type="onenote",
+        item_id=f"{page_id}{attempt_suffix}",
+        original_filename=f"{title or 'untitled_onenote_page'}.txt",
+    )
+
+    return stage_graph_file_for_review(
+        document_id=document_id,
+        title=title or "Untitled OneNote Page",
+        original_filename=stored_filename,
+        content_bytes=text_content.encode("utf-8"),
+        source_path=connector_path,
+        source_type="onenote",
+        uploaded_by=user,
+    )
+
+
+def run_onenote_stage_job(job_id: str, request: StageOneNotePagesJobRequest) -> None:
+    """Stage selected OneNote pages in the background and store per-page results."""
+    update_job(
+        job_id,
+        JOB_STATUS_RUNNING,
+        f"Staging {len(request.pages)} OneNote page(s).",
+    )
+
+    results = []
+
+    for page_item in request.pages:
+        try:
+            metadata = stage_onenote_page_item(
+                page_id=page_item.page_id,
+                title=page_item.title,
+                connector_path=page_item.connector_path,
+                user=request.user,
+            )
+        except Exception as error:
+            results.append(
+                {
+                    "Page": page_item.title or "Untitled Page",
+                    "Path": page_item.connector_path,
+                    "Status": "Rejected",
+                    "Message": str(error),
+                }
+            )
+        else:
+            results.append(
+                {
+                    "Page": page_item.title or "Untitled Page",
+                    "Path": page_item.connector_path,
+                    "Status": "Staged",
+                    "Message": f"Staged {metadata['document_id']} for review.",
+                }
+            )
+
+    staged_count = sum(1 for result in results if result["Status"] == "Staged")
+
+    update_job(
+        job_id,
+        JOB_STATUS_SUCCEEDED,
+        f"OneNote staging finished: {staged_count}/{len(results)} page(s) staged.",
+        result={
+            "results": results,
+            "staged_count": staged_count,
+            "total_count": len(results),
+            "message": f"OneNote staging finished: {staged_count}/{len(results)} page(s) staged.",
+        },
+    )
+
+
+@app.post("/admin/graph/onenote/stage-pages-job", response_model=JobResponse)
+def create_onenote_stage_job(
+    request: StageOneNotePagesJobRequest,
+    background_tasks: BackgroundTasks,
+) -> JobResponse:
+    """Create a durable job for batch OneNote page staging."""
+    if request.role != SYSTEM_ADMIN_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="Only System Admin can batch stage OneNote connector pages.",
+        )
+
+    if not request.pages:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one OneNote page is required.",
+        )
+
+    job = create_job(
+        job_type=JOB_TYPE_ONENOTE_STAGE,
+        created_by=request.user,
+        message=f"OneNote staging queued for {len(request.pages)} page(s).",
+    )
+
+    background_tasks.add_task(run_onenote_stage_job, job["job_id"], request)
+
+    return JobResponse(**job)
