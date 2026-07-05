@@ -36,6 +36,7 @@ from src.core.constants import (
     ROLE_OPTIONS,
     SYSTEM_ADMIN_ROLE,
 )
+from src.core.answer_status import classify_answer_status
 
 
 ROLE_AWARE_CHAT_PROMPTS = {
@@ -90,6 +91,7 @@ CHAT_JOBS_URL = f"{API_BASE_URL}/chat/jobs"
 BACKEND_JOBS_URL = f"{API_BASE_URL}/admin/jobs"
 REINDEX_JOBS_URL = f"{API_BASE_URL}/admin/reindex-jobs"
 INDEX_UPDATE_JOBS_URL = f"{API_BASE_URL}/admin/index-update-jobs"
+INDEX_SNAPSHOT_JOBS_URL = f"{API_BASE_URL}/admin/index-snapshot-jobs"
 METADATA_UPDATE_VALIDATE_URL = f"{API_BASE_URL}/admin/validate-metadata-update"
 ARCHIVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/archive-document"
 UNARCHIVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/unarchive-document"
@@ -283,6 +285,21 @@ def submit_index_update_job() -> dict:
     """Submit pending-document indexing as a durable backend job."""
     response = requests.post(
         INDEX_UPDATE_JOBS_URL,
+        json={
+            "role": st.session_state["role"],
+            "user": st.session_state["user"],
+        },
+        timeout=10,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def submit_index_snapshot_job() -> dict:
+    """Submit a saved index snapshot refresh as a durable backend job."""
+    response = requests.post(
+        INDEX_SNAPSHOT_JOBS_URL,
         json={
             "role": st.session_state["role"],
             "user": st.session_state["user"],
@@ -667,6 +684,40 @@ def poll_active_index_update_job() -> None:
 
 
 @st.fragment(run_every="2s")
+def poll_active_index_snapshot_job() -> None:
+    """Poll the active index snapshot refresh job."""
+    active_index_snapshot_job_id = st.session_state.get("active_index_snapshot_job_id")
+
+    if not active_index_snapshot_job_id:
+        return
+
+    try:
+        job = get_backend_job(active_index_snapshot_job_id)
+    except requests.exceptions.RequestException as error:
+        st.warning(f"Index snapshot job status unavailable: {error}")
+        return
+
+    if job["status"] in ["queued", "running"]:
+        st.info(job["message"])
+        return
+
+    if job["status"] == "succeeded":
+        result = job["result"]
+        st.session_state["index_snapshot_job_message"] = result.get(
+            "message",
+            job["message"],
+        )
+        st.session_state["index_snapshot_job_status"] = "success"
+
+    elif job["status"] == "failed":
+        st.session_state["index_snapshot_job_message"] = job["message"]
+        st.session_state["index_snapshot_job_status"] = "error"
+
+    st.session_state.pop("active_index_snapshot_job_id", None)
+    st.rerun()
+
+
+@st.fragment(run_every="2s")
 def poll_active_onedrive_stage_job() -> None:
     """Poll the active OneDrive staging job without blocking Streamlit navigation."""
     active_job_id = st.session_state.get("active_onedrive_stage_job_id")
@@ -775,6 +826,94 @@ def poll_active_document_lifecycle_job() -> None:
 
     st.session_state.pop("active_document_lifecycle_job_id", None)
     st.rerun()
+
+
+def render_sidebar_notice_messages(pending_index_count: int = 0) -> None:
+    """Show durable workflow results without stacking loud success banners."""
+    notice_specs = [
+        ("document_lifecycle_message", "document_lifecycle_status"),
+        ("index_snapshot_job_message", "index_snapshot_job_status"),
+        ("index_update_job_message", "index_update_job_status"),
+        ("reindex_job_message", "reindex_job_status"),
+    ]
+    active_notice_specs = [
+        (message_key, status_key)
+        for message_key, status_key in notice_specs
+        if st.session_state.get(message_key)
+    ]
+
+    if not active_notice_specs:
+        return
+
+    action_notices = []
+    in_progress_notices = []
+    activity_notices = []
+
+    for message_key, status_key in active_notice_specs:
+        message = st.session_state[message_key]
+        status = st.session_state.get(status_key, "info")
+
+        needs_index_update = (
+            "marked pending index" in message
+            or "Run Update for Pending Documents" in message
+        )
+
+        if needs_index_update and pending_index_count == 0:
+            st.session_state.pop(message_key, None)
+            st.session_state.pop(status_key, None)
+            continue
+
+        if status == "error":
+            action_notices.append(("error", message))
+        elif needs_index_update:
+            action_notices.append(("warning", message))
+        elif status == "success":
+            activity_notices.append(message)
+        else:
+            in_progress_notices.append(message)
+
+    if not action_notices and not in_progress_notices and not activity_notices:
+        return
+
+    st.markdown("### Notices")
+
+    for notice_type, message in action_notices:
+        if notice_type == "error":
+            st.error(message)
+        else:
+            st.warning(message)
+
+    for message in in_progress_notices:
+        st.info(message)
+
+    if activity_notices:
+        st.caption("Latest activity")
+        st.markdown(
+            f"""
+            <div style="
+                padding: 0.55rem 0.7rem;
+                border: 1px solid #e2e8f0;
+                border-radius: 0.5rem;
+                background: #ffffff;
+                color: #475569;
+                font-size: 0.82rem;
+                line-height: 1.45;
+            ">{escape(activity_notices[0])}</div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        if len(activity_notices) > 1:
+            with st.expander("Recent activity", expanded=False):
+                for message in activity_notices[1:]:
+                    st.caption(message)
+
+    if st.button("Clear notices", use_container_width=True, key="clear_sidebar_notices"):
+        for message_key, status_key in notice_specs:
+            st.session_state.pop(message_key, None)
+            st.session_state.pop(status_key, None)
+
+        st.rerun()
 
 
 def is_api_online() -> bool:
@@ -904,30 +1043,6 @@ def initialise_query_log_database() -> None:
                 connection.execute(
                     f"ALTER TABLE query_logs ADD COLUMN {column_name} {column_type}"
                 )
-
-
-def classify_answer_status(answer: str, sources: list[str]) -> str:
-    """Classify the result so dashboard metrics can group query outcomes."""
-    lowered_answer = answer.lower()
-
-    if "insufficient permission" in lowered_answer:
-        return "permission_block"
-    
-    not_found_phrases = [
-        "not explicitly stated",
-        "unable to find",
-        "information missing",
-        "could not find",
-        "not found",
-    ]
-
-    if any(phrase in lowered_answer for phrase in not_found_phrases):
-        return "not_found"
-
-    if not sources:
-        return "not_found"
-    
-    return "success"
 
 
 def get_status_label(status: str) -> str:
@@ -1564,12 +1679,6 @@ st.sidebar.markdown(
 
 st.sidebar.divider()
 
-poll_active_reindex_job()
-poll_active_index_update_job()
-poll_active_onedrive_stage_job()
-poll_active_onenote_stage_job()
-poll_active_document_lifecycle_job()
-
 kb_page_label = get_kb_page_label()
 
 page_options = [
@@ -1595,34 +1704,43 @@ selected_page = st.sidebar.radio(
     key="selected_navigation_page",
 )
 
+sidebar_pending_index_documents = []
+
+if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
+    sidebar_pending_index_documents = [
+        document
+        for document in load_document_metadata()
+        if can_view_document(document) and get_index_status_label(document) == "Pending Index"
+    ]
+
+st.sidebar.divider()
+
+with st.sidebar:
+    poll_active_reindex_job()
+    poll_active_index_update_job()
+    poll_active_onedrive_stage_job()
+    poll_active_onenote_stage_job()
+    poll_active_index_snapshot_job()
+    poll_active_document_lifecycle_job()
+
+    if (
+        st.session_state["role"] == SYSTEM_ADMIN_ROLE
+        and selected_page != kb_page_label
+        and sidebar_pending_index_documents
+    ):
+        st.warning(
+            f"{len(sidebar_pending_index_documents)} document(s) waiting for index update."
+        )
+
+    render_sidebar_notice_messages(
+        pending_index_count=len(sidebar_pending_index_documents)
+    )
+
 st.sidebar.divider()
 
 if st.sidebar.button("Logout", use_container_width=True):
     logout_user()
     st.rerun()
-
-
-if st.session_state["role"] == SYSTEM_ADMIN_ROLE and selected_page != kb_page_label:
-    pending_index_documents = [
-        document
-        for document in load_document_metadata()
-        if get_index_status_label(document) == "Pending Index"
-    ]
-
-    if pending_index_documents:
-        with st.container(border=True):
-            st.warning(
-                f"**Admin Action Required:** {len(pending_index_documents)} document(s) waiting for search index update."
-            )
-            
-            st.markdown("Review pending documents in **KB Management**, then run **Update for Pending Documents**.")
-
-            with st.expander("View waiting documents"):
-                for document in pending_index_documents[:3]:
-                    st.caption(f"• {document['title']} ({document['document_id']})")
-                
-                if len(pending_index_documents) > 3:
-                    st.caption(f"+ {len(pending_index_documents) - 3} more...")
 
 
 if selected_page == "Performance":
@@ -1728,15 +1846,42 @@ if selected_page == "Performance":
                 query_log_summary["unresolved_queries"],
             )
 
-    st.subheader("Search Index Update Status")
-    st.caption(
-        "Shows whether the active search index reflects approved/latest documents, "
-        "and compares full rebuild work against incremental document updates."
-    )
+    index_status_columns = st.columns([3, 1])
+
+    with index_status_columns[0]:
+        st.subheader("Search Index Update Status")
+
+    with index_status_columns[1]:
+        if st.button(
+            "Refresh",
+            use_container_width=True,
+            disabled=bool(st.session_state.get("active_index_snapshot_job_id")),
+            key="refresh_index_snapshot_button",
+            help="Refresh the saved index snapshot shown on this dashboard.",
+        ):
+            try:
+                job = submit_index_snapshot_job()
+            except requests.exceptions.HTTPError as error:
+                st.session_state["index_snapshot_job_message"] = (
+                    f"Snapshot refresh rejected by backend: {error.response.text}"
+                )
+                st.session_state["index_snapshot_job_status"] = "error"
+            except requests.exceptions.RequestException as error:
+                st.session_state["index_snapshot_job_message"] = (
+                    f"Could not submit snapshot refresh job: {error}"
+                )
+                st.session_state["index_snapshot_job_status"] = "error"
+            else:
+                st.session_state["active_index_snapshot_job_id"] = job["job_id"]
+                st.session_state["index_snapshot_job_message"] = job["message"]
+                st.session_state["index_snapshot_job_status"] = "info"
+
+            st.rerun()
 
     if index_benchmark_results:
-        after_snapshot = index_benchmark_results.get("after", index_benchmark_results)
-        benchmark_type = index_benchmark_results.get("benchmark_type", "snapshot")
+        benchmark_snapshot = index_benchmark_results
+        after_snapshot = benchmark_snapshot.get("after", benchmark_snapshot)
+        benchmark_type = benchmark_snapshot.get("benchmark_type", "snapshot")
 
         active_vectors = after_snapshot.get("indexed_chunk_count", after_snapshot.get("chroma_vector_count", 0))
         active_records = after_snapshot["active_metadata_records"]
@@ -1923,8 +2068,6 @@ if selected_page == "Performance":
             )
 
         else:
-            st.info("Latest result is an index snapshot.")
-
             metric_columns = st.columns(3)
 
             with metric_columns[0]:
@@ -2192,16 +2335,6 @@ elif selected_page in ["KB Management", "KB Status"]:
             unsafe_allow_html=True,
         )
 
-    if st.session_state.get("document_lifecycle_message"):
-        lifecycle_status = st.session_state.get("document_lifecycle_status", "info")
-
-        if lifecycle_status == "success":
-            st.success(st.session_state["document_lifecycle_message"])
-        elif lifecycle_status == "error":
-            st.error(st.session_state["document_lifecycle_message"])
-        else:
-            st.info(st.session_state["document_lifecycle_message"])
-
     active_documents = load_document_metadata()
     all_documents = load_document_metadata(include_inactive=True)
 
@@ -2238,6 +2371,15 @@ elif selected_page in ["KB Management", "KB Status"]:
         for document in visible_documents
         if get_index_status_label(document) == "Indexed"
     )
+
+    if (
+        visible_pending_index_count > 0
+        and st.session_state.get("index_update_job_status") == "success"
+        and not st.session_state.get("active_index_update_job_id")
+    ):
+        st.session_state.pop("index_update_job_message", None)
+        st.session_state.pop("index_update_job_status", None)
+
     reviewable_count = sum(
         1
         for document in pending_review_documents
@@ -2908,26 +3050,6 @@ elif selected_page in ["KB Management", "KB Status"]:
                 with st.container(border=True):
                     st.markdown("**Index Sync**")
 
-                    if st.session_state.get("index_update_job_message"):
-                        index_update_status = st.session_state.get("index_update_job_status", "info")
-
-                        if index_update_status == "success":
-                            st.success(st.session_state["index_update_job_message"])
-                        elif index_update_status == "error":
-                            st.error(st.session_state["index_update_job_message"])
-                        else:
-                            st.info(st.session_state["index_update_job_message"])
-
-                    if st.session_state.get("reindex_job_message"):
-                        reindex_status = st.session_state.get("reindex_job_status", "info")
-
-                        if reindex_status == "success":
-                            st.success(st.session_state["reindex_job_message"])
-                        elif reindex_status == "error":
-                            st.error(st.session_state["reindex_job_message"])
-                        else:
-                            st.info(st.session_state["reindex_job_message"])
-
                     st.caption("Full rebuild is long-running and reconstructs the active index from scratch.")
                     index_action_columns = st.columns(2)
 
@@ -3538,8 +3660,14 @@ elif selected_page == "Chat":
                 if message.get("sources") or message.get("context"):
                     meta_col1, meta_col2 = st.columns(2)
                     if message.get("sources"):
+                        source_label = (
+                            "Sources Checked"
+                            if message.get("status") == "not_found"
+                            else "Sources"
+                        )
+
                         with meta_col1:
-                            with st.expander("Sources"):
+                            with st.expander(source_label):
                                 for source in message["sources"]:
                                     st.code(source, language=None)
                     
