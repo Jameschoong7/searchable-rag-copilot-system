@@ -39,7 +39,12 @@ def document_matches_filters(
 ) -> bool:
     """Check whether a document matches optional user-selected search filters."""
     if department_filter and department_filter != "All":
-        if document["department"] != department_filter:
+        allowed_departments = document.get("allowed_departments", [])
+
+        if (
+            document["department"] != department_filter
+            and department_filter not in allowed_departments
+        ):
             return False
 
     if file_type_filter and file_type_filter != "All":

@@ -36,7 +36,8 @@ from src.core.constants import (
     ROLE_OPTIONS,
     SYSTEM_ADMIN_ROLE,
 )
-from src.core.answer_status import classify_answer_status
+
+from src.core.answer_status import classify_answer_status_detail
 
 
 ROLE_AWARE_CHAT_PROMPTS = {
@@ -556,16 +557,19 @@ def poll_active_chat_job() -> None:
 
     if job["status"] == "succeeded":
         result = job["result"]
-        answer_status = classify_answer_status(
+        answer_status_detail = classify_answer_status_detail(
             result["answer"],
             result["sources"],
         )
+        answer_status = answer_status_detail["status"]
 
         query_log_id = write_query_log(
             question=result["question"],
             department_filter=result.get("department_filter"),
             file_type_filter=result.get("file_type_filter"),
             status=answer_status,
+            status_reason=answer_status_detail["reason"],
+            answer_text=result["answer"],
             sources=result["sources"],
             latency_seconds=result.get("latency_seconds", 0),
         )
@@ -596,6 +600,8 @@ def poll_active_chat_job() -> None:
             department_filter=result.get("department_filter"),
             file_type_filter=result.get("file_type_filter"),
             status="api_error",
+            status_reason="Backend chat job failed",
+            answer_text=job["message"],
             sources=[],
             latency_seconds=result.get("latency_seconds", 0),
         )
@@ -1036,6 +1042,8 @@ def initialise_query_log_database() -> None:
             "feedback": "TEXT DEFAULT 'none'",
             "feedback_note": "TEXT",
             "feedback_at": "TEXT",
+            "answer_text": "TEXT",
+            "status_reason": "TEXT",
         }
 
         for column_name, column_type in feedback_columns.items():
@@ -1118,6 +1126,8 @@ def write_query_log(
         department_filter: str | None,
         file_type_filter: str | None,
         status: str,
+        status_reason: str,
+        answer_text: str,
         sources: list[str],
         latency_seconds: float,
 ) -> int:
@@ -1136,10 +1146,12 @@ def write_query_log(
                 department_filter,
                 file_type_filter,
                 status,
+                status_reason,
+                answer_text,
                 sources_json,
                 latency_seconds
             )
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 datetime.now().isoformat(timespec="seconds"),
@@ -1150,6 +1162,8 @@ def write_query_log(
                 department_filter,
                 file_type_filter,
                 status,
+                status_reason,
+                answer_text,
                 json.dumps(sources),
                 round(latency_seconds, 3),
             )
@@ -1214,6 +1228,8 @@ def read_query_log_summary() -> dict:
                 department_filter,
                 file_type_filter,
                 status,
+                status_reason,
+                answer_text,
                 sources_json,
                 latency_seconds,
                 feedback,
@@ -1886,9 +1902,11 @@ if selected_page == "Performance":
                 "Department": row[3],
                 "Question": row[4],
                 "Status": get_status_label(row[7]),
-                "Sources / Checked": format_logged_sources(row[7], row[8]),
-                "Latency (s)": row[9],
-                "Feedback": row[10] or "none",
+                "Reason": row[8] or "",
+                "Answer Preview": (row[9] or "")[:180],
+                "Sources / Checked": format_logged_sources(row[7], row[10]),
+                "Latency (s)": row[11],
+                "Feedback": row[12] or "none",
             }
             for row in query_log_summary["recent_outcome_rows"]
         ]
@@ -3689,7 +3707,6 @@ elif selected_page == "Chat":
 
                 st.write(message["content"])
 
-                # Wrap sources and context into columns and expanders to declutter the chat flow
                 if message.get("sources") or message.get("context"):
                     meta_col1, meta_col2 = st.columns(2)
                     if message.get("sources"):
