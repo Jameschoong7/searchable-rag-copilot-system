@@ -101,6 +101,7 @@ QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
 ONEDRIVE_FILES_URL = f"{API_BASE_URL}/admin/graph/onedrive/files"
 ONEDRIVE_STAGE_FILE_URL = f"{API_BASE_URL}/admin/graph/onedrive/stage-file"
 ONEDRIVE_STAGE_FILES_JOB_URL = f"{API_BASE_URL}/admin/graph/onedrive/stage-files-job"
+ONENOTE_PAGES_URL = f"{API_BASE_URL}/admin/graph/onenote/pages"
 EVALUATION_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/retrieval_eval_results.json"
 INDEX_BENCHMARK_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_results.json"
 INDEX_BENCHMARK_HISTORY_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_history.json"
@@ -202,6 +203,20 @@ def submit_onedrive_stage_job(file_items: list[dict]) -> dict:
             ],
         },
         timeout=10,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_onenote_page_scan() -> dict:
+    """Ask FastAPI to list pages under the configured OneNote notebook scope."""
+    response = requests.post(
+        ONENOTE_PAGES_URL,
+        json={
+            "role": st.session_state["role"],
+        },
+        timeout=60,
     )
 
     response.raise_for_status()
@@ -2096,12 +2111,13 @@ elif selected_page in ["KB Management", "KB Status"]:
     
     if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
         if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-            upload_tab, onedrive_tab, review_tab, index_tab = st.tabs(
-                ["Upload", "OneDrive", "Review Queue", "Index Sync"]
+            upload_tab, onedrive_tab, onenote_tab, review_tab, index_tab = st.tabs(
+                ["Upload", "OneDrive", "OneNote", "Review Queue", "Index Sync"]
             )
         else:
             upload_tab, review_tab = st.tabs(["Upload", "Review Queue"])
             onedrive_tab = None
+            onenote_tab = None
             index_tab = None
 
         with upload_tab:
@@ -2451,7 +2467,42 @@ elif selected_page in ["KB Management", "KB Status"]:
                                 hide_index=True,
                                 height=220,
                             )
+            with onenote_tab:
+                if st.button(
+                    "Scan OneNote Notebook",
+                    use_container_width=True,
+                    key="scan_onenote_pages_button",
+                ):
+                    try:
+                        scan_result = request_onenote_page_scan()
+                    except requests.exceptions.HTTPError as error:
+                        st.error(f"OneNote scan rejected by backend: {error.response.text}")
+                    except requests.exceptions.RequestException as error:
+                        st.error(f"Could not scan OneNote connector: {error}")
+                    else:
+                        st.session_state["onenote_pages"] = scan_result["pages"]
+                        st.success(f"Found {len(scan_result['pages'])} page(s).")
 
+                onenote_pages = st.session_state.get("onenote_pages", [])
+
+                if onenote_pages:
+                    st.dataframe(
+                        [
+                            {
+                                "Title": page["title"] or "Untitled Page",
+                                "Notebook": page["notebook_name"],
+                                "Section": page["section_name"],
+                                "Path": page["connector_path"],
+                                "Modified": page.get("last_modified_datetime"),
+                            }
+                            for page in onenote_pages
+                        ],
+                        use_container_width=True,
+                        hide_index=True,
+                        height=260,
+                    )
+                else:
+                    st.caption("No OneNote pages loaded from the configured notebook scope.")
 
         with review_tab:
             st.markdown('<div class="compact-section-title">Review Queue</div>', unsafe_allow_html=True)
