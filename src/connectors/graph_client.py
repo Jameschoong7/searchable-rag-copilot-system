@@ -2,6 +2,7 @@ import requests
 
 from src.connectors.graph_auth import get_graph_access_token
 from src.core.config import read_app_config
+from urllib.parse import quote
 
 
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
@@ -123,3 +124,67 @@ def list_onedrive_files_recursive(folder_path: str | None = None) -> list[dict]:
             discovered_files.append(file_item)
 
     return discovered_files
+
+
+def graph_path_id(item_id: str) -> str:
+    """URL-encode a Graph item ID before placing it into a path."""
+    return quote(item_id, safe="")
+
+
+def list_onenote_notebooks() -> list[dict]:
+    """List OneNote notebooks for the signed-in Graph user."""
+    result = graph_get("/me/onenote/notebooks")
+    return result.get("value", [])
+
+
+def list_onenote_notebook_sections(notebook_id: str) -> list[dict]:
+    """List sections inside one OneNote notebook."""
+    encoded_notebook_id = graph_path_id(notebook_id)
+    result = graph_get(f"/me/onenote/notebooks/{encoded_notebook_id}/sections")
+    return result.get("value", [])
+
+
+def list_onenote_section_pages(section_id: str) -> list[dict]:
+    """List pages inside one OneNote section."""
+    encoded_section_id = graph_path_id(section_id)
+    result = graph_get(f"/me/onenote/sections/{encoded_section_id}/pages")
+    return result.get("value", [])
+
+
+def build_onenote_connector_path(
+    notebook_name: str,
+    section_name: str,
+    page_title: str,
+) -> str:
+    """Build a readable connector path for a OneNote page."""
+    return f"/OneNote/{notebook_name}/{section_name}/{page_title}"
+
+
+def list_onenote_pages_recursive() -> list[dict]:
+    """List OneNote pages with notebook and section context."""
+    app_config = read_app_config()
+    notebook_filter = app_config.graph_onenote_notebook_filter
+    discovered_pages = []
+
+    for notebook in list_onenote_notebooks():
+        notebook_name = notebook.get("displayName", "Untitled Notebook")
+
+        if notebook_filter and notebook_name.lower() != notebook_filter.lower():
+            continue
+
+        for section in list_onenote_notebook_sections(notebook["id"]):
+            section_name = section.get("displayName", "Untitled Section")
+
+            for page in list_onenote_section_pages(section["id"]):
+                page_title = page.get("title", "Untitled Page")
+                page_item = page.copy()
+                page_item["notebook_name"] = notebook_name
+                page_item["section_name"] = section_name
+                page_item["connector_path"] = build_onenote_connector_path(
+                    notebook_name=notebook_name,
+                    section_name=section_name,
+                    page_title=page_title,
+                )
+                discovered_pages.append(page_item)
+
+    return discovered_pages

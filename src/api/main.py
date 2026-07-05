@@ -164,6 +164,24 @@ class StageOneDriveFilesJobRequest(BaseModel):
     files: list[OneDriveStageFileItem]
 
 
+class OneNotePageSummary(BaseModel):
+    """Represent one OneNote page discovered through Microsoft Graph."""
+
+    id: str
+    title: str
+    notebook_name: str
+    section_name: str
+    connector_path: str
+    last_modified_datetime: str | None = None
+
+
+class OneNotePagesResponse(BaseModel):
+    """Represent OneNote pages discovered through Microsoft Graph."""
+
+    status: str
+    pages: list[OneNotePageSummary]
+
+
 class ReindexRequest(BaseModel):
     """Represent an admin reindex request from a frontend client."""
 
@@ -1587,6 +1605,46 @@ def list_graph_onedrive_files(
         )
 
     return OneDriveFilesResponse(status="success", files=files)
+
+
+@app.post("/admin/graph/onenote/pages", response_model=OneNotePagesResponse)
+def list_graph_onenote_pages(
+    request: GraphConnectorListRequest,
+) -> OneNotePagesResponse:
+    """List OneNote pages available to the signed-in Graph user."""
+    if request.role != SYSTEM_ADMIN_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="Only System Admin can scan OneNote connector pages.",
+        )
+
+    try:
+        from src.connectors.graph_client import list_onenote_pages_recursive
+
+        discovered_pages = list_onenote_pages_recursive()
+
+    except RuntimeError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(
+            status_code=502,
+            detail=f"OneNote scan failed: {error}",
+        ) from error
+
+    pages = [
+        OneNotePageSummary(
+            id=page["id"],
+            title=page.get("title", "Untitled Page"),
+            notebook_name=page.get("notebook_name", "Untitled Notebook"),
+            section_name=page.get("section_name", "Untitled Section"),
+            connector_path=page["connector_path"],
+            last_modified_datetime=page.get("lastModifiedDateTime"),
+        )
+        for page in discovered_pages
+    ]
+
+    return OneNotePagesResponse(status="success", pages=pages)
+
 
 @app.post("/admin/graph/onedrive/stage-file", response_model=StageOneDriveFileResponse)
 def stage_onedrive_file(

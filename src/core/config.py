@@ -47,6 +47,7 @@ class AppConfig:
     graph_connector_enabled: bool
     graph_access_token: str | None
     graph_onedrive_root_path: str
+    graph_onenote_notebook_filter: str | None
     sharepoint_mode: str
     top_k: int
     minimum_relevance_threshold: float
@@ -110,6 +111,7 @@ def read_app_config() -> AppConfig:
             "GRAPH_ONEDRIVE_ROOT_PATH",
             "/Enterprise Knowledge Base",
         ),
+        graph_onenote_notebook_filter=os.getenv("GRAPH_ONENOTE_NOTEBOOK_FILTER"),
         sharepoint_mode=read_config_value(
             "SHAREPOINT_MODE",
             SIMULATED_SHAREPOINT_MODE,
@@ -180,6 +182,7 @@ def read_app_config_with_pending() -> AppConfig:
             "GRAPH_ONEDRIVE_ROOT_PATH",
             "/Enterprise Knowledge Base",
         ),
+        graph_onenote_notebook_filter=os.getenv("GRAPH_ONENOTE_NOTEBOOK_FILTER"),
         sharepoint_mode=read_config_value(
             "SHAREPOINT_MODE",
             SIMULATED_SHAREPOINT_MODE,
