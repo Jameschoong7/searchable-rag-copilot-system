@@ -38,6 +38,7 @@ from src.core.constants import (
 )
 
 from src.core.answer_status import classify_answer_status_detail
+from src.core.user_repository import authenticate_user
 
 
 ROLE_AWARE_CHAT_PROMPTS = {
@@ -58,24 +59,6 @@ ROLE_AWARE_CHAT_PROMPTS = {
         "Expense Claims": "How do I submit an expense claim?",
         "Security Incident": "What is the security incident reporting procedure?",
         "Onboarding": "What is the employee onboarding process?",
-    },
-}
-
-DEMO_ACCOUNTS = {
-    "admin_jc": {
-        "password": "password123",
-        "role": SYSTEM_ADMIN_ROLE,
-        "department": "IT",
-    },
-    "pm_engineering": {
-        "password": "password123",
-        "role": PROJECT_MANAGER_ROLE,
-        "department": "Engineering",
-    },
-    "employee_hr": {
-        "password": "password123",
-        "role": GENERAL_EMPLOYEE_ROLE,
-        "department": "HR",
     },
 }
 
@@ -1120,25 +1103,25 @@ def submit_chat_question() -> None:
 
 
 def is_logged_in() -> bool:
-    """Check whether the current Streamlit session has an authenticated demo user."""
+    """Check whether the current Streamlit session has an authenticated user."""
     return "user" in st.session_state
 
 
 def login_user(username: str, password: str) -> bool:
-    """Validate a demo account and store role/department in the session."""
-    account = DEMO_ACCOUNTS.get(username)
+    """Validate a SQLite-backed user and store role/department in the session."""
+    account = authenticate_user(username, password)
 
-    if account is None or account["password"] != password:
+    if account is None:
         return False
 
-    st.session_state["user"] = username
+    st.session_state["user"] = account["username"]
     st.session_state["role"] = account["role"]
     st.session_state["department"] = account["department"]
     return True
 
 
 def logout_user() -> None:
-    """Clear demo authentication state from the current Streamlit session."""
+    """Clear authentication state from the current Streamlit session."""
     st.session_state.clear()
 
 
@@ -1763,7 +1746,7 @@ st.set_page_config(
 
 if not is_logged_in():
     st.title("Searchable RAG Copilot")
-    st.caption("Sign in to the standalone Admin Web Portal.")
+    st.caption("Use an assigned portal account. Registration is disabled.")
     
     with st.container(border=True):
         username = st.text_input("Username", value="admin_jc")
