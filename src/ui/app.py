@@ -107,6 +107,7 @@ QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
 ONEDRIVE_FILES_URL = f"{API_BASE_URL}/admin/graph/onedrive/files"
 ONEDRIVE_STAGE_FILE_URL = f"{API_BASE_URL}/admin/graph/onedrive/stage-file"
 ONEDRIVE_STAGE_FILES_JOB_URL = f"{API_BASE_URL}/admin/graph/onedrive/stage-files-job"
+ONEDRIVE_REFRESH_FILE_URL = f"{API_BASE_URL}/admin/graph/onedrive/refresh-file"
 ONENOTE_PAGES_URL = f"{API_BASE_URL}/admin/graph/onenote/pages"
 ONENOTE_STAGE_PAGES_JOB_URL = f"{API_BASE_URL}/admin/graph/onenote/stage-pages-job"
 EVALUATION_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/retrieval_eval_results.json"
@@ -210,6 +211,25 @@ def submit_onedrive_stage_job(file_items: list[dict]) -> dict:
             ],
         },
         timeout=10,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_onedrive_file_refresh(file_item: dict) -> dict:
+    """Ask FastAPI to refresh one already-ingested OneDrive source file."""
+    response = requests.post(
+        ONEDRIVE_REFRESH_FILE_URL,
+        json={
+            "role": st.session_state["role"],
+            "user": st.session_state["user"],
+            "user_department": st.session_state["department"],
+            "item_id": file_item["id"],
+            "name": file_item["name"],
+            "connector_path": file_item["connector_path"],
+        },
+        timeout=120,
     )
 
     response.raise_for_status()
@@ -2820,6 +2840,49 @@ elif selected_page in ["KB Management", "KB Status"]:
                                 hide_index=True,
                                 height=220,
                             )
+                        
+                    refreshable_file_options = {
+                        label: file_item
+                        for label, file_item in file_options.items()
+                        if file_item.get("connector_state") in ["Pending Index", "Indexed"]
+                    }
+
+                    if refreshable_file_options:
+                        st.divider()
+                        st.markdown("**Refresh Existing OneDrive Document**")
+                        st.caption(
+                            "Checks the selected Graph file against the active KB version. "
+                            "If content changed, a new version is created and marked pending index."
+                        )
+
+                        selected_refresh_label = st.selectbox(
+                            "Select OneDrive file to refresh",
+                            list(refreshable_file_options.keys()),
+                            key="selected_onedrive_file_to_refresh",
+                        )
+
+                        if st.button(
+                            "Refresh Selected OneDrive File",
+                            use_container_width=True,
+                            key="refresh_selected_onedrive_file_button",
+                        ):
+                            try:
+                                with st.spinner("Checking OneDrive content and version history..."):
+                                    refresh_result = request_onedrive_file_refresh(
+                                        refreshable_file_options[selected_refresh_label]
+                                    )
+                            except requests.exceptions.HTTPError as error:
+                                st.error(f"OneDrive refresh rejected by backend: {error.response.text}")
+                            except requests.exceptions.RequestException as error:
+                                st.error(f"Could not refresh OneDrive file: {error}")
+                            else:
+                                if refresh_result["status"] == "updated":
+                                    st.success(refresh_result["message"])
+                                elif refresh_result["status"] == "no_change":
+                                    st.info(refresh_result["message"])
+                                else:
+                                    st.warning(refresh_result["message"])
+
             with onenote_tab:
                 if st.button(
                     "Scan OneNote Notebook",

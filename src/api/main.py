@@ -1900,18 +1900,20 @@ def approve_pending_document(
     )
 
 
-def get_onedrive_connector_state(item_id: str, documents: list[dict]) -> dict:
-    """Return current review/index state for a discovered OneDrive file."""
+def get_onenote_connector_state(page_id: str, documents: list[dict]) -> dict:
+    """Return current review/index state for a discovered OneNote page."""
     from src.connectors.graph_connector import build_graph_document_id
 
-    base_document_id = build_graph_document_id("GRAPH-OD", item_id)
+    base_document_id = build_graph_document_id("GRAPH-ON", page_id)
 
     matching_documents = [
         document
         for document in documents
         if (
             document["document_id"] == base_document_id
+            or document.get("source_document_id") == base_document_id
             or document["document_id"].startswith(f"{base_document_id}-R")
+            or document["document_id"].startswith(f"{base_document_id}-V")
         )
     ]
 
@@ -1921,7 +1923,17 @@ def get_onedrive_connector_state(item_id: str, documents: list[dict]) -> dict:
             "staged_document_id": None,
         }
 
-    latest_document = matching_documents[-1]
+    active_matches = [
+        document
+        for document in matching_documents
+        if document.get("is_active") == 1
+    ]
+
+    latest_document = sorted(
+        active_matches or matching_documents,
+        key=lambda document: document.get("version_number") or 1,
+    )[-1]
+
     chunk_id = latest_document.get("chunk_id")
 
     state_by_chunk_id = {
@@ -1966,18 +1978,20 @@ def find_active_graph_document(
     )[-1]
 
 
-def get_onenote_connector_state(page_id: str, documents: list[dict]) -> dict:
-    """Return current review/index state for a discovered OneNote page."""
+def get_onedrive_connector_state(item_id: str, documents: list[dict]) -> dict:
+    """Return current review/index state for a discovered OneDrive file."""
     from src.connectors.graph_connector import build_graph_document_id
 
-    base_document_id = build_graph_document_id("GRAPH-ON", page_id)
+    base_document_id = build_graph_document_id("GRAPH-OD", item_id)
 
     matching_documents = [
         document
         for document in documents
         if (
             document["document_id"] == base_document_id
+            or document.get("source_document_id") == base_document_id
             or document["document_id"].startswith(f"{base_document_id}-R")
+            or document["document_id"].startswith(f"{base_document_id}-V")
         )
     ]
 
@@ -1987,7 +2001,17 @@ def get_onenote_connector_state(page_id: str, documents: list[dict]) -> dict:
             "staged_document_id": None,
         }
 
-    latest_document = matching_documents[-1]
+    active_matches = [
+        document
+        for document in matching_documents
+        if document.get("is_active") == 1
+    ]
+
+    latest_document = sorted(
+        active_matches or matching_documents,
+        key=lambda document: document.get("version_number") or 1,
+    )[-1]
+
     chunk_id = latest_document.get("chunk_id")
 
     state_by_chunk_id = {
