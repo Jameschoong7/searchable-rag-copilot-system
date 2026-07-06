@@ -627,6 +627,18 @@ def get_backend_job(job_id: str) -> dict:
     return response.json()
 
 
+def get_latest_backend_job(job_type: str) -> dict | None:
+    """Load the latest backend job of one type for dashboard evidence."""
+    response = requests.get(
+        f"{BACKEND_JOBS_URL}/latest",
+        params={"job_type": job_type},
+        timeout=10,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
 @st.fragment(run_every="2s")
 def poll_active_chat_job() -> None:
     """Poll the active chat job without rerunning the whole Streamlit app aggressively."""
@@ -1168,6 +1180,43 @@ def load_index_benchmark_history() -> list[dict]:
 
     with INDEX_BENCHMARK_HISTORY_PATH.open("r", encoding="utf-8") as history_file:
         return json.load(history_file)
+
+
+def summarize_connector_refresh_job(job: dict | None, connector_label: str) -> dict:
+    """Return compact measured counts from the latest connector refresh job."""
+    if not job:
+        return {
+            "Connector": connector_label,
+            "Checked": 0,
+            "Updated": 0,
+            "Unchanged": 0,
+            "Rejected / Error": 0,
+            "Status": "No job",
+            "Updated At": "-",
+        }
+
+    result = job.get("result") or {}
+    result_rows = result.get("results", [])
+    rejected_or_error_count = sum(
+        1
+        for row in result_rows
+        if row.get("Status") in ["Rejected", "Error"]
+    )
+
+    return {
+        "Connector": connector_label,
+        "Checked": result.get("total_count", len(result_rows)),
+        "Updated": result.get("updated_count", 0),
+        "Unchanged": result.get("unchanged_count", 0),
+        "Rejected / Error": rejected_or_error_count,
+        "Status": job.get("status", "unknown").title(),
+        "Updated At": job.get("updated_at", "-"),
+    }
+
+
+def is_connector_document(document: dict) -> bool:
+    """Check whether a metadata row came from a live Graph connector."""
+    return document.get("source") in ["onedrive", "onenote"]
 
 
 def initialise_query_log_database() -> None:
@@ -1955,6 +2004,7 @@ if selected_page == "Performance":
     )
 
     documents = load_document_metadata()
+    all_documents = load_document_metadata(include_inactive=True)
     indexed_document_count = len(documents)
     query_log_summary = read_query_log_summary()
     evaluation_results = load_retrieval_evaluation_results()
@@ -1967,6 +2017,17 @@ if selected_page == "Performance":
         ),
         None,
     )
+    connector_evidence_error = None
+    latest_onedrive_refresh_job = None
+    latest_onenote_refresh_job = None
+    latest_index_update_job = None
+
+    try:
+        latest_onedrive_refresh_job = get_latest_backend_job("onedrive_refresh")
+        latest_onenote_refresh_job = get_latest_backend_job("onenote_refresh")
+        latest_index_update_job = get_latest_backend_job("index_update")
+    except requests.exceptions.RequestException as error:
+        connector_evidence_error = str(error)
 
     if evaluation_results:
         evaluation_summary = evaluation_results["summary"]["overall"]
@@ -2081,6 +2142,130 @@ if selected_page == "Performance":
             )
         else:
             st.info("No logged chat outcomes yet. Submit a Chat query to populate this table.")
+
+    with st.container(border=True):
+        st.subheader("Document Update Evidence")
+
+        connector_active_documents = [
+            document
+            for document in documents
+            if is_connector_document(document)
+        ]
+        connector_pending_index_documents = [
+            document
+            for document in connector_active_documents
+            if document.get("chunk_id") in ["pending", "pending_index"]
+        ]
+        connector_archived_versions = [
+            document
+            for document in all_documents
+            if (
+                is_connector_document(document)
+                and document.get("is_active") == 0
+                and document.get("chunk_id") == "archived"
+                and document.get("replaced_by_document_id")
+            )
+        ]
+        connector_refresh_rows = [
+            summarize_connector_refresh_job(
+                latest_onedrive_refresh_job,
+                "OneDrive",
+            ),
+            summarize_connector_refresh_job(
+                latest_onenote_refresh_job,
+                "OneNote",
+            ),
+        ]
+        total_checked = sum(row["Checked"] for row in connector_refresh_rows)
+        total_updated = sum(row["Updated"] for row in connector_refresh_rows)
+        total_unchanged = sum(row["Unchanged"] for row in connector_refresh_rows)
+        total_rejected_or_error = sum(row["Rejected / Error"] for row in connector_refresh_rows)
+        latest_index_result = (
+            latest_index_update_job.get("result", {})
+            if latest_index_update_job
+            else {}
+        )
+        latest_chunks_indexed = latest_index_result.get("total_chunks_indexed", 0)
+        latest_deleted_vectors = latest_index_result.get("total_deleted_vectors", 0)
+        latest_index_status = (
+            latest_index_update_job.get("status", "No job").title()
+            if latest_index_update_job
+            else "No job"
+        )
+
+        update_metric_columns = st.columns(4)
+
+        with update_metric_columns[0]:
+            render_status_card("Sources Checked", total_checked)
+
+        with update_metric_columns[1]:
+            render_status_card(
+                "Changed",
+                total_updated,
+                "attention" if total_updated else "neutral",
+            )
+
+        with update_metric_columns[2]:
+            render_status_card(
+                "Unchanged",
+                total_unchanged,
+                "success" if total_unchanged else "neutral",
+            )
+
+        with update_metric_columns[3]:
+            render_status_card(
+                "Pending Index",
+                len(connector_pending_index_documents),
+                "attention" if connector_pending_index_documents else "success",
+            )
+
+        if connector_evidence_error:
+            st.warning(
+                f"Could not load latest connector job evidence from backend: {connector_evidence_error}"
+            )
+
+        st.dataframe(
+            connector_refresh_rows,
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        evidence_detail_columns = st.columns(3)
+
+        with evidence_detail_columns[0]:
+            st.metric(
+                "Old Versions Archived",
+                len(connector_archived_versions),
+                "Connector replacements",
+            )
+
+        with evidence_detail_columns[1]:
+            st.metric(
+                "Latest Chunks Updated",
+                latest_chunks_indexed,
+                f"{latest_deleted_vectors} old vectors removed",
+            )
+
+        with evidence_detail_columns[2]:
+            st.metric(
+                "Latest Index Job",
+                latest_index_status,
+                latest_index_update_job["updated_at"] if latest_index_update_job else "-",
+            )
+
+        if total_rejected_or_error:
+            st.warning(
+                f"{total_rejected_or_error} connector refresh item(s) were rejected or errored in the latest jobs."
+            )
+        elif total_checked:
+            st.caption(
+                "Refresh checks compare the latest Graph content hash against SQLite metadata. "
+                "Changed sources create new pending versions; unchanged sources are skipped."
+            )
+        else:
+            st.caption(
+                "Run a OneDrive or OneNote refresh job to populate measured update evidence."
+            )
 
     index_status_columns = st.columns([3, 1])
 
