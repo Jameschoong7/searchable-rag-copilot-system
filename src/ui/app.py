@@ -1676,6 +1676,13 @@ def render_status_card(label: str, value: int | str, tone: str = "neutral") -> N
             "value": "#14532d",
             "bar": "#22c55e",
         },
+        "info": {
+            "background": "#eff6ff",
+            "border": "#93c5fd",
+            "label": "#1d4ed8",
+            "value": "#1e3a8a",
+            "bar": "#3b82f6",
+        },
     }
     selected_tone = tones.get(tone, tones["neutral"])
 
@@ -1859,6 +1866,10 @@ st.markdown(
         overflow: hidden;
     }}
 
+    div[data-testid="stExpander"] {{
+        margin-top: 0.8rem;
+    }}
+
     .stButton > button {{
         border-radius: 7px;
         border-color: #98a2b3;
@@ -1980,6 +1991,66 @@ st.markdown(
             transform: translateY(-3px);
         }}
     }}
+
+    * {{
+        box-sizing: border-box;
+    }}
+
+    div[data-testid="column"] {{
+        min-width: 0;
+    }}
+
+    div[data-testid="stDataFrame"] {{
+        max-width: 100%;
+        overflow-x: auto;
+    }}
+
+    @media (max-width: 980px) {{
+        .block-container {{
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+            max-width: 100%;
+        }}
+
+        div[data-testid="column"] {{
+            flex: 1 1 100% !important;
+            width: 100% !important;
+        }}
+
+        .status-pill {{
+            width: 100%;
+            justify-content: center;
+            margin-top: 0.35rem;
+        }}
+
+        .stButton > button,
+        .stFormSubmitButton > button {{
+            min-height: 2.45rem;
+            white-space: normal;
+        }}
+    }}
+
+    @media (max-width: 640px) {{
+        .block-container {{
+            padding-top: 0.45rem;
+        }}
+
+        h1 {{
+            font-size: 1.55rem !important;
+        }}
+
+        h2, h3 {{
+            font-size: 1.12rem !important;
+        }}
+
+        div[data-testid="stMetric"] {{
+            padding: 10px;
+        }}
+
+        div[data-testid="stDataFrame"] {{
+            font-size: 0.82rem;
+        }}
+    }}
     </style>
     <div style="
         display: flex;
@@ -2062,6 +2133,22 @@ selected_page = st.sidebar.radio(
     page_options,
     key="selected_navigation_page",
 )
+
+previous_selected_page = st.session_state.get("previous_selected_navigation_page")
+
+if previous_selected_page != selected_page:
+    st.session_state["previous_selected_navigation_page"] = selected_page
+
+    for transient_key in [
+        "selected_onedrive_files_to_stage",
+        "selected_onedrive_files_to_refresh",
+        "selected_onedrive_file_to_refresh",
+        "selected_onenote_pages_to_stage",
+        "selected_onenote_pages_to_refresh",
+        "selected_onenote_page_to_refresh",
+        "selected_connector_review_document",
+    ]:
+        st.session_state.pop(transient_key, None)
 
 sidebar_pending_index_documents = []
 
@@ -2217,7 +2304,7 @@ if selected_page == "Performance":
             render_status_card(
                 "Permission Blocks",
                 query_log_summary["permission_blocks"],
-                "attention" if query_log_summary["permission_blocks"] else "neutral",
+                "info" if query_log_summary["permission_blocks"] else "neutral",
             )
 
         with live_metric_columns[3]:
@@ -2299,7 +2386,7 @@ if selected_page == "Performance":
             render_status_card(
                 "Unchanged",
                 total_unchanged,
-                "success" if total_unchanged else "neutral",
+                "neutral",
             )
 
         with update_metric_columns[3]:
@@ -2346,298 +2433,299 @@ if selected_page == "Performance":
                 "Run a OneDrive or OneNote refresh job to populate measured update evidence."
             )
 
-    index_status_columns = st.columns([3, 1])
+    with st.container(border=True):
+        index_status_columns = st.columns([3, 1])
 
-    with index_status_columns[0]:
-        st.subheader("Search Index Update Status")
+        with index_status_columns[0]:
+            st.subheader("Search Index Update Status")
 
-    with index_status_columns[1]:
-        if st.button(
-            "Refresh",
-            use_container_width=True,
-            disabled=bool(st.session_state.get("active_index_snapshot_job_id")),
-            key="refresh_index_snapshot_button",
-            help="Refresh the saved index snapshot shown on this dashboard.",
-        ):
-            try:
-                job = submit_index_snapshot_job()
-            except requests.exceptions.HTTPError as error:
-                st.session_state["index_snapshot_job_message"] = (
-                    f"Snapshot refresh rejected by backend: {error.response.text}"
-                )
-                st.session_state["index_snapshot_job_status"] = "error"
-            except requests.exceptions.RequestException as error:
-                st.session_state["index_snapshot_job_message"] = (
-                    f"Could not submit snapshot refresh job: {error}"
-                )
-                st.session_state["index_snapshot_job_status"] = "error"
-            else:
-                st.session_state["active_index_snapshot_job_id"] = job["job_id"]
-                st.session_state["index_snapshot_job_message"] = job["message"]
-                st.session_state["index_snapshot_job_status"] = "info"
-
-            st.rerun()
-
-    if index_benchmark_results:
-        benchmark_snapshot = index_benchmark_results
-        after_snapshot = benchmark_snapshot.get("after", benchmark_snapshot)
-        benchmark_type = benchmark_snapshot.get("benchmark_type", "snapshot")
-
-        active_vectors = after_snapshot.get("indexed_chunk_count", after_snapshot.get("chroma_vector_count", 0))
-        active_records = after_snapshot["active_metadata_records"]
-        physical_files = after_snapshot["simulated_source_files"]
-        db_size_mb = after_snapshot.get("index_size_mb", after_snapshot.get("chroma_db_size_mb"))
-        vector_backend = after_snapshot.get("vector_backend", "chroma")
-        archived_file_count = max(physical_files - active_records, 0)
-
-        if benchmark_type == "batch_incremental_update":
-            changed_document_count = index_benchmark_results["changed_document_count"]
-            chunks_refreshed = index_benchmark_results["total_chunks_indexed"]
-            deleted_vectors = index_benchmark_results["total_deleted_vectors"]
-            avoided_chunks = index_benchmark_results["estimated_unchanged_chunks_avoided"]
-            elapsed_seconds = index_benchmark_results["elapsed_seconds"]
-            before_snapshot = index_benchmark_results["before"]
-            before_active_vectors = before_snapshot.get(
-                "indexed_chunk_count",
-                before_snapshot.get("chroma_vector_count", 0),
-            )
-
-            document_label = (
-                "document"
-                if changed_document_count == 1
-                else "documents"
-            )
-
-            st.success(
-                f"Latest index update processed {changed_document_count} changed "
-                f"{document_label} in {elapsed_seconds}s. {chunks_refreshed} chunks were "
-                f"re-indexed and {avoided_chunks} unchanged chunks were skipped."
-            )
-
-            metric_columns = st.columns(4)
-
-            with metric_columns[0]:
-                st.metric(
-                    "Changed Documents",
-                    changed_document_count,
-                    "Latest update run",
-                )
-
-            with metric_columns[1]:
-                st.metric(
-                    "Chunks Re-indexed",
-                    chunks_refreshed,
-                    f"{avoided_chunks} unchanged avoided",
-                )
-
-            with metric_columns[2]:
-                st.metric(
-                    "Old Vectors Removed",
-                    deleted_vectors,
-                    "Removed before re-index",
-                )
-
-            with metric_columns[3]:
-                active_index_delta = (
-                "Portal only"
-                if db_size_mb is None
-                else f"{db_size_mb} MB"
-            )
-
-                st.metric(
-                    "Active Index",
-                    f"{active_vectors} vectors",
-                    active_index_delta,
-                )
-
-            avoided_percent = (
-                avoided_chunks / before_active_vectors * 100
-                if before_active_vectors
-                else 0
-            )
-            refreshed_percent = (
-                chunks_refreshed / before_active_vectors
-                if before_active_vectors
-                else 0
-            )
-            if latest_full_rebuild_result:
-                full_rebuild_baseline_seconds = latest_full_rebuild_result["elapsed_seconds"]
-                full_rebuild_baseline_chunks = latest_full_rebuild_result["rebuild_result"]["chunks_indexed"]
-                time_difference_seconds = round(
-                    full_rebuild_baseline_seconds - elapsed_seconds,
-                    3,
-                )
-            else:
-                full_rebuild_baseline_seconds = None
-                full_rebuild_baseline_chunks = None
-                time_difference_seconds = None
-
-            with st.expander("Update Efficiency Details", expanded=False):
-                efficiency_columns = st.columns(2)
-
-                with efficiency_columns[0]:
-                    st.metric(
-                        "Work Avoided",
-                        f"{avoided_percent:.1f}%",
-                        f"{avoided_chunks} chunks skipped",
+        with index_status_columns[1]:
+            if st.button(
+                "Refresh",
+                use_container_width=True,
+                disabled=bool(st.session_state.get("active_index_snapshot_job_id")),
+                key="refresh_index_snapshot_button",
+                help="Refresh the saved index snapshot shown on this dashboard.",
+            ):
+                try:
+                    job = submit_index_snapshot_job()
+                except requests.exceptions.HTTPError as error:
+                    st.session_state["index_snapshot_job_message"] = (
+                        f"Snapshot refresh rejected by backend: {error.response.text}"
                     )
-
-                with efficiency_columns[1]:
-                    if time_difference_seconds is None:
-                        st.metric(
-                            "Runtime Difference",
-                            "No baseline",
-                            "Run full rebuild first",
-                        )
-                    elif time_difference_seconds >= 0:
-                        st.metric(
-                            "Runtime Difference",
-                            f"{time_difference_seconds}s faster",
-                            f"vs {full_rebuild_baseline_seconds}s full rebuild",
-                        )
-                    else:
-                        st.metric(
-                            "Runtime Difference",
-                            f"{abs(time_difference_seconds)}s slower",
-                            f"vs {full_rebuild_baseline_seconds}s full rebuild",
-                        )
-                st.progress(refreshed_percent)
-
-                st.caption(
-                    f"Incremental update avoided re-embedding {avoided_chunks} of "
-                    f"{before_active_vectors} previous active chunks. "
-                    f"{chunks_refreshed} new chunks were embedded for the changed document(s)."
-                )
-                if latest_full_rebuild_result:
-                    st.dataframe(
-                        [
-                            {
-                                "Method": "Full Active Rebuild",
-                                "Scope": "All active documents",
-                                "Chunks Processed": full_rebuild_baseline_chunks,
-                                "Elapsed Time": f"{full_rebuild_baseline_seconds}s",
-                                "Use Case": "Clean full index reconstruction",
-                            },
-                            {
-                                "Method": "Incremental Update",
-                                "Scope": f"{changed_document_count} changed {document_label}",
-                                "Chunks Processed": chunks_refreshed,
-                                "Elapsed Time": f"{elapsed_seconds}s",
-                                "Use Case": "Normal document update/sync",
-                            },
-                        ],
-                        use_container_width=True,
-                        hide_index=True,
+                    st.session_state["index_snapshot_job_status"] = "error"
+                except requests.exceptions.RequestException as error:
+                    st.session_state["index_snapshot_job_message"] = (
+                        f"Could not submit snapshot refresh job: {error}"
                     )
+                    st.session_state["index_snapshot_job_status"] = "error"
                 else:
-                    st.info(
-                        "Run a full rebuild benchmark first to compare incremental update "
-                        "against a measured rebuild baseline."
-                    )
-        elif benchmark_type == "full_rebuild":
-            elapsed_seconds = index_benchmark_results["elapsed_seconds"]
-            chunks_indexed = index_benchmark_results["rebuild_result"]["chunks_indexed"]
+                    st.session_state["active_index_snapshot_job_id"] = job["job_id"]
+                    st.session_state["index_snapshot_job_message"] = job["message"]
+                    st.session_state["index_snapshot_job_status"] = "info"
 
-            st.info(
-                f"Latest benchmark was a full active-aware rebuild. "
-                f"{chunks_indexed} active chunks were rebuilt in {elapsed_seconds}s."
-            )
+                st.rerun()
 
-            metric_columns = st.columns(4)
+        if index_benchmark_results:
+            benchmark_snapshot = index_benchmark_results
+            after_snapshot = benchmark_snapshot.get("after", benchmark_snapshot)
+            benchmark_type = benchmark_snapshot.get("benchmark_type", "snapshot")
 
-            with metric_columns[0]:
-                st.metric("Rebuild Time", f"{elapsed_seconds}s")
-
-            with metric_columns[1]:
-                st.metric("Chunks Rebuilt", chunks_indexed)
-
-            with metric_columns[2]:
-                st.metric("Active Records", active_records)
-
-            with metric_columns[3]:
-                 active_index_delta = (
-                "Portal only"
-                if db_size_mb is None
-                else f"{db_size_mb} MB"
-            )
-
-            st.metric(
-                "Active Index",
-                f"{active_vectors} vectors",
-                active_index_delta,
-            )
-
-        else:
-            metric_columns = st.columns(3)
-
-            with metric_columns[0]:
-                st.metric("Active Records", active_records)
-
-            with metric_columns[1]:
-                st.metric("Active Index", f"{active_vectors} vectors")
-
-            with metric_columns[2]:
-                if db_size_mb is None:
-                    st.metric("Index Size", "Portal only")
-                else:
-                    st.metric("Index Size", f"{db_size_mb} MB")
-
-        if archived_file_count:
-            st.warning(
-                f"{archived_file_count} archived source file(s) remain on disk for audit, "
-                "but active-aware indexing excludes archived versions from the configured search index."
-            )
-        else:
-            st.caption("Physical source files and active metadata records are aligned.")
-
-        with st.expander("Technical index benchmark details", expanded=False):
-            detail_rows = [
-                {"Metric": "Benchmark Type", "Value": benchmark_type},
-                {"Metric": "Active Metadata Records", "Value": active_records},
-                {"Metric": "Physical Source Files", "Value": physical_files},
-                {"Metric": "Archived Physical Files", "Value": archived_file_count},
-                {"Metric": "Vector Backend", "Value": vector_backend},
-                {"Metric": "Indexed Chunks", "Value": active_vectors},
-                {"Metric": "Index Size MB", "Value": "Portal only" if db_size_mb is None else db_size_mb},
-            ]
+            active_vectors = after_snapshot.get("indexed_chunk_count", after_snapshot.get("chroma_vector_count", 0))
+            active_records = after_snapshot["active_metadata_records"]
+            physical_files = after_snapshot["simulated_source_files"]
+            db_size_mb = after_snapshot.get("index_size_mb", after_snapshot.get("chroma_db_size_mb"))
+            vector_backend = after_snapshot.get("vector_backend", "chroma")
+            archived_file_count = max(physical_files - active_records, 0)
 
             if benchmark_type == "batch_incremental_update":
-                detail_rows.extend(
-                    [
-                        {
-                            "Metric": "Updated Sources",
-                            "Value": ", ".join(index_benchmark_results["updated_sources"]),
-                        },
-                        {
-                            "Metric": "Deleted Vectors",
-                            "Value": index_benchmark_results["total_deleted_vectors"],
-                        },
-                        {
-                            "Metric": "Chunks Re-indexed",
-                            "Value": index_benchmark_results["total_chunks_indexed"],
-                        },
-                        {
-                            "Metric": "Unchanged Chunks Avoided",
-                            "Value": index_benchmark_results["estimated_unchanged_chunks_avoided"],
-                        },
-                        {
-                            "Metric": "Elapsed Seconds",
-                            "Value": index_benchmark_results["elapsed_seconds"],
-                        },
-                    ]
+                changed_document_count = index_benchmark_results["changed_document_count"]
+                chunks_refreshed = index_benchmark_results["total_chunks_indexed"]
+                deleted_vectors = index_benchmark_results["total_deleted_vectors"]
+                avoided_chunks = index_benchmark_results["estimated_unchanged_chunks_avoided"]
+                elapsed_seconds = index_benchmark_results["elapsed_seconds"]
+                before_snapshot = index_benchmark_results["before"]
+                before_active_vectors = before_snapshot.get(
+                    "indexed_chunk_count",
+                    before_snapshot.get("chroma_vector_count", 0),
                 )
 
-            st.dataframe(
-                detail_rows,
-                use_container_width=True,
-                hide_index=True,
-            )
+                document_label = (
+                    "document"
+                    if changed_document_count == 1
+                    else "documents"
+                )
 
-    else:
-        st.info(
-            "No vector index benchmark found yet. Run "
-            "`python -m src.evaluation.index_benchmark` to generate one."
-        )
+                st.success(
+                    f"Latest index update processed {changed_document_count} changed "
+                    f"{document_label} in {elapsed_seconds}s. {chunks_refreshed} chunks were "
+                    f"re-indexed and {avoided_chunks} unchanged chunks were skipped."
+                )
+
+                metric_columns = st.columns(4)
+
+                with metric_columns[0]:
+                    render_status_card(
+                        "Changed Documents",
+                        changed_document_count,
+                        "attention" if changed_document_count else "neutral",
+                    )
+
+                with metric_columns[1]:
+                    render_status_card(
+                        "Chunks Re-indexed",
+                        chunks_refreshed,
+                        "info" if chunks_refreshed else "neutral",
+                    )
+
+                with metric_columns[2]:
+                    render_status_card(
+                        "Old Vectors Removed",
+                        deleted_vectors,
+                        "attention" if deleted_vectors else "neutral",
+                    )
+
+                with metric_columns[3]:
+                    active_index_delta = (
+                        "Portal only"
+                        if db_size_mb is None
+                        else f"{db_size_mb} MB"
+                    )
+
+                    render_status_card(
+                        "Active Index",
+                        f"{active_vectors} vectors",
+                        "neutral",
+                    )
+
+                avoided_percent = (
+                    avoided_chunks / before_active_vectors * 100
+                    if before_active_vectors
+                    else 0
+                )
+                refreshed_percent = (
+                    chunks_refreshed / before_active_vectors
+                    if before_active_vectors
+                    else 0
+                )
+                if latest_full_rebuild_result:
+                    full_rebuild_baseline_seconds = latest_full_rebuild_result["elapsed_seconds"]
+                    full_rebuild_baseline_chunks = latest_full_rebuild_result["rebuild_result"]["chunks_indexed"]
+                    time_difference_seconds = round(
+                        full_rebuild_baseline_seconds - elapsed_seconds,
+                        3,
+                    )
+                else:
+                    full_rebuild_baseline_seconds = None
+                    full_rebuild_baseline_chunks = None
+                    time_difference_seconds = None
+
+                with st.expander("Update Efficiency Details", expanded=False):
+                    efficiency_columns = st.columns(2)
+
+                    with efficiency_columns[0]:
+                        st.metric(
+                            "Work Avoided",
+                            f"{avoided_percent:.1f}%",
+                            f"{avoided_chunks} chunks skipped",
+                        )
+
+                    with efficiency_columns[1]:
+                        if time_difference_seconds is None:
+                            st.metric(
+                                "Runtime Difference",
+                                "No baseline",
+                                "Run full rebuild first",
+                            )
+                        elif time_difference_seconds >= 0:
+                            st.metric(
+                                "Runtime Difference",
+                                f"{time_difference_seconds}s faster",
+                                f"vs {full_rebuild_baseline_seconds}s full rebuild",
+                            )
+                        else:
+                            st.metric(
+                                "Runtime Difference",
+                                f"{abs(time_difference_seconds)}s slower",
+                                f"vs {full_rebuild_baseline_seconds}s full rebuild",
+                            )
+                    st.progress(refreshed_percent)
+
+                    st.caption(
+                        f"Incremental update avoided re-embedding {avoided_chunks} of "
+                        f"{before_active_vectors} previous active chunks. "
+                        f"{chunks_refreshed} new chunks were embedded for the changed document(s)."
+                    )
+                    if latest_full_rebuild_result:
+                        st.dataframe(
+                            [
+                                {
+                                    "Method": "Full Active Rebuild",
+                                    "Scope": "All active documents",
+                                    "Chunks Processed": full_rebuild_baseline_chunks,
+                                    "Elapsed Time": f"{full_rebuild_baseline_seconds}s",
+                                    "Use Case": "Clean full index reconstruction",
+                                },
+                                {
+                                    "Method": "Incremental Update",
+                                    "Scope": f"{changed_document_count} changed {document_label}",
+                                    "Chunks Processed": chunks_refreshed,
+                                    "Elapsed Time": f"{elapsed_seconds}s",
+                                    "Use Case": "Normal document update/sync",
+                                },
+                            ],
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+                    else:
+                        st.info(
+                            "Run a full rebuild benchmark first to compare incremental update "
+                            "against a measured rebuild baseline."
+                        )
+            elif benchmark_type == "full_rebuild":
+                elapsed_seconds = index_benchmark_results["elapsed_seconds"]
+                chunks_indexed = index_benchmark_results["rebuild_result"]["chunks_indexed"]
+
+                st.info(
+                    f"Latest benchmark was a full active-aware rebuild. "
+                    f"{chunks_indexed} active chunks were rebuilt in {elapsed_seconds}s."
+                )
+
+                metric_columns = st.columns(4)
+
+                with metric_columns[0]:
+                    render_status_card("Rebuild Time", f"{elapsed_seconds}s", "info")
+
+                with metric_columns[1]:
+                    render_status_card("Chunks Rebuilt", chunks_indexed, "attention")
+
+                with metric_columns[2]:
+                    render_status_card("Active Records", active_records)
+
+                with metric_columns[3]:
+                    active_index_delta = (
+                        "Portal only"
+                        if db_size_mb is None
+                        else f"{db_size_mb} MB"
+                    )
+
+                    render_status_card(
+                        "Active Index",
+                        f"{active_vectors} vectors",
+                        "neutral",
+                    )
+
+            else:
+                metric_columns = st.columns(3)
+
+                with metric_columns[0]:
+                    render_status_card("Active Records", active_records)
+
+                with metric_columns[1]:
+                    render_status_card("Active Index", f"{active_vectors} vectors")
+
+                with metric_columns[2]:
+                    if db_size_mb is None:
+                        render_status_card("Index Size", "Portal only")
+                    else:
+                        render_status_card("Index Size", f"{db_size_mb} MB")
+
+            if archived_file_count:
+                st.warning(
+                    f"{archived_file_count} archived source file(s) remain on disk for audit, "
+                    "but active-aware indexing excludes archived versions from the configured search index."
+                )
+            else:
+                st.caption("Physical source files and active metadata records are aligned.")
+
+            with st.expander("Technical index benchmark details", expanded=False):
+                detail_rows = [
+                    {"Metric": "Benchmark Type", "Value": benchmark_type},
+                    {"Metric": "Active Metadata Records", "Value": active_records},
+                    {"Metric": "Physical Source Files", "Value": physical_files},
+                    {"Metric": "Archived Physical Files", "Value": archived_file_count},
+                    {"Metric": "Vector Backend", "Value": vector_backend},
+                    {"Metric": "Indexed Chunks", "Value": active_vectors},
+                    {"Metric": "Index Size MB", "Value": "Portal only" if db_size_mb is None else db_size_mb},
+                ]
+
+                if benchmark_type == "batch_incremental_update":
+                    detail_rows.extend(
+                        [
+                            {
+                                "Metric": "Updated Sources",
+                                "Value": ", ".join(index_benchmark_results["updated_sources"]),
+                            },
+                            {
+                                "Metric": "Deleted Vectors",
+                                "Value": index_benchmark_results["total_deleted_vectors"],
+                            },
+                            {
+                                "Metric": "Chunks Re-indexed",
+                                "Value": index_benchmark_results["total_chunks_indexed"],
+                            },
+                            {
+                                "Metric": "Unchanged Chunks Avoided",
+                                "Value": index_benchmark_results["estimated_unchanged_chunks_avoided"],
+                            },
+                            {
+                                "Metric": "Elapsed Seconds",
+                                "Value": index_benchmark_results["elapsed_seconds"],
+                            },
+                        ]
+                    )
+
+                st.dataframe(
+                    detail_rows,
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+        else:
+            st.info(
+                "No vector index benchmark found yet. Run "
+                "`python -m src.evaluation.index_benchmark` to generate one."
+            )
 
     st.divider()
 
@@ -2792,7 +2880,10 @@ if selected_page == "Performance":
             st.info("No logged chat queries yet. Submit a Chat query to create a log.")
 
 
-elif selected_page in ["KB Management", "KB Status"]:
+    st.stop()
+
+
+if selected_page in ["KB Management", "KB Status"]:
     title_columns = st.columns([2.6, 1])
 
     with title_columns[0]:
@@ -4263,7 +4354,10 @@ elif selected_page in ["KB Management", "KB Status"]:
 
                     st.rerun()                
 
-elif selected_page == "Chat":
+    st.stop()
+
+
+if selected_page == "Chat":
     chat_title_columns = st.columns([2.6, 1])
 
     with chat_title_columns[0]:
@@ -4575,7 +4669,10 @@ elif selected_page == "Chat":
 
     poll_active_chat_job()
 
-elif selected_page == "Settings":
+    st.stop()
+
+
+if selected_page == "Settings":
     st.header("System Settings")
     st.caption("Admin-only backend mode, retrieval, and guardrail configuration.")
 
