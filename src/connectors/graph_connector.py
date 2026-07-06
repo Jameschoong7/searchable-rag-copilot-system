@@ -1,6 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 import re
+import hashlib
 
 from src.core.constants import SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE
 from src.metadata.repository import append_document_metadata
@@ -45,6 +46,7 @@ def stage_graph_file_for_review(
 
     metadata["storage_backend"] = stored_document.storage_backend
     metadata["storage_uri"] = stored_document.storage_uri
+    metadata["content_hash"] = hashlib.sha256(content_bytes).hexdigest()
 
     append_document_metadata(metadata)
 
