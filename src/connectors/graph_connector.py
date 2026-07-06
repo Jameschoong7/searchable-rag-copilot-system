@@ -28,6 +28,7 @@ def stage_graph_file_for_review(
     source_path: str,
     source_type: str,
     uploaded_by: str = "graph_connector",
+    source_document_id: str | None = None,
 ) -> dict:
     """Stage a downloaded Graph file with a real local/Blob-backed source file."""
     stored_document = save_document_bytes(
@@ -42,6 +43,7 @@ def stage_graph_file_for_review(
         source_path=source_path,
         source_type=source_type,
         uploaded_by=uploaded_by,
+        source_document_id=source_document_id,
     )
 
     metadata["storage_backend"] = stored_document.storage_backend
@@ -77,6 +79,7 @@ def build_pending_review_metadata(
     source_path: str,
     source_type: str,
     uploaded_by: str = "graph_connector",
+    source_document_id: str | None = None,
 ) -> dict:
     """Build safe pending-review metadata for a read-only Graph-ingested document."""
     inferred_department = infer_department_from_source_path(source_path)
@@ -106,7 +109,7 @@ def build_pending_review_metadata(
         "page_number": None,
         "chunk_id": "pending_review",
         "visual_extraction_status": "Pending review",
-        "source_document_id": document_id,
+        "source_document_id": source_document_id or document_id,
         "version_number": 1,
         "is_active": 0,
         "content_hash": None,
@@ -171,4 +174,3 @@ def normalize_onenote_html_to_text(html_content: bytes) -> str:
     ]
 
     return "\n".join(lines)
-

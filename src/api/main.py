@@ -52,6 +52,7 @@ from src.core.job_repository import (
     JOB_TYPE_ONEDRIVE_STAGE,
     JOB_TYPE_ONEDRIVE_REFRESH,
     JOB_TYPE_ONENOTE_STAGE,
+    JOB_TYPE_ONENOTE_REFRESH,
     JOB_TYPE_DOCUMENT_ARCHIVE,
     JOB_TYPE_DOCUMENT_UNARCHIVE,
     JOB_TYPE_INDEX_SNAPSHOT,
@@ -249,6 +250,27 @@ class StageOneNotePageResponse(BaseModel):
     message: str
 
 
+class RefreshOneNotePageRequest(BaseModel):
+    """Represent an admin request to refresh one already-ingested OneNote page."""
+
+    role: str
+    user: str
+    user_department: str
+    page_id: str
+    title: str
+    connector_path: str
+
+
+class RefreshOneNotePageResponse(BaseModel):
+    """Represent the result of refreshing one OneNote-backed KB document."""
+
+    status: str
+    document_id: str | None = None
+    previous_document_id: str | None = None
+    chunk_id: str | None = None
+    message: str
+
+
 class OneNoteStagePageItem(BaseModel):
     """Represent one OneNote page selected for batch staging."""
 
@@ -263,6 +285,23 @@ class StageOneNotePagesJobRequest(BaseModel):
     role: str
     user: str
     pages: list[OneNoteStagePageItem]
+
+
+class OneNoteRefreshPageItem(BaseModel):
+    """Represent one OneNote page selected for batch refresh."""
+
+    page_id: str
+    title: str
+    connector_path: str
+
+
+class RefreshOneNotePagesJobRequest(BaseModel):
+    """Represent a durable batch OneNote refresh request."""
+
+    role: str
+    user: str
+    user_department: str
+    pages: list[OneNoteRefreshPageItem]
 
 
 class ReindexRequest(BaseModel):
@@ -1918,6 +1957,21 @@ def approve_pending_document(
     )
 
 
+def graph_document_matches_source(document: dict, base_document_id: str) -> bool:
+    """Match all metadata rows that belong to one external Graph source."""
+    document_id = document.get("document_id") or ""
+    source_document_id = document.get("source_document_id") or ""
+
+    return (
+        document_id == base_document_id
+        or source_document_id == base_document_id
+        or document_id.startswith(f"{base_document_id}-R")
+        or document_id.startswith(f"{base_document_id}-V")
+        or source_document_id.startswith(f"{base_document_id}-R")
+        or source_document_id.startswith(f"{base_document_id}-V")
+    )
+
+
 def get_onenote_connector_state(page_id: str, documents: list[dict]) -> dict:
     """Return current review/index state for a discovered OneNote page."""
     from src.connectors.graph_connector import build_graph_document_id
@@ -1927,12 +1981,7 @@ def get_onenote_connector_state(page_id: str, documents: list[dict]) -> dict:
     matching_documents = [
         document
         for document in documents
-        if (
-            document["document_id"] == base_document_id
-            or document.get("source_document_id") == base_document_id
-            or document["document_id"].startswith(f"{base_document_id}-R")
-            or document["document_id"].startswith(f"{base_document_id}-V")
-        )
+        if graph_document_matches_source(document, base_document_id)
     ]
 
     if not matching_documents:
@@ -1977,14 +2026,8 @@ def find_active_graph_document(
     matching_documents = [
         document
         for document in documents
-        if (
-            document.get("is_active") == 1
-            and (
-                document["document_id"] == base_document_id
-                or document.get("source_document_id") == base_document_id
-                or document["document_id"].startswith(f"{base_document_id}-V")
-            )
-        )
+        if document.get("is_active") == 1
+        and graph_document_matches_source(document, base_document_id)
     ]
 
     if not matching_documents:
@@ -2005,12 +2048,7 @@ def get_onedrive_connector_state(item_id: str, documents: list[dict]) -> dict:
     matching_documents = [
         document
         for document in documents
-        if (
-            document["document_id"] == base_document_id
-            or document.get("source_document_id") == base_document_id
-            or document["document_id"].startswith(f"{base_document_id}-R")
-            or document["document_id"].startswith(f"{base_document_id}-V")
-        )
+        if graph_document_matches_source(document, base_document_id)
     ]
 
     if not matching_documents:
@@ -2225,6 +2263,7 @@ def stage_onedrive_file(
             source_path=request.connector_path,
             source_type="onedrive",
             uploaded_by=request.user,
+            source_document_id=base_document_id,
         )
 
     except HTTPException:
@@ -2379,6 +2418,7 @@ def stage_onedrive_file_item(
         source_path=connector_path,
         source_type="onedrive",
         uploaded_by=user,
+        source_document_id=base_document_id,
     )
 
 
@@ -2534,10 +2574,7 @@ def refresh_onedrive_file_item(
         )
 
     next_version_number = (active_document.get("version_number") or 1) + 1
-    source_document_id = active_document.get(
-        "source_document_id",
-        active_document["document_id"],
-    )
+    source_document_id = base_document_id
     new_document_id = f"{source_document_id}-V{next_version_number}"
 
     stored_filename = build_graph_storage_filename(
@@ -2559,6 +2596,7 @@ def refresh_onedrive_file_item(
             "storage_uri": stored_document.storage_uri,
             "file_type": file_type,
             "source": "onedrive",
+            "source_document_id": source_document_id,
             "uploaded_by": user,
             "uploaded_at": datetime.now().isoformat(timespec="minutes"),
             "chunk_id": "pending_index",
@@ -2779,6 +2817,7 @@ def stage_onenote_page(
             source_path=request.connector_path,
             source_type="onenote",
             uploaded_by=request.user,
+            source_document_id=document_id,
         )
 
     except HTTPException:
@@ -2870,6 +2909,7 @@ def stage_onenote_page_item(
         source_path=connector_path,
         source_type="onenote",
         uploaded_by=user,
+        source_document_id=base_document_id,
     )
 
 
@@ -2950,5 +2990,268 @@ def create_onenote_stage_job(
     )
 
     background_tasks.add_task(run_onenote_stage_job, job["job_id"], request)
+
+    return JobResponse(**job)
+
+
+def refresh_onenote_page_item(
+    page_id: str,
+    title: str,
+    connector_path: str,
+    role: str,
+    user: str,
+    user_department: str,
+) -> RefreshOneNotePageResponse:
+    """Refresh one OneNote-backed KB document and return a structured result."""
+    from src.connectors.graph_client import download_onenote_page_content_by_id
+    from src.connectors.graph_connector import (
+        build_graph_document_id,
+        build_graph_storage_filename,
+        normalize_onenote_html_to_text,
+    )
+    from src.metadata.repository import (
+        create_new_document_version,
+        load_document_metadata,
+    )
+    from src.storage.document_storage import save_document_bytes
+
+    base_document_id = build_graph_document_id("GRAPH-ON", page_id)
+    all_documents = load_document_metadata(include_inactive=True)
+
+    active_document = find_active_graph_document(
+        documents=all_documents,
+        base_document_id=base_document_id,
+    )
+
+    if active_document is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No active KB document found for this OneNote source page.",
+        )
+
+    if active_document.get("source") != "onenote":
+        raise HTTPException(
+            status_code=400,
+            detail="Only OneNote-backed documents can be refreshed by this endpoint.",
+        )
+
+    if active_document.get("chunk_id") not in ["pending_index", "indexed"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Only approved OneNote documents can be refreshed.",
+        )
+
+    if role == PROJECT_MANAGER_ROLE and active_document["department"] != user_department:
+        raise HTTPException(
+            status_code=403,
+            detail="Project Manager can only refresh own-department connector documents.",
+        )
+
+    html_content = download_onenote_page_content_by_id(page_id)
+    text_content = normalize_onenote_html_to_text(html_content)
+
+    if not text_content.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="OneNote page did not contain extractable text.",
+        )
+
+    content_bytes = text_content.encode("utf-8")
+    new_content_hash = hashlib.sha256(content_bytes).hexdigest()
+
+    if active_document.get("content_hash") == new_content_hash:
+        return RefreshOneNotePageResponse(
+            status="no_change",
+            document_id=active_document["document_id"],
+            chunk_id=active_document.get("chunk_id"),
+            message="No content change detected for this OneNote page.",
+        )
+
+    next_version_number = (active_document.get("version_number") or 1) + 1
+    source_document_id = base_document_id
+    new_document_id = f"{source_document_id}-V{next_version_number}"
+
+    stored_filename = build_graph_storage_filename(
+        source_type="onenote",
+        item_id=f"{page_id}_v{next_version_number}",
+        original_filename=f"{title or 'untitled_onenote_page'}.txt",
+    )
+
+    stored_document = save_document_bytes(stored_filename, content_bytes)
+
+    new_document = active_document.copy()
+    new_document.update(
+        {
+            "document_id": new_document_id,
+            "title": title or "Untitled OneNote Page",
+            "filename": stored_document.filename,
+            "storage_backend": stored_document.storage_backend,
+            "storage_uri": stored_document.storage_uri,
+            "file_type": "TXT",
+            "source": "onenote",
+            "source_document_id": source_document_id,
+            "uploaded_by": user,
+            "uploaded_at": datetime.now().isoformat(timespec="minutes"),
+            "chunk_id": "pending_index",
+            "visual_extraction_status": "Text extracted from OneNote page",
+            "content_hash": new_content_hash,
+            "archived_at": None,
+            "replaced_by_document_id": None,
+        }
+    )
+
+    create_new_document_version(
+        previous_document_id=active_document["document_id"],
+        new_document=new_document,
+        archived_at=datetime.now().isoformat(timespec="minutes"),
+    )
+
+    return RefreshOneNotePageResponse(
+        status="updated",
+        document_id=new_document_id,
+        previous_document_id=active_document["document_id"],
+        chunk_id="pending_index",
+        message=(
+            f"Detected OneNote page change and created {new_document_id}. "
+            "Run Update for Pending Documents to refresh search results."
+        ),
+    )
+
+
+@app.post("/admin/graph/onenote/refresh-page", response_model=RefreshOneNotePageResponse)
+def refresh_onenote_page(
+    request: RefreshOneNotePageRequest,
+) -> RefreshOneNotePageResponse:
+    """Refresh one OneNote-backed KB document if the Graph source changed."""
+    if request.role == GENERAL_EMPLOYEE_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="General Employee cannot refresh connector documents.",
+        )
+
+    try:
+        return refresh_onenote_page_item(
+            page_id=request.page_id,
+            title=request.title,
+            connector_path=request.connector_path,
+            role=request.role,
+            user=request.user,
+            user_department=request.user_department,
+        )
+    except HTTPException:
+        raise
+    except RuntimeError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(
+            status_code=502,
+            detail=f"OneNote refresh failed: {error}",
+        ) from error
+
+
+def run_onenote_refresh_job(
+    job_id: str,
+    request: RefreshOneNotePagesJobRequest,
+) -> None:
+    """Refresh selected OneNote pages in the background and store per-page results."""
+    update_job(
+        job_id,
+        JOB_STATUS_RUNNING,
+        f"Refreshing {len(request.pages)} OneNote page(s).",
+    )
+
+    results = []
+
+    for page_item in request.pages:
+        try:
+            refresh_result = refresh_onenote_page_item(
+                page_id=page_item.page_id,
+                title=page_item.title,
+                connector_path=page_item.connector_path,
+                role=request.role,
+                user=request.user,
+                user_department=request.user_department,
+            )
+        except HTTPException as error:
+            results.append(
+                {
+                    "Page": page_item.title or "Untitled Page",
+                    "Path": page_item.connector_path,
+                    "Status": "Rejected",
+                    "Message": str(error.detail),
+                }
+            )
+        except Exception as error:
+            results.append(
+                {
+                    "Page": page_item.title or "Untitled Page",
+                    "Path": page_item.connector_path,
+                    "Status": "Error",
+                    "Message": str(error),
+                }
+            )
+        else:
+            status_label = (
+                "Updated"
+                if refresh_result.status == "updated"
+                else "No Change"
+            )
+            results.append(
+                {
+                    "Page": page_item.title or "Untitled Page",
+                    "Path": page_item.connector_path,
+                    "Status": status_label,
+                    "Message": refresh_result.message,
+                }
+            )
+
+    updated_count = sum(1 for result in results if result["Status"] == "Updated")
+    unchanged_count = sum(1 for result in results if result["Status"] == "No Change")
+
+    update_job(
+        job_id,
+        JOB_STATUS_SUCCEEDED,
+        (
+            f"OneNote refresh finished: {updated_count} updated, "
+            f"{unchanged_count} unchanged, {len(results)} checked."
+        ),
+        result={
+            "results": results,
+            "updated_count": updated_count,
+            "unchanged_count": unchanged_count,
+            "total_count": len(results),
+            "message": (
+                f"OneNote refresh finished: {updated_count} updated, "
+                f"{unchanged_count} unchanged, {len(results)} checked."
+            ),
+        },
+    )
+
+
+@app.post("/admin/graph/onenote/refresh-pages-job", response_model=JobResponse)
+def create_onenote_refresh_job(
+    request: RefreshOneNotePagesJobRequest,
+    background_tasks: BackgroundTasks,
+) -> JobResponse:
+    """Create a durable job for batch OneNote page refresh."""
+    if request.role == GENERAL_EMPLOYEE_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="General Employee cannot refresh connector documents.",
+        )
+
+    if not request.pages:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one OneNote page is required.",
+        )
+
+    job = create_job(
+        job_type=JOB_TYPE_ONENOTE_REFRESH,
+        created_by=request.user,
+        message=f"OneNote refresh queued for {len(request.pages)} page(s).",
+    )
+
+    background_tasks.add_task(run_onenote_refresh_job, job["job_id"], request)
 
     return JobResponse(**job)

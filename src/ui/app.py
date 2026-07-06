@@ -111,6 +111,8 @@ ONEDRIVE_REFRESH_FILE_URL = f"{API_BASE_URL}/admin/graph/onedrive/refresh-file"
 ONEDRIVE_REFRESH_FILES_JOB_URL = f"{API_BASE_URL}/admin/graph/onedrive/refresh-files-job"
 ONENOTE_PAGES_URL = f"{API_BASE_URL}/admin/graph/onenote/pages"
 ONENOTE_STAGE_PAGES_JOB_URL = f"{API_BASE_URL}/admin/graph/onenote/stage-pages-job"
+ONENOTE_REFRESH_PAGE_URL = f"{API_BASE_URL}/admin/graph/onenote/refresh-page"
+ONENOTE_REFRESH_PAGES_JOB_URL = f"{API_BASE_URL}/admin/graph/onenote/refresh-pages-job"
 EVALUATION_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/retrieval_eval_results.json"
 INDEX_BENCHMARK_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_results.json"
 INDEX_BENCHMARK_HISTORY_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_history.json"
@@ -282,6 +284,49 @@ def submit_onenote_stage_job(page_items: list[dict]) -> dict:
         json={
             "role": st.session_state["role"],
             "user": st.session_state["user"],
+            "pages": [
+                {
+                    "page_id": page_item["id"],
+                    "title": page_item.get("title") or "Untitled Page",
+                    "connector_path": page_item["connector_path"],
+                }
+                for page_item in page_items
+            ],
+        },
+        timeout=10,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_onenote_page_refresh(page_item: dict) -> dict:
+    """Ask FastAPI to refresh one already-ingested OneNote source page."""
+    response = requests.post(
+        ONENOTE_REFRESH_PAGE_URL,
+        json={
+            "role": st.session_state["role"],
+            "user": st.session_state["user"],
+            "user_department": st.session_state["department"],
+            "page_id": page_item["id"],
+            "title": page_item.get("title") or "Untitled Page",
+            "connector_path": page_item["connector_path"],
+        },
+        timeout=120,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def submit_onenote_refresh_job(page_items: list[dict]) -> dict:
+    """Submit selected OneNote pages as one durable backend refresh job."""
+    response = requests.post(
+        ONENOTE_REFRESH_PAGES_JOB_URL,
+        json={
+            "role": st.session_state["role"],
+            "user": st.session_state["user"],
+            "user_department": st.session_state["department"],
             "pages": [
                 {
                     "page_id": page_item["id"],
@@ -870,6 +915,41 @@ def poll_active_onenote_stage_job() -> None:
         st.session_state["onenote_stage_status"] = "error"
 
     st.session_state.pop("active_onenote_stage_job_id", None)
+    st.rerun()
+
+
+@st.fragment(run_every="2s")
+def poll_active_onenote_refresh_job() -> None:
+    """Poll the active OneNote refresh job without blocking Streamlit navigation."""
+    active_job_id = st.session_state.get("active_onenote_refresh_job_id")
+
+    if not active_job_id:
+        return
+
+    try:
+        job = get_backend_job(active_job_id)
+    except requests.exceptions.RequestException as error:
+        st.warning(f"OneNote refresh job status unavailable: {error}")
+        return
+
+    if job["status"] in ["queued", "running"]:
+        st.info(job["message"])
+        return
+
+    if job["status"] == "succeeded":
+        result = job["result"]
+        st.session_state["onenote_refresh_results"] = result.get("results", [])
+        st.session_state["onenote_refresh_message"] = result.get(
+            "message",
+            job["message"],
+        )
+        st.session_state["onenote_refresh_status"] = "success"
+
+    elif job["status"] == "failed":
+        st.session_state["onenote_refresh_message"] = job["message"]
+        st.session_state["onenote_refresh_status"] = "error"
+
+    st.session_state.pop("active_onenote_refresh_job_id", None)
     st.rerun()
 
 
@@ -1843,6 +1923,7 @@ with st.sidebar:
     poll_active_onedrive_stage_job()
     poll_active_onedrive_refresh_job()
     poll_active_onenote_stage_job()
+    poll_active_onenote_refresh_job()
     poll_active_index_snapshot_job()
     poll_active_document_lifecycle_job()
 
@@ -3144,6 +3225,124 @@ elif selected_page in ["KB Management", "KB Status"]:
                             hide_index=True,
                             height=220,
                         )
+
+                    refreshable_page_options = {
+                        label: page
+                        for label, page in page_options.items()
+                        if page.get("connector_state") in ["Pending Index", "Indexed"]
+                    }
+
+                    if refreshable_page_options:
+                        st.divider()
+                        st.markdown("**Refresh Existing OneNote Pages**")
+                        st.caption(
+                            "Primary flow: batch-check approved OneNote pages. "
+                            "Changed pages create new pending-index versions; unchanged pages are reported without changes."
+                        )
+
+                        if st.session_state.get("onenote_refresh_message"):
+                            refresh_status = st.session_state.get("onenote_refresh_status", "info")
+
+                            if refresh_status == "success":
+                                st.success(st.session_state["onenote_refresh_message"])
+                            elif refresh_status == "error":
+                                st.error(st.session_state["onenote_refresh_message"])
+                            else:
+                                st.info(st.session_state["onenote_refresh_message"])
+
+                        refresh_columns = st.columns(3)
+
+                        with refresh_columns[0]:
+                            if st.button(
+                                "Select All Refreshable",
+                                use_container_width=True,
+                                key="select_all_onenote_refresh_pages_button",
+                            ):
+                                st.session_state["selected_onenote_pages_to_refresh"] = list(
+                                    refreshable_page_options.keys()
+                                )
+                                st.rerun()
+
+                        with refresh_columns[1]:
+                            if st.button(
+                                "Clear Refresh Selection",
+                                use_container_width=True,
+                                key="clear_onenote_refresh_selection_button",
+                            ):
+                                st.session_state["selected_onenote_pages_to_refresh"] = []
+                                st.rerun()
+
+                        with refresh_columns[2]:
+                            st.caption(f"{len(refreshable_page_options)} refreshable page(s)")
+
+                        selected_refresh_labels = st.multiselect(
+                            "Select OneNote pages to refresh",
+                            list(refreshable_page_options.keys()),
+                            key="selected_onenote_pages_to_refresh",
+                        )
+
+                        if st.button(
+                            "Refresh Selected OneNote Pages",
+                            use_container_width=True,
+                            disabled=(
+                                not selected_refresh_labels
+                                or bool(st.session_state.get("active_onenote_refresh_job_id"))
+                            ),
+                            key="submit_onenote_refresh_job_button",
+                        ):
+                            selected_refresh_pages = [
+                                refreshable_page_options[selected_refresh_label]
+                                for selected_refresh_label in selected_refresh_labels
+                            ]
+
+                            try:
+                                job = submit_onenote_refresh_job(selected_refresh_pages)
+                            except requests.exceptions.HTTPError as error:
+                                st.error(f"OneNote refresh rejected by backend: {error.response.text}")
+                            except requests.exceptions.RequestException as error:
+                                st.error(f"Could not submit OneNote refresh job: {error}")
+                            else:
+                                st.session_state["active_onenote_refresh_job_id"] = job["job_id"]
+                                st.session_state["onenote_refresh_message"] = job["message"]
+                                st.session_state["onenote_refresh_status"] = "info"
+                                st.rerun()
+
+                        if st.session_state.get("onenote_refresh_results"):
+                            st.dataframe(
+                                st.session_state["onenote_refresh_results"],
+                                use_container_width=True,
+                                hide_index=True,
+                                height=220,
+                            )
+
+                        with st.expander("Single Page Refresh", expanded=False):
+                            selected_refresh_label = st.selectbox(
+                                "Select one OneNote page to refresh",
+                                list(refreshable_page_options.keys()),
+                                key="selected_onenote_page_to_refresh",
+                            )
+
+                            if st.button(
+                                "Refresh One Page",
+                                use_container_width=True,
+                                key="refresh_selected_onenote_page_button",
+                            ):
+                                try:
+                                    with st.spinner("Checking OneNote content and version history..."):
+                                        refresh_result = request_onenote_page_refresh(
+                                            refreshable_page_options[selected_refresh_label]
+                                        )
+                                except requests.exceptions.HTTPError as error:
+                                    st.error(f"OneNote refresh rejected by backend: {error.response.text}")
+                                except requests.exceptions.RequestException as error:
+                                    st.error(f"Could not refresh OneNote page: {error}")
+                                else:
+                                    if refresh_result["status"] == "updated":
+                                        st.success(refresh_result["message"])
+                                    elif refresh_result["status"] == "no_change":
+                                        st.info(refresh_result["message"])
+                                    else:
+                                        st.warning(refresh_result["message"])
 
                 else:
                     st.caption("No OneNote pages loaded from the configured notebook scope.")
