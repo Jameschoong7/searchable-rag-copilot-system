@@ -1293,6 +1293,7 @@ def render_pending_index_notice(
     label: str = "document",
     expander_label: str = "Pending Documents",
     show_index_sync_hint: bool = True,
+    use_expander: bool = True,
 ) -> None:
     """Show pending-index follow-up guidance without changing backend state."""
     if not pending_documents:
@@ -1307,20 +1308,30 @@ def render_pending_index_notice(
             "Open Index Sync and run Update for Pending Documents so chat uses the refreshed content."
         )
 
-    with st.expander(expander_label, expanded=False):
+    table_rows = [
+        {
+            "Title": document.get("title"),
+            "Source": document.get("source", ""),
+            "Department": document.get("department"),
+            "Document ID": document.get("document_id"),
+            "Version": get_version_label(document),
+            "Index Status": get_index_status_label(document),
+            "Updated At": document.get("uploaded_at"),
+        }
+        for document in pending_documents
+    ]
+
+    if use_expander:
+        with st.expander(expander_label, expanded=False):
+            st.dataframe(
+                table_rows,
+                use_container_width=True,
+                hide_index=True,
+                height=min(260, 38 * (len(pending_documents) + 1)),
+            )
+    else:
         st.dataframe(
-            [
-                {
-                    "Title": document.get("title"),
-                    "Source": document.get("source", ""),
-                    "Department": document.get("department"),
-                    "Document ID": document.get("document_id"),
-                    "Version": get_version_label(document),
-                    "Index Status": get_index_status_label(document),
-                    "Updated At": document.get("uploaded_at"),
-                }
-                for document in pending_documents
-            ],
+            table_rows,
             use_container_width=True,
             hide_index=True,
             height=min(260, 38 * (len(pending_documents) + 1)),
@@ -1849,6 +1860,15 @@ st.markdown(
     div[data-testid="stVerticalBlockBorderWrapper"] {{
         border-color: #cbd5e1 !important;
         box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+        margin-bottom: 1rem;
+    }}
+
+    .element-container:has(> div[data-testid="stVerticalBlockBorderWrapper"]) {{
+        margin-bottom: 1rem !important;
+    }}
+
+    div[data-testid="stVerticalBlockBorderWrapper"] + div[data-testid="stVerticalBlockBorderWrapper"] {{
+        margin-top: 0.35rem;
     }}
 
     div[data-testid="stTabs"] button {{
@@ -1867,7 +1887,7 @@ st.markdown(
     }}
 
     div[data-testid="stExpander"] {{
-        margin-top: 0.8rem;
+        margin: 0.85rem 0 1rem 0;
     }}
 
     .stButton > button {{
@@ -1954,6 +1974,53 @@ st.markdown(
         font-size: 0.74rem;
         font-weight: 750;
         border: 1px solid transparent;
+    }}
+
+    .sidebar-section-label {{
+        color: #667085;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin: 0.25rem 0 0.45rem 0;
+    }}
+
+    .account-card {{
+        padding: 0.8rem;
+        border: 1px solid #d0d5dd;
+        border-left: 4px solid {brand_red};
+        border-radius: 0.5rem;
+        background: #ffffff;
+        box-shadow: 0 1px 2px rgba(16,24,40,0.05);
+        margin-bottom: 1rem;
+    }}
+
+    .account-name {{
+        color: #101828;
+        font-size: 0.95rem;
+        font-weight: 800;
+        line-height: 1.25;
+        margin-bottom: 0.55rem;
+        overflow-wrap: anywhere;
+    }}
+
+    .account-meta-row {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }}
+
+    .account-chip {{
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid #d0d5dd;
+        border-radius: 999px;
+        padding: 0.18rem 0.5rem;
+        color: #344054;
+        background: #f9fafb;
+        font-size: 0.72rem;
+        font-weight: 750;
+        line-height: 1.25;
     }}
 
     .typing-indicator {{
@@ -2084,24 +2151,15 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.sidebar.markdown("### Account")
-st.sidebar.caption(escape(st.session_state["user"]))
 st.sidebar.markdown(
     f"""
-    <div style="
-        padding: 0.75rem;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.5rem;
-        background: #ffffff;
-        font-size: 0.85rem;
-        line-height: 1.65;
-        margin-bottom: 1rem;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-    ">
-        <strong style="color: #475569;">Role</strong><br>
-        <span style="font-weight: 500; color: #0f172a;">{escape(st.session_state["role"])}</span><br>
-        <strong style="color: #475569; display: inline-block; margin-top: 0.25rem;">Department</strong><br>
-        <span style="font-weight: 500; color: #0f172a;">{escape(st.session_state["department"])}</span>
+    <div class="sidebar-section-label">Account</div>
+    <div class="account-card">
+        <div class="account-name">{escape(st.session_state["user"])}</div>
+        <div class="account-meta-row">
+            <span class="account-chip">{escape(st.session_state["role"])}</span>
+            <span class="account-chip">Dept: {escape(st.session_state["department"])}</span>
+        </div>
     </div>
     """,
     unsafe_allow_html=True,
@@ -2192,11 +2250,7 @@ if st.sidebar.button("Logout", use_container_width=True):
 
 
 if selected_page == "Performance":
-    st.header("Performance Dashboard")
-    st.caption(
-        "Monitoring real local queries, retrieval evaluation metrics, "
-        "and active vector index benchmarks."
-    )
+    st.header("Dashboard")
 
     documents = load_document_metadata()
     all_documents = load_document_metadata(include_inactive=True)
@@ -2243,46 +2297,40 @@ if selected_page == "Performance":
         miss_delta = "Awaiting labelled result"
 
     with st.container(border=True):
-        st.subheader("System Metrics")
+        st.subheader("System Overview")
 
         metric_columns = st.columns(4)
 
         with metric_columns[0]:
-            st.metric(
-                "Time-to-First-Answer",
+            render_status_card(
+                "Time-To-First-Answer",
                 f"{query_log_summary['average_latency']:.2f}s",
-                "Local logged average",
+                "info",
             )
 
         with metric_columns[1]:
-            st.metric(
-                "Eval Top-K Accuracy (K=5)",
+            render_status_card(
+                "Eval Retrieval Accuracy",
                 top_k_accuracy,
-                top_k_delta,
+                "success" if evaluation_results else "neutral",
             )
 
         with metric_columns[2]:
-            st.metric(
+            render_status_card(
                 "Miss Rate",
                 miss_rate,
-                miss_delta,
+                "attention" if evaluation_results and evaluation_summary["miss_count"] else "neutral",
             )
 
         with metric_columns[3]:
-            st.metric(
+            render_status_card(
                 "Indexed Documents",
                 f"{indexed_document_count}",
-                "Active KB records",
+                "neutral",
             )
 
-        st.caption(
-            "TTFA is calculated from local chat logs. Eval Top-K Accuracy and Miss Rate come "
-            "from the latest labelled retrieval evaluation run. Live chat retrieval uses "
-            "the active Top-K and threshold from Settings."
-        )
-
     with st.container(border=True):
-        st.subheader("Live Query Signals")
+        st.subheader("Query Outcomes")
 
         live_metric_columns = st.columns(4)
 
@@ -2331,7 +2379,7 @@ if selected_page == "Performance":
             for row in query_log_summary["recent_outcome_rows"]
         ]
 
-        with st.expander("Recent Chat Outcomes", expanded=False):
+        with st.expander("Recent Outcomes", expanded=False):
             if recent_outcome_rows:
                 st.dataframe(
                     recent_outcome_rows,
@@ -2342,7 +2390,7 @@ if selected_page == "Performance":
                 st.info("No logged chat outcomes yet. Submit a Chat query to populate this table.")
 
     with st.container(border=True):
-        st.subheader("Document Update Evidence")
+        st.subheader("Source Refresh")
 
         connector_active_documents = [
             document
@@ -2401,14 +2449,14 @@ if selected_page == "Performance":
                 f"Could not load latest connector job evidence from backend: {connector_evidence_error}"
             )
 
-        with st.expander("Connector Refresh Details", expanded=False):
+        with st.expander("Refresh Jobs", expanded=False):
             st.dataframe(
                 connector_refresh_rows,
                 use_container_width=True,
                 hide_index=True,
             )
 
-        with st.expander("Connector Version Chain", expanded=False):
+        with st.expander("Version Changes", expanded=False):
             if connector_version_chain_rows:
                 st.dataframe(
                     connector_version_chain_rows,
@@ -2417,7 +2465,7 @@ if selected_page == "Performance":
                     height=min(260, 38 * (len(connector_version_chain_rows) + 1)),
                 )
             else:
-                st.caption("No connector replacement chain has been recorded yet.")
+                st.caption("No source replacements recorded.")
 
         if total_rejected_or_error:
             st.warning(
@@ -2425,19 +2473,18 @@ if selected_page == "Performance":
             )
         elif total_checked:
             st.caption(
-                "Refresh checks compare the latest Graph content hash against SQLite metadata. "
-                "Changed sources create new pending versions; unchanged sources are skipped."
+                "Changed sources create pending versions. Unchanged sources are skipped."
             )
         else:
             st.caption(
-                "Run a OneDrive or OneNote refresh job to populate measured update evidence."
+                "Run a OneDrive or OneNote refresh to populate this section."
             )
 
     with st.container(border=True):
         index_status_columns = st.columns([3, 1])
 
         with index_status_columns[0]:
-            st.subheader("Search Index Update Status")
+            st.subheader("Index Status")
 
         with index_status_columns[1]:
             if st.button(
@@ -2497,9 +2544,9 @@ if selected_page == "Performance":
                 )
 
                 st.success(
-                    f"Latest index update processed {changed_document_count} changed "
-                    f"{document_label} in {elapsed_seconds}s. {chunks_refreshed} chunks were "
-                    f"re-indexed and {avoided_chunks} unchanged chunks were skipped."
+                    f"Indexed {changed_document_count} changed {document_label} in "
+                    f"{elapsed_seconds}s. Updated {chunks_refreshed} chunks; skipped "
+                    f"{avoided_chunks} unchanged chunks."
                 )
 
                 metric_columns = st.columns(4)
@@ -2513,14 +2560,14 @@ if selected_page == "Performance":
 
                 with metric_columns[1]:
                     render_status_card(
-                        "Chunks Re-indexed",
+                        "Chunks Updated",
                         chunks_refreshed,
                         "info" if chunks_refreshed else "neutral",
                     )
 
                 with metric_columns[2]:
                     render_status_card(
-                        "Old Vectors Removed",
+                        "Vectors Removed",
                         deleted_vectors,
                         "attention" if deleted_vectors else "neutral",
                     )
@@ -2560,7 +2607,7 @@ if selected_page == "Performance":
                     full_rebuild_baseline_chunks = None
                     time_difference_seconds = None
 
-                with st.expander("Update Efficiency Details", expanded=False):
+                with st.expander("Update Details", expanded=False):
                     efficiency_columns = st.columns(2)
 
                     with efficiency_columns[0]:
@@ -2676,9 +2723,9 @@ if selected_page == "Performance":
                     "but active-aware indexing excludes archived versions from the configured search index."
                 )
             else:
-                st.caption("Physical source files and active metadata records are aligned.")
+                st.caption("Active records and source files are aligned.")
 
-            with st.expander("Technical index benchmark details", expanded=False):
+            with st.expander("Index Details", expanded=False):
                 detail_rows = [
                     {"Metric": "Benchmark Type", "Value": benchmark_type},
                     {"Metric": "Active Metadata Records", "Value": active_records},
@@ -2730,7 +2777,7 @@ if selected_page == "Performance":
     st.divider()
 
     with st.container(border=True):
-        st.subheader("Daily Average Query Latency")
+        st.subheader("Query Latency")
 
         latency_rows = []
 
@@ -2784,7 +2831,7 @@ if selected_page == "Performance":
         else:
             st.info("No query latency data yet. Submit a Chat query to populate this chart.")
 
-    with st.expander("How benchmark accuracy is measured"):
+    with st.expander("Evaluation Method"):
         st.markdown(
             "**Eval Top-K Accuracy checks whether the expected source document appears "
             "within the top 5 retrieved chunks in the labelled evaluation run.**"
@@ -2797,12 +2844,7 @@ if selected_page == "Performance":
         if evaluation_results and evaluation_results.get("threshold_interpretation"):
             threshold_interpretation = evaluation_results["threshold_interpretation"]
 
-            st.markdown("**Relevance Threshold Comparison**")
-            st.caption(
-                "This compares candidate retrieval score thresholds using the same "
-                "labelled query set. It helps justify whether a lower threshold "
-                "recovers useful documents or only adds noise."
-            )
+            st.markdown("**Threshold Comparison**")
 
             st.dataframe(
                 threshold_interpretation["comparison_rows"],
@@ -2816,8 +2858,7 @@ if selected_page == "Performance":
                 st.info(threshold_interpretation["recommendation"])
 
     if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-        with st.expander("Admin Review Queue - Benchmark Misses", expanded=False):
-            st.markdown("**Labelled Benchmark Misses**")
+        with st.expander("Benchmark Misses", expanded=False):
             if evaluation_results and evaluation_results["miss_rows"]:
                 real_miss_rows = [
                     {
@@ -2848,13 +2889,9 @@ if selected_page == "Performance":
                 )
 
     with st.expander(
-        f"Query History - Latest {query_log_summary['query_history_limit']} Logged Queries",
+        f"Query Log - Latest {query_log_summary['query_history_limit']}",
         expanded=False,
     ):
-        st.caption(
-            "This is the persisted local chat/query history used for audit-style review, "
-            "debugging, and dashboard signals."
-        )
         recent_query_rows = [
             {
                 "Timestamp": row[0],
@@ -3237,108 +3274,126 @@ if selected_page in ["KB Management", "KB Status"]:
                     onedrive_files = st.session_state.get("onedrive_files", [])
 
                     if onedrive_files:
-                        st.dataframe(
-                            [
-                                {
-                                    "Name": file_item["name"],
-                                    "State": file_item.get("connector_state", "New"),
-                                    "Path": file_item["connector_path"],
-                                    "Size (KB)": round((file_item.get("size") or 0) / 1024, 1),
-                                    "Modified": file_item.get("last_modified_datetime"),
-                                    "KB Record": file_item.get("staged_document_id") or "",
-                                }
-                                for file_item in onedrive_files
-                            ],
-                            use_container_width=True,
-                            hide_index=True,
-                            height=260,
-                        )
                         stageable_count = sum(
                             1
                             for file_item in onedrive_files
                             if file_item.get("connector_state", "New") in ["New", "Rejected"]
                         )
-                        st.caption(
-                            f"{len(onedrive_files)} discovered file(s), "
-                            f"{stageable_count} stageable"
+                        refreshable_count = sum(
+                            1
+                            for file_item in onedrive_files
+                            if file_item.get("connector_state") in ["Pending Index", "Indexed"]
                         )
+                        connector_metric_columns = st.columns(3)
+
+                        with connector_metric_columns[0]:
+                            render_status_card("Discovered", len(onedrive_files))
+
+                        with connector_metric_columns[1]:
+                            render_status_card(
+                                "Stageable",
+                                stageable_count,
+                                "attention" if stageable_count else "neutral",
+                            )
+
+                        with connector_metric_columns[2]:
+                            render_status_card("Refreshable", refreshable_count)
+
+                        with st.expander("Discovered Files", expanded=False):
+                            st.dataframe(
+                                [
+                                    {
+                                        "Name": file_item["name"],
+                                        "State": file_item.get("connector_state", "New"),
+                                        "Path": file_item["connector_path"],
+                                        "Size (KB)": round((file_item.get("size") or 0) / 1024, 1),
+                                        "Modified": file_item.get("last_modified_datetime"),
+                                        "KB Record": file_item.get("staged_document_id") or "",
+                                    }
+                                    for file_item in onedrive_files
+                                ],
+                                use_container_width=True,
+                                hide_index=True,
+                                height=260,
+                            )
                         file_options = {
                             f"{file_item['name']} - {file_item['connector_path']}": file_item
                             for file_item in onedrive_files
                         }
 
-                        selection_columns = st.columns(3)
+                        with st.expander("Stage Files for Review", expanded=False):
+                            selection_columns = st.columns(3)
 
-                        with selection_columns[0]:
-                            if st.button(
-                                "Select All",
-                                use_container_width=True,
-                                key="select_all_onedrive_files_button",
-                            ):
-                                st.session_state["selected_onedrive_files_to_stage"] = list(file_options.keys())
-                                st.rerun()
+                            with selection_columns[0]:
+                                if st.button(
+                                    "Select All",
+                                    use_container_width=True,
+                                    key="select_all_onedrive_files_button",
+                                ):
+                                    st.session_state["selected_onedrive_files_to_stage"] = list(file_options.keys())
+                                    st.rerun()
 
-                        with selection_columns[1]:
-                            if st.button(
-                                "Select New/Rejected",
-                                use_container_width=True,
-                                key="select_stageable_onedrive_files_button",
-                            ):
-                                st.session_state["selected_onedrive_files_to_stage"] = [
-                                    label
-                                    for label, file_item in file_options.items()
-                                    if file_item.get("connector_state", "New") in ["New", "Rejected"]
-                                ]
-                                st.rerun()
+                            with selection_columns[1]:
+                                if st.button(
+                                    "Select New/Rejected",
+                                    use_container_width=True,
+                                    key="select_stageable_onedrive_files_button",
+                                ):
+                                    st.session_state["selected_onedrive_files_to_stage"] = [
+                                        label
+                                        for label, file_item in file_options.items()
+                                        if file_item.get("connector_state", "New") in ["New", "Rejected"]
+                                    ]
+                                    st.rerun()
 
-                        with selection_columns[2]:
-                            if st.button(
-                                "Clear Selection",
-                                use_container_width=True,
-                                key="clear_onedrive_selection_button",
-                            ):
-                                st.session_state["selected_onedrive_files_to_stage"] = []
-                                st.rerun()
+                            with selection_columns[2]:
+                                if st.button(
+                                    "Clear Selection",
+                                    use_container_width=True,
+                                    key="clear_onedrive_selection_button",
+                                ):
+                                    st.session_state["selected_onedrive_files_to_stage"] = []
+                                    st.rerun()
 
-                        selected_file_labels = st.multiselect(
-                            "Select OneDrive files to stage",
-                            list(file_options.keys()),
-                            key="selected_onedrive_files_to_stage",
-                        )
-
-                        if st.button(
-                            "Stage Selected Files for Review",
-                            use_container_width=True,
-                            disabled=(
-                                not selected_file_labels
-                                or bool(st.session_state.get("active_onedrive_stage_job_id"))
-                            ),
-                            key="submit_onedrive_stage_job_button",
-                        ):
-                            selected_files = [
-                                file_options[selected_file_label]
-                                for selected_file_label in selected_file_labels
-                            ]
-
-                            try:
-                                job = submit_onedrive_stage_job(selected_files)
-                            except requests.exceptions.HTTPError as error:
-                                st.error(f"OneDrive staging rejected by backend: {error.response.text}")
-                            except requests.exceptions.RequestException as error:
-                                st.error(f"Could not submit OneDrive staging job: {error}")
-                            else:
-                                st.session_state["active_onedrive_stage_job_id"] = job["job_id"]
-                                st.session_state["onedrive_stage_message"] = job["message"]
-                                st.session_state["onedrive_stage_status"] = "info"
-                                st.rerun()
-
-                        if st.session_state.get("onedrive_stage_results"):
-                            st.dataframe(
-                                st.session_state["onedrive_stage_results"],
-                                use_container_width=True,
-                                hide_index=True,
-                                height=220,
+                            selected_file_labels = st.multiselect(
+                                "Select OneDrive files to stage",
+                                list(file_options.keys()),
+                                key="selected_onedrive_files_to_stage",
                             )
+
+                            if st.button(
+                                "Stage Selected Files for Review",
+                                use_container_width=True,
+                                disabled=(
+                                    not selected_file_labels
+                                    or bool(st.session_state.get("active_onedrive_stage_job_id"))
+                                ),
+                                key="submit_onedrive_stage_job_button",
+                            ):
+                                selected_files = [
+                                    file_options[selected_file_label]
+                                    for selected_file_label in selected_file_labels
+                                ]
+
+                                try:
+                                    job = submit_onedrive_stage_job(selected_files)
+                                except requests.exceptions.HTTPError as error:
+                                    st.error(f"OneDrive staging rejected by backend: {error.response.text}")
+                                except requests.exceptions.RequestException as error:
+                                    st.error(f"Could not submit OneDrive staging job: {error}")
+                                else:
+                                    st.session_state["active_onedrive_stage_job_id"] = job["job_id"]
+                                    st.session_state["onedrive_stage_message"] = job["message"]
+                                    st.session_state["onedrive_stage_status"] = "info"
+                                    st.rerun()
+
+                            if st.session_state.get("onedrive_stage_results"):
+                                st.dataframe(
+                                    st.session_state["onedrive_stage_results"],
+                                    use_container_width=True,
+                                    hide_index=True,
+                                    height=220,
+                                )
                         
                     refreshable_file_options = {
                         label: file_item
@@ -3347,98 +3402,92 @@ if selected_page in ["KB Management", "KB Status"]:
                     }
 
                     if refreshable_file_options:
-                        st.divider()
-                        st.markdown("**Refresh Existing OneDrive Documents**")
-                        st.caption(
-                            "Primary flow: batch-check approved OneDrive sources. "
-                            "Changed files create new pending-index versions; unchanged files are reported without changes."
-                        )
+                        with st.expander("Refresh OneDrive Sources", expanded=False):
+                            if st.session_state.get("onedrive_refresh_message"):
+                                refresh_status = st.session_state.get("onedrive_refresh_status", "info")
 
-                        if st.session_state.get("onedrive_refresh_message"):
-                            refresh_status = st.session_state.get("onedrive_refresh_status", "info")
+                                if refresh_status == "success":
+                                    st.success(st.session_state["onedrive_refresh_message"])
+                                elif refresh_status == "error":
+                                    st.error(st.session_state["onedrive_refresh_message"])
+                                else:
+                                    st.info(st.session_state["onedrive_refresh_message"])
 
-                            if refresh_status == "success":
-                                st.success(st.session_state["onedrive_refresh_message"])
-                            elif refresh_status == "error":
-                                st.error(st.session_state["onedrive_refresh_message"])
-                            else:
-                                st.info(st.session_state["onedrive_refresh_message"])
+                            refresh_columns = st.columns(3)
 
-                        refresh_columns = st.columns(3)
+                            with refresh_columns[0]:
+                                if st.button(
+                                    "Select All Refreshable",
+                                    use_container_width=True,
+                                    key="select_all_onedrive_refresh_files_button",
+                                ):
+                                    st.session_state["selected_onedrive_files_to_refresh"] = list(
+                                        refreshable_file_options.keys()
+                                    )
+                                    st.rerun()
 
-                        with refresh_columns[0]:
+                            with refresh_columns[1]:
+                                if st.button(
+                                    "Clear Selection",
+                                    use_container_width=True,
+                                    key="clear_onedrive_refresh_selection_button",
+                                ):
+                                    st.session_state["selected_onedrive_files_to_refresh"] = []
+                                    st.rerun()
+
+                            with refresh_columns[2]:
+                                st.caption(f"{len(refreshable_file_options)} available")
+
+                            selected_refresh_labels = st.multiselect(
+                                "Select OneDrive files to refresh",
+                                list(refreshable_file_options.keys()),
+                                key="selected_onedrive_files_to_refresh",
+                            )
+
                             if st.button(
-                                "Select All Refreshable",
+                                "Refresh Selected OneDrive Files",
                                 use_container_width=True,
-                                key="select_all_onedrive_refresh_files_button",
+                                disabled=(
+                                    not selected_refresh_labels
+                                    or bool(st.session_state.get("active_onedrive_refresh_job_id"))
+                                ),
+                                key="submit_onedrive_refresh_job_button",
                             ):
-                                st.session_state["selected_onedrive_files_to_refresh"] = list(
-                                    refreshable_file_options.keys()
+                                selected_refresh_files = [
+                                    refreshable_file_options[selected_refresh_label]
+                                    for selected_refresh_label in selected_refresh_labels
+                                ]
+
+                                try:
+                                    job = submit_onedrive_refresh_job(selected_refresh_files)
+                                except requests.exceptions.HTTPError as error:
+                                    st.error(f"OneDrive refresh rejected by backend: {error.response.text}")
+                                except requests.exceptions.RequestException as error:
+                                    st.error(f"Could not submit OneDrive refresh job: {error}")
+                                else:
+                                    st.session_state["active_onedrive_refresh_job_id"] = job["job_id"]
+                                    st.session_state["onedrive_refresh_message"] = job["message"]
+                                    st.session_state["onedrive_refresh_status"] = "info"
+                                    st.rerun()
+
+                            if st.session_state.get("onedrive_refresh_results"):
+                                st.dataframe(
+                                    st.session_state["onedrive_refresh_results"],
+                                    use_container_width=True,
+                                    hide_index=True,
+                                    height=220,
                                 )
-                                st.rerun()
+                                render_pending_index_notice(
+                                    [
+                                        document
+                                        for document in pending_connector_versions
+                                        if document.get("source") == "onedrive"
+                                    ],
+                                    label="OneDrive-updated document",
+                                    expander_label="Pending OneDrive Versions",
+                                    use_expander=False,
+                                )
 
-                        with refresh_columns[1]:
-                            if st.button(
-                                "Clear Refresh Selection",
-                                use_container_width=True,
-                                key="clear_onedrive_refresh_selection_button",
-                            ):
-                                st.session_state["selected_onedrive_files_to_refresh"] = []
-                                st.rerun()
-
-                        with refresh_columns[2]:
-                            st.caption(f"{len(refreshable_file_options)} refreshable file(s)")
-
-                        selected_refresh_labels = st.multiselect(
-                            "Select OneDrive files to refresh",
-                            list(refreshable_file_options.keys()),
-                            key="selected_onedrive_files_to_refresh",
-                        )
-
-                        if st.button(
-                            "Refresh Selected OneDrive Files",
-                            use_container_width=True,
-                            disabled=(
-                                not selected_refresh_labels
-                                or bool(st.session_state.get("active_onedrive_refresh_job_id"))
-                            ),
-                            key="submit_onedrive_refresh_job_button",
-                        ):
-                            selected_refresh_files = [
-                                refreshable_file_options[selected_refresh_label]
-                                for selected_refresh_label in selected_refresh_labels
-                            ]
-
-                            try:
-                                job = submit_onedrive_refresh_job(selected_refresh_files)
-                            except requests.exceptions.HTTPError as error:
-                                st.error(f"OneDrive refresh rejected by backend: {error.response.text}")
-                            except requests.exceptions.RequestException as error:
-                                st.error(f"Could not submit OneDrive refresh job: {error}")
-                            else:
-                                st.session_state["active_onedrive_refresh_job_id"] = job["job_id"]
-                                st.session_state["onedrive_refresh_message"] = job["message"]
-                                st.session_state["onedrive_refresh_status"] = "info"
-                                st.rerun()
-
-                        if st.session_state.get("onedrive_refresh_results"):
-                            st.dataframe(
-                                st.session_state["onedrive_refresh_results"],
-                                use_container_width=True,
-                                hide_index=True,
-                                height=220,
-                            )
-                            render_pending_index_notice(
-                                [
-                                    document
-                                    for document in pending_connector_versions
-                                    if document.get("source") == "onedrive"
-                                ],
-                                label="OneDrive-updated document",
-                                expander_label="Pending OneDrive Versions",
-                            )
-
-                        with st.expander("Single File Refresh", expanded=False):
                             selected_refresh_label = st.selectbox(
                                 "Select one OneDrive file to refresh",
                                 list(refreshable_file_options.keys()),
@@ -3486,111 +3535,137 @@ if selected_page in ["KB Management", "KB Status"]:
                 onenote_pages = st.session_state.get("onenote_pages", [])
 
                 if onenote_pages:
-                    st.dataframe(
-                        [
-                            {
-                                "Title": page["title"] or "Untitled Page",
-                                "State": page.get("connector_state", "New"),
-                                "Notebook": page["notebook_name"],
-                                "Section": page["section_name"],
-                                "Path": page["connector_path"],
-                                "Modified": page.get("last_modified_datetime"),
-                                "KB Record": page.get("staged_document_id") or "",
-                            }
-                            for page in onenote_pages
-                        ],
-                        use_container_width=True,
-                        hide_index=True,
-                        height=260,
-                    )
-
                     page_options = {
                         f"{page.get('title') or 'Untitled Page'} - {page['connector_path']}": page
                         for page in onenote_pages
                     }
-
-                    selection_columns = st.columns(3)
-
-                    with selection_columns[0]:
-                        if st.button(
-                            "Select All Pages",
-                            use_container_width=True,
-                            key="select_all_onenote_pages_button",
-                        ):
-                            st.session_state["selected_onenote_pages_to_stage"] = list(page_options.keys())
-                            st.rerun()
-
-                    with selection_columns[1]:
-                        if st.button(
-                            "Select New/Rejected",
-                            use_container_width=True,
-                            key="select_stageable_onenote_pages_button",
-                        ):
-                            st.session_state["selected_onenote_pages_to_stage"] = [
-                                label
-                                for label, page in page_options.items()
-                                if page.get("connector_state", "New") in ["New", "Rejected"]
-                            ]
-                            st.rerun()
-
-                    with selection_columns[2]:
-                        if st.button(
-                            "Clear Page Selection",
-                            use_container_width=True,
-                            key="clear_onenote_selection_button",
-                        ):
-                            st.session_state["selected_onenote_pages_to_stage"] = []
-                            st.rerun()
-
-                    selected_page_labels = st.multiselect(
-                        "Select OneNote pages to stage",
-                        list(page_options.keys()),
-                        key="selected_onenote_pages_to_stage",
+                    stageable_count = sum(
+                        1
+                        for page in onenote_pages
+                        if page.get("connector_state", "New") in ["New", "Rejected"]
                     )
+                    refreshable_count = sum(
+                        1
+                        for page in onenote_pages
+                        if page.get("connector_state") in ["Pending Index", "Indexed"]
+                    )
+                    connector_metric_columns = st.columns(3)
 
-                    if st.session_state.get("onenote_stage_message"):
-                        stage_status = st.session_state.get("onenote_stage_status", "info")
+                    with connector_metric_columns[0]:
+                        render_status_card("Discovered", len(onenote_pages))
 
-                        if stage_status == "success":
-                            st.success(st.session_state["onenote_stage_message"])
-                        elif stage_status == "error":
-                            st.error(st.session_state["onenote_stage_message"])
-                        else:
-                            st.info(st.session_state["onenote_stage_message"])
+                    with connector_metric_columns[1]:
+                        render_status_card(
+                            "Stageable",
+                            stageable_count,
+                            "attention" if stageable_count else "neutral",
+                        )
 
-                    if st.button(
-                        "Stage Selected Pages for Review",
-                        use_container_width=True,
-                        disabled=(
-                            not selected_page_labels
-                            or bool(st.session_state.get("active_onenote_stage_job_id"))
-                        ),
-                        key="submit_onenote_stage_job_button",
-                    ):
-                        selected_pages = [
-                            page_options[selected_page_label]
-                            for selected_page_label in selected_page_labels
-                        ]
+                    with connector_metric_columns[2]:
+                        render_status_card("Refreshable", refreshable_count)
 
-                        try:
-                            job = submit_onenote_stage_job(selected_pages)
-                        except requests.exceptions.HTTPError as error:
-                            st.error(f"OneNote staging rejected by backend: {error.response.text}")
-                        except requests.exceptions.RequestException as error:
-                            st.error(f"Could not submit OneNote staging job: {error}")
-                        else:
-                            st.session_state["active_onenote_stage_job_id"] = job["job_id"]
-                            st.session_state["onenote_stage_message"] = job["message"]
-                            st.session_state["onenote_stage_status"] = "info"
-                            st.rerun()
-
-                    if st.session_state.get("onenote_stage_results"):
+                    with st.expander("Discovered Pages", expanded=False):
                         st.dataframe(
-                            st.session_state["onenote_stage_results"],
+                            [
+                                {
+                                    "Title": page["title"] or "Untitled Page",
+                                    "State": page.get("connector_state", "New"),
+                                    "Notebook": page["notebook_name"],
+                                    "Section": page["section_name"],
+                                    "Path": page["connector_path"],
+                                    "Modified": page.get("last_modified_datetime"),
+                                    "KB Record": page.get("staged_document_id") or "",
+                                }
+                                for page in onenote_pages
+                            ],
                             use_container_width=True,
                             hide_index=True,
-                            height=220,
+                            height=260,
                         )
+
+                    with st.expander("Stage Pages for Review", expanded=False):
+                        selection_columns = st.columns(3)
+
+                        with selection_columns[0]:
+                            if st.button(
+                                "Select All Pages",
+                                use_container_width=True,
+                                key="select_all_onenote_pages_button",
+                            ):
+                                st.session_state["selected_onenote_pages_to_stage"] = list(page_options.keys())
+                                st.rerun()
+
+                        with selection_columns[1]:
+                            if st.button(
+                                "Select New/Rejected",
+                                use_container_width=True,
+                                key="select_stageable_onenote_pages_button",
+                            ):
+                                st.session_state["selected_onenote_pages_to_stage"] = [
+                                    label
+                                    for label, page in page_options.items()
+                                    if page.get("connector_state", "New") in ["New", "Rejected"]
+                                ]
+                                st.rerun()
+
+                        with selection_columns[2]:
+                            if st.button(
+                                "Clear Selection",
+                                use_container_width=True,
+                                key="clear_onenote_selection_button",
+                            ):
+                                st.session_state["selected_onenote_pages_to_stage"] = []
+                                st.rerun()
+
+                        selected_page_labels = st.multiselect(
+                            "Select OneNote pages to stage",
+                            list(page_options.keys()),
+                            key="selected_onenote_pages_to_stage",
+                        )
+
+                        if st.session_state.get("onenote_stage_message"):
+                            stage_status = st.session_state.get("onenote_stage_status", "info")
+
+                            if stage_status == "success":
+                                st.success(st.session_state["onenote_stage_message"])
+                            elif stage_status == "error":
+                                st.error(st.session_state["onenote_stage_message"])
+                            else:
+                                st.info(st.session_state["onenote_stage_message"])
+
+                        if st.button(
+                            "Stage Selected Pages for Review",
+                            use_container_width=True,
+                            disabled=(
+                                not selected_page_labels
+                                or bool(st.session_state.get("active_onenote_stage_job_id"))
+                            ),
+                            key="submit_onenote_stage_job_button",
+                        ):
+                            selected_pages = [
+                                page_options[selected_page_label]
+                                for selected_page_label in selected_page_labels
+                            ]
+
+                            try:
+                                job = submit_onenote_stage_job(selected_pages)
+                            except requests.exceptions.HTTPError as error:
+                                st.error(f"OneNote staging rejected by backend: {error.response.text}")
+                            except requests.exceptions.RequestException as error:
+                                st.error(f"Could not submit OneNote staging job: {error}")
+                            else:
+                                st.session_state["active_onenote_stage_job_id"] = job["job_id"]
+                                st.session_state["onenote_stage_message"] = job["message"]
+                                st.session_state["onenote_stage_status"] = "info"
+                                st.rerun()
+
+                        if st.session_state.get("onenote_stage_results"):
+                            st.dataframe(
+                                st.session_state["onenote_stage_results"],
+                                use_container_width=True,
+                                hide_index=True,
+                                height=220,
+                            )
 
                     refreshable_page_options = {
                         label: page
@@ -3599,98 +3674,92 @@ if selected_page in ["KB Management", "KB Status"]:
                     }
 
                     if refreshable_page_options:
-                        st.divider()
-                        st.markdown("**Refresh Existing OneNote Pages**")
-                        st.caption(
-                            "Primary flow: batch-check approved OneNote pages. "
-                            "Changed pages create new pending-index versions; unchanged pages are reported without changes."
-                        )
+                        with st.expander("Refresh OneNote Pages", expanded=False):
+                            if st.session_state.get("onenote_refresh_message"):
+                                refresh_status = st.session_state.get("onenote_refresh_status", "info")
 
-                        if st.session_state.get("onenote_refresh_message"):
-                            refresh_status = st.session_state.get("onenote_refresh_status", "info")
+                                if refresh_status == "success":
+                                    st.success(st.session_state["onenote_refresh_message"])
+                                elif refresh_status == "error":
+                                    st.error(st.session_state["onenote_refresh_message"])
+                                else:
+                                    st.info(st.session_state["onenote_refresh_message"])
 
-                            if refresh_status == "success":
-                                st.success(st.session_state["onenote_refresh_message"])
-                            elif refresh_status == "error":
-                                st.error(st.session_state["onenote_refresh_message"])
-                            else:
-                                st.info(st.session_state["onenote_refresh_message"])
+                            refresh_columns = st.columns(3)
 
-                        refresh_columns = st.columns(3)
+                            with refresh_columns[0]:
+                                if st.button(
+                                    "Select All Refreshable",
+                                    use_container_width=True,
+                                    key="select_all_onenote_refresh_pages_button",
+                                ):
+                                    st.session_state["selected_onenote_pages_to_refresh"] = list(
+                                        refreshable_page_options.keys()
+                                    )
+                                    st.rerun()
 
-                        with refresh_columns[0]:
+                            with refresh_columns[1]:
+                                if st.button(
+                                    "Clear Selection",
+                                    use_container_width=True,
+                                    key="clear_onenote_refresh_selection_button",
+                                ):
+                                    st.session_state["selected_onenote_pages_to_refresh"] = []
+                                    st.rerun()
+
+                            with refresh_columns[2]:
+                                st.caption(f"{len(refreshable_page_options)} available")
+
+                            selected_refresh_labels = st.multiselect(
+                                "Select OneNote pages to refresh",
+                                list(refreshable_page_options.keys()),
+                                key="selected_onenote_pages_to_refresh",
+                            )
+
                             if st.button(
-                                "Select All Refreshable",
+                                "Refresh Selected OneNote Pages",
                                 use_container_width=True,
-                                key="select_all_onenote_refresh_pages_button",
+                                disabled=(
+                                    not selected_refresh_labels
+                                    or bool(st.session_state.get("active_onenote_refresh_job_id"))
+                                ),
+                                key="submit_onenote_refresh_job_button",
                             ):
-                                st.session_state["selected_onenote_pages_to_refresh"] = list(
-                                    refreshable_page_options.keys()
+                                selected_refresh_pages = [
+                                    refreshable_page_options[selected_refresh_label]
+                                    for selected_refresh_label in selected_refresh_labels
+                                ]
+
+                                try:
+                                    job = submit_onenote_refresh_job(selected_refresh_pages)
+                                except requests.exceptions.HTTPError as error:
+                                    st.error(f"OneNote refresh rejected by backend: {error.response.text}")
+                                except requests.exceptions.RequestException as error:
+                                    st.error(f"Could not submit OneNote refresh job: {error}")
+                                else:
+                                    st.session_state["active_onenote_refresh_job_id"] = job["job_id"]
+                                    st.session_state["onenote_refresh_message"] = job["message"]
+                                    st.session_state["onenote_refresh_status"] = "info"
+                                    st.rerun()
+
+                            if st.session_state.get("onenote_refresh_results"):
+                                st.dataframe(
+                                    st.session_state["onenote_refresh_results"],
+                                    use_container_width=True,
+                                    hide_index=True,
+                                    height=220,
                                 )
-                                st.rerun()
+                                render_pending_index_notice(
+                                    [
+                                        document
+                                        for document in pending_connector_versions
+                                        if document.get("source") == "onenote"
+                                    ],
+                                    label="OneNote-updated document",
+                                    expander_label="Pending OneNote Versions",
+                                    use_expander=False,
+                                )
 
-                        with refresh_columns[1]:
-                            if st.button(
-                                "Clear Refresh Selection",
-                                use_container_width=True,
-                                key="clear_onenote_refresh_selection_button",
-                            ):
-                                st.session_state["selected_onenote_pages_to_refresh"] = []
-                                st.rerun()
-
-                        with refresh_columns[2]:
-                            st.caption(f"{len(refreshable_page_options)} refreshable page(s)")
-
-                        selected_refresh_labels = st.multiselect(
-                            "Select OneNote pages to refresh",
-                            list(refreshable_page_options.keys()),
-                            key="selected_onenote_pages_to_refresh",
-                        )
-
-                        if st.button(
-                            "Refresh Selected OneNote Pages",
-                            use_container_width=True,
-                            disabled=(
-                                not selected_refresh_labels
-                                or bool(st.session_state.get("active_onenote_refresh_job_id"))
-                            ),
-                            key="submit_onenote_refresh_job_button",
-                        ):
-                            selected_refresh_pages = [
-                                refreshable_page_options[selected_refresh_label]
-                                for selected_refresh_label in selected_refresh_labels
-                            ]
-
-                            try:
-                                job = submit_onenote_refresh_job(selected_refresh_pages)
-                            except requests.exceptions.HTTPError as error:
-                                st.error(f"OneNote refresh rejected by backend: {error.response.text}")
-                            except requests.exceptions.RequestException as error:
-                                st.error(f"Could not submit OneNote refresh job: {error}")
-                            else:
-                                st.session_state["active_onenote_refresh_job_id"] = job["job_id"]
-                                st.session_state["onenote_refresh_message"] = job["message"]
-                                st.session_state["onenote_refresh_status"] = "info"
-                                st.rerun()
-
-                        if st.session_state.get("onenote_refresh_results"):
-                            st.dataframe(
-                                st.session_state["onenote_refresh_results"],
-                                use_container_width=True,
-                                hide_index=True,
-                                height=220,
-                            )
-                            render_pending_index_notice(
-                                [
-                                    document
-                                    for document in pending_connector_versions
-                                    if document.get("source") == "onenote"
-                                ],
-                                label="OneNote-updated document",
-                                expander_label="Pending OneNote Versions",
-                            )
-
-                        with st.expander("Single Page Refresh", expanded=False):
                             selected_refresh_label = st.selectbox(
                                 "Select one OneNote page to refresh",
                                 list(refreshable_page_options.keys()),
@@ -3874,8 +3943,6 @@ if selected_page in ["KB Management", "KB Status"]:
             with index_tab:
                 with st.container(border=True):
                     st.markdown("**Index Sync**")
-
-                    st.caption("Full rebuild is long-running and reconstructs the active index from scratch.")
                     render_pending_index_notice(
                         pending_index_documents,
                         label="pending document",
@@ -4463,7 +4530,7 @@ if selected_page == "Chat":
 
         with filter_columns[2]:
             st.text_input(
-                "Selected Search Scope",
+                "Active Scope",
                 value=filter_status,
                 disabled=True,
             )
@@ -4577,38 +4644,38 @@ if selected_page == "Chat":
                 disabled=chat_is_processing,
             )
 
-    # Prompt buttons directly below the input
-    st.markdown("<div style='margin-top: 0.5rem;'></div>", unsafe_allow_html=True)
     example_prompts = ROLE_AWARE_CHAT_PROMPTS[st.session_state["role"]]
-    
-    # Calculate columns (Add +1 for Demo button if General Employee, or Clear button)
-    total_cols = len(example_prompts) + (2 if st.session_state["role"] == GENERAL_EMPLOYEE_ROLE else 1)
-    example_columns = st.columns(total_cols)
 
-    for i, (label, prompt) in enumerate(example_prompts.items()):
-        with example_columns[i]:
-            st.button(
-                label,
-                key=f"example_prompt_{label}",
-                on_click=select_example_chat_prompt,
-                args=(prompt,),
-                use_container_width=True,
-                disabled=chat_is_processing,
-            )
+    with st.expander("Suggested Questions", expanded=False):
+        total_cols = len(example_prompts) + (1 if st.session_state["role"] == GENERAL_EMPLOYEE_ROLE else 0)
+        example_columns = st.columns(total_cols)
 
-    if st.session_state["role"] == GENERAL_EMPLOYEE_ROLE:
-        with example_columns[-2]:
-            st.button(
-                "Demo Restricted IT Policy",
-                key="acl_demo_prompt",
-                on_click=select_example_chat_prompt,
-                args=("What are the password policy requirements?",),
-                use_container_width=True,
-                disabled=chat_is_processing,
-            )
+        for i, (label, prompt) in enumerate(example_prompts.items()):
+            with example_columns[i]:
+                st.button(
+                    label,
+                    key=f"example_prompt_{label}",
+                    on_click=select_example_chat_prompt,
+                    args=(prompt,),
+                    use_container_width=True,
+                    disabled=chat_is_processing,
+                )
 
-    with example_columns[-1]:
-        if st.button("Clear", use_container_width=True, disabled=chat_is_processing):
+        if st.session_state["role"] == GENERAL_EMPLOYEE_ROLE:
+            with example_columns[-1]:
+                st.button(
+                    "Restricted IT Policy",
+                    key="acl_demo_prompt",
+                    on_click=select_example_chat_prompt,
+                    args=("What are the password policy requirements?",),
+                    use_container_width=True,
+                    disabled=chat_is_processing,
+                )
+
+    clear_columns = st.columns([1, 5])
+
+    with clear_columns[0]:
+        if st.button("Clear Chat", use_container_width=True, disabled=chat_is_processing):
             st.session_state["chat_messages"] = []
             st.rerun()
 
