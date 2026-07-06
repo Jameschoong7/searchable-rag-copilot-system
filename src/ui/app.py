@@ -1219,6 +1219,50 @@ def is_connector_document(document: dict) -> bool:
     return document.get("source") in ["onedrive", "onenote"]
 
 
+def build_connector_version_chain_rows(documents: list[dict]) -> list[dict]:
+    """Build a compact previous-version to new-version table for Graph connectors."""
+    document_by_id = {
+        document["document_id"]: document
+        for document in documents
+    }
+    chain_rows = []
+
+    for previous_document in documents:
+        replacement_id = previous_document.get("replaced_by_document_id")
+
+        if (
+            not is_connector_document(previous_document)
+            or previous_document.get("chunk_id") != "archived"
+            or not replacement_id
+        ):
+            continue
+
+        new_document = document_by_id.get(replacement_id, {})
+        source_label = (
+            new_document.get("source")
+            or previous_document.get("source")
+            or "connector"
+        ).title()
+
+        chain_rows.append(
+            {
+                "Connector": source_label,
+                "Changed Source": new_document.get("title") or previous_document.get("title"),
+                "Previous Document ID": previous_document["document_id"],
+                "New Document ID": replacement_id,
+                "Version": get_version_label(new_document) if new_document else "-",
+                "Index Status": get_index_status_label(new_document) if new_document else "Missing",
+                "Archived At": previous_document.get("archived_at") or "-",
+            }
+        )
+
+    return sorted(
+        chain_rows,
+        key=lambda row: row["Archived At"],
+        reverse=True,
+    )
+
+
 def initialise_query_log_database() -> None:
     """Create the local SQLite query log table if it does not exist."""
     QUERY_LOG_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -2020,12 +2064,10 @@ if selected_page == "Performance":
     connector_evidence_error = None
     latest_onedrive_refresh_job = None
     latest_onenote_refresh_job = None
-    latest_index_update_job = None
 
     try:
         latest_onedrive_refresh_job = get_latest_backend_job("onedrive_refresh")
         latest_onenote_refresh_job = get_latest_backend_job("onenote_refresh")
-        latest_index_update_job = get_latest_backend_job("index_update")
     except requests.exceptions.RequestException as error:
         connector_evidence_error = str(error)
 
@@ -2094,27 +2136,31 @@ if selected_page == "Performance":
         live_metric_columns = st.columns(4)
 
         with live_metric_columns[0]:
-            st.metric(
+            render_status_card(
                 "Grounded Answers",
                 query_log_summary["grounded_answers"],
+                "success",
             )
 
         with live_metric_columns[1]:
-            st.metric(
+            render_status_card(
                 "Not Found",
                 query_log_summary["not_found_queries"],
+                "attention" if query_log_summary["not_found_queries"] else "neutral",
             )
 
         with live_metric_columns[2]:
-            st.metric(
+            render_status_card(
                 "Permission Blocks",
                 query_log_summary["permission_blocks"],
+                "attention" if query_log_summary["permission_blocks"] else "neutral",
             )
 
         with live_metric_columns[3]:
-            st.metric(
+            render_status_card(
                 "API / Connection Errors",
                 query_log_summary["error_queries"],
+                "danger" if query_log_summary["error_queries"] else "neutral",
             )
 
         recent_outcome_rows = [
@@ -2134,14 +2180,15 @@ if selected_page == "Performance":
             for row in query_log_summary["recent_outcome_rows"]
         ]
 
-        if recent_outcome_rows:
-            st.dataframe(
-                recent_outcome_rows,
-                use_container_width=True,
-                hide_index=True,
-            )
-        else:
-            st.info("No logged chat outcomes yet. Submit a Chat query to populate this table.")
+        with st.expander("Recent Chat Outcomes", expanded=False):
+            if recent_outcome_rows:
+                st.dataframe(
+                    recent_outcome_rows,
+                    use_container_width=True,
+                    hide_index=True,
+                )
+            else:
+                st.info("No logged chat outcomes yet. Submit a Chat query to populate this table.")
 
     with st.container(border=True):
         st.subheader("Document Update Evidence")
@@ -2156,16 +2203,7 @@ if selected_page == "Performance":
             for document in connector_active_documents
             if document.get("chunk_id") in ["pending", "pending_index"]
         ]
-        connector_archived_versions = [
-            document
-            for document in all_documents
-            if (
-                is_connector_document(document)
-                and document.get("is_active") == 0
-                and document.get("chunk_id") == "archived"
-                and document.get("replaced_by_document_id")
-            )
-        ]
+        connector_version_chain_rows = build_connector_version_chain_rows(all_documents)
         connector_refresh_rows = [
             summarize_connector_refresh_job(
                 latest_onedrive_refresh_job,
@@ -2180,18 +2218,6 @@ if selected_page == "Performance":
         total_updated = sum(row["Updated"] for row in connector_refresh_rows)
         total_unchanged = sum(row["Unchanged"] for row in connector_refresh_rows)
         total_rejected_or_error = sum(row["Rejected / Error"] for row in connector_refresh_rows)
-        latest_index_result = (
-            latest_index_update_job.get("result", {})
-            if latest_index_update_job
-            else {}
-        )
-        latest_chunks_indexed = latest_index_result.get("total_chunks_indexed", 0)
-        latest_deleted_vectors = latest_index_result.get("total_deleted_vectors", 0)
-        latest_index_status = (
-            latest_index_update_job.get("status", "No job").title()
-            if latest_index_update_job
-            else "No job"
-        )
 
         update_metric_columns = st.columns(4)
 
@@ -2224,34 +2250,23 @@ if selected_page == "Performance":
                 f"Could not load latest connector job evidence from backend: {connector_evidence_error}"
             )
 
-        st.dataframe(
-            connector_refresh_rows,
-            use_container_width=True,
-            hide_index=True,
-        )
-
-        evidence_detail_columns = st.columns(3)
-
-        with evidence_detail_columns[0]:
-            st.metric(
-                "Old Versions Archived",
-                len(connector_archived_versions),
-                "Connector replacements",
+        with st.expander("Connector Refresh Details", expanded=False):
+            st.dataframe(
+                connector_refresh_rows,
+                use_container_width=True,
+                hide_index=True,
             )
 
-        with evidence_detail_columns[1]:
-            st.metric(
-                "Latest Chunks Updated",
-                latest_chunks_indexed,
-                f"{latest_deleted_vectors} old vectors removed",
-            )
-
-        with evidence_detail_columns[2]:
-            st.metric(
-                "Latest Index Job",
-                latest_index_status,
-                latest_index_update_job["updated_at"] if latest_index_update_job else "-",
-            )
+        with st.expander("Connector Version Chain", expanded=False):
+            if connector_version_chain_rows:
+                st.dataframe(
+                    connector_version_chain_rows,
+                    use_container_width=True,
+                    hide_index=True,
+                    height=min(260, 38 * (len(connector_version_chain_rows) + 1)),
+                )
+            else:
+                st.caption("No connector replacement chain has been recorded yet.")
 
         if total_rejected_or_error:
             st.warning(
