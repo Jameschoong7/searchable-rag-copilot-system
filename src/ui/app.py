@@ -1263,6 +1263,70 @@ def build_connector_version_chain_rows(documents: list[dict]) -> list[dict]:
     )
 
 
+def get_pending_connector_versions(documents: list[dict]) -> list[dict]:
+    """Return connector-backed active versions waiting for index update."""
+    return [
+        document
+        for document in documents
+        if (
+            is_connector_document(document)
+            and document.get("is_active") == 1
+            and document.get("chunk_id") in ["pending", "pending_index"]
+        )
+    ]
+
+
+def get_pending_index_documents(documents: list[dict]) -> list[dict]:
+    """Return active visible documents waiting for index update."""
+    return [
+        document
+        for document in documents
+        if (
+            document.get("is_active") == 1
+            and document.get("chunk_id") in ["pending", "pending_index"]
+        )
+    ]
+
+
+def render_pending_index_notice(
+    pending_documents: list[dict],
+    label: str = "document",
+    expander_label: str = "Pending Documents",
+    show_index_sync_hint: bool = True,
+) -> None:
+    """Show pending-index follow-up guidance without changing backend state."""
+    if not pending_documents:
+        return
+
+    st.warning(
+        f"{len(pending_documents)} {label}(s) are waiting for index update."
+    )
+
+    if show_index_sync_hint:
+        st.caption(
+            "Open Index Sync and run Update for Pending Documents so chat uses the refreshed content."
+        )
+
+    with st.expander(expander_label, expanded=False):
+        st.dataframe(
+            [
+                {
+                    "Title": document.get("title"),
+                    "Source": document.get("source", ""),
+                    "Department": document.get("department"),
+                    "Document ID": document.get("document_id"),
+                    "Version": get_version_label(document),
+                    "Index Status": get_index_status_label(document),
+                    "Updated At": document.get("uploaded_at"),
+                }
+                for document in pending_documents
+            ],
+            use_container_width=True,
+            hide_index=True,
+            height=min(260, 38 * (len(pending_documents) + 1)),
+        )
+
+
 def initialise_query_log_database() -> None:
     """Create the local SQLite query log table if it does not exist."""
     QUERY_LOG_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -2779,6 +2843,8 @@ elif selected_page in ["KB Management", "KB Status"]:
         for document in visible_documents
         if get_index_status_label(document) == "Pending Index"
     )
+    pending_index_documents = get_pending_index_documents(visible_documents)
+    pending_connector_versions = get_pending_connector_versions(visible_documents)
     visible_indexed_count = sum(
         1
         for document in visible_documents
@@ -3271,6 +3337,15 @@ elif selected_page in ["KB Management", "KB Status"]:
                                 hide_index=True,
                                 height=220,
                             )
+                            render_pending_index_notice(
+                                [
+                                    document
+                                    for document in pending_connector_versions
+                                    if document.get("source") == "onedrive"
+                                ],
+                                label="OneDrive-updated document",
+                                expander_label="Pending OneDrive Versions",
+                            )
 
                         with st.expander("Single File Refresh", expanded=False):
                             selected_refresh_label = st.selectbox(
@@ -3514,6 +3589,15 @@ elif selected_page in ["KB Management", "KB Status"]:
                                 hide_index=True,
                                 height=220,
                             )
+                            render_pending_index_notice(
+                                [
+                                    document
+                                    for document in pending_connector_versions
+                                    if document.get("source") == "onenote"
+                                ],
+                                label="OneNote-updated document",
+                                expander_label="Pending OneNote Versions",
+                            )
 
                         with st.expander("Single Page Refresh", expanded=False):
                             selected_refresh_label = st.selectbox(
@@ -3701,6 +3785,12 @@ elif selected_page in ["KB Management", "KB Status"]:
                     st.markdown("**Index Sync**")
 
                     st.caption("Full rebuild is long-running and reconstructs the active index from scratch.")
+                    render_pending_index_notice(
+                        pending_index_documents,
+                        label="pending document",
+                        expander_label="Pending Documents",
+                        show_index_sync_hint=False,
+                    )
                     index_action_columns = st.columns(2)
 
                     with index_action_columns[0]:
