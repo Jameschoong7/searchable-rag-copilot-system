@@ -50,6 +50,7 @@ from src.core.job_repository import (
     JOB_TYPE_REINDEX,
     JOB_TYPE_INDEX_UPDATE,
     JOB_TYPE_ONEDRIVE_STAGE,
+    JOB_TYPE_ONEDRIVE_REFRESH,
     JOB_TYPE_ONENOTE_STAGE,
     JOB_TYPE_DOCUMENT_ARCHIVE,
     JOB_TYPE_DOCUMENT_UNARCHIVE,
@@ -187,6 +188,23 @@ class RefreshOneDriveFileResponse(BaseModel):
     previous_document_id: str | None = None
     chunk_id: str | None = None
     message: str
+
+
+class OneDriveRefreshFileItem(BaseModel):
+    """Represent one OneDrive file selected for batch refresh."""
+
+    item_id: str
+    name: str
+    connector_path: str
+
+
+class RefreshOneDriveFilesJobRequest(BaseModel):
+    """Represent a durable batch OneDrive refresh request."""
+
+    role: str
+    user: str
+    user_department: str
+    files: list[OneDriveRefreshFileItem]
 
 
 class OneNotePageSummary(BaseModel):
@@ -2445,6 +2463,130 @@ def create_onedrive_stage_job(
     return JobResponse(**job)
 
 
+def refresh_onedrive_file_item(
+    item_id: str,
+    name: str,
+    connector_path: str,
+    role: str,
+    user: str,
+    user_department: str,
+) -> RefreshOneDriveFileResponse:
+    """Refresh one OneDrive-backed KB document and return a structured result."""
+    from src.connectors.graph_client import download_onedrive_file_by_item_id
+    from src.connectors.graph_connector import (
+        build_graph_document_id,
+        build_graph_storage_filename,
+    )
+    from src.metadata.repository import (
+        create_new_document_version,
+        load_document_metadata,
+    )
+    from src.storage.document_storage import save_document_bytes
+
+    base_document_id = build_graph_document_id("GRAPH-OD", item_id)
+    all_documents = load_document_metadata(include_inactive=True)
+
+    active_document = find_active_graph_document(
+        documents=all_documents,
+        base_document_id=base_document_id,
+    )
+
+    if active_document is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No active KB document found for this OneDrive source item.",
+        )
+
+    if active_document.get("source") != "onedrive":
+        raise HTTPException(
+            status_code=400,
+            detail="Only OneDrive-backed documents can be refreshed by this endpoint.",
+        )
+
+    if active_document.get("chunk_id") not in ["pending_index", "indexed"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Only approved OneDrive documents can be refreshed.",
+        )
+
+    if role == PROJECT_MANAGER_ROLE and active_document["department"] != user_department:
+        raise HTTPException(
+            status_code=403,
+            detail="Project Manager can only refresh own-department connector documents.",
+        )
+
+    content_bytes = download_onedrive_file_by_item_id(item_id)
+
+    if not content_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail="Downloaded OneDrive file is empty.",
+        )
+
+    new_content_hash = hashlib.sha256(content_bytes).hexdigest()
+
+    if active_document.get("content_hash") == new_content_hash:
+        return RefreshOneDriveFileResponse(
+            status="no_change",
+            document_id=active_document["document_id"],
+            chunk_id=active_document.get("chunk_id"),
+            message="No content change detected for this OneDrive document.",
+        )
+
+    next_version_number = (active_document.get("version_number") or 1) + 1
+    source_document_id = active_document.get(
+        "source_document_id",
+        active_document["document_id"],
+    )
+    new_document_id = f"{source_document_id}-V{next_version_number}"
+
+    stored_filename = build_graph_storage_filename(
+        source_type="onedrive",
+        item_id=f"{item_id}_v{next_version_number}",
+        original_filename=name,
+    )
+
+    stored_document = save_document_bytes(stored_filename, content_bytes)
+    file_type = get_uploaded_file_type(stored_document.filename)
+
+    new_document = active_document.copy()
+    new_document.update(
+        {
+            "document_id": new_document_id,
+            "title": name,
+            "filename": stored_document.filename,
+            "storage_backend": stored_document.storage_backend,
+            "storage_uri": stored_document.storage_uri,
+            "file_type": file_type,
+            "source": "onedrive",
+            "uploaded_by": user,
+            "uploaded_at": datetime.now().isoformat(timespec="minutes"),
+            "chunk_id": "pending_index",
+            "visual_extraction_status": get_visual_extraction_status(file_type),
+            "content_hash": new_content_hash,
+            "archived_at": None,
+            "replaced_by_document_id": None,
+        }
+    )
+
+    create_new_document_version(
+        previous_document_id=active_document["document_id"],
+        new_document=new_document,
+        archived_at=datetime.now().isoformat(timespec="minutes"),
+    )
+
+    return RefreshOneDriveFileResponse(
+        status="updated",
+        document_id=new_document_id,
+        previous_document_id=active_document["document_id"],
+        chunk_id="pending_index",
+        message=(
+            f"Detected OneDrive content change and created {new_document_id}. "
+            "Run Update for Pending Documents to refresh search results."
+        ),
+    )
+
+
 @app.post("/admin/graph/onedrive/refresh-file", response_model=RefreshOneDriveFileResponse)
 def refresh_onedrive_file(
     request: RefreshOneDriveFileRequest,
@@ -2457,108 +2599,14 @@ def refresh_onedrive_file(
         )
 
     try:
-        from src.connectors.graph_client import download_onedrive_file_by_item_id
-        from src.connectors.graph_connector import (
-            build_graph_document_id,
-            build_graph_storage_filename,
+        return refresh_onedrive_file_item(
+            item_id=request.item_id,
+            name=request.name,
+            connector_path=request.connector_path,
+            role=request.role,
+            user=request.user,
+            user_department=request.user_department,
         )
-        from src.metadata.repository import (
-            create_new_document_version,
-            load_document_metadata,
-        )
-        from src.storage.document_storage import save_document_bytes
-
-        base_document_id = build_graph_document_id("GRAPH-OD", request.item_id)
-        all_documents = load_document_metadata(include_inactive=True)
-
-        active_document = find_active_graph_document(
-            documents=all_documents,
-            base_document_id=base_document_id,
-        )
-
-        if active_document is None:
-            raise HTTPException(
-                status_code=404,
-                detail="No active KB document found for this OneDrive source item.",
-            )
-
-        if active_document.get("source") != "onedrive":
-            raise HTTPException(
-                status_code=400,
-                detail="Only OneDrive-backed documents can be refreshed by this endpoint.",
-            )
-
-        if active_document.get("chunk_id") not in ["pending_index", "indexed"]:
-            raise HTTPException(
-                status_code=400,
-                detail="Only approved OneDrive documents can be refreshed.",
-            )
-
-
-        if request.role == PROJECT_MANAGER_ROLE:
-            if active_document["department"] != request.user_department:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Project Manager can only refresh own-department connector documents.",
-                )
-
-        content_bytes = download_onedrive_file_by_item_id(request.item_id)
-
-        if not content_bytes:
-            raise HTTPException(
-                status_code=400,
-                detail="Downloaded OneDrive file is empty.",
-            )
-
-        new_content_hash = hashlib.sha256(content_bytes).hexdigest()
-
-        if active_document.get("content_hash") == new_content_hash:
-            return RefreshOneDriveFileResponse(
-                status="no_change",
-                document_id=active_document["document_id"],
-                chunk_id=active_document.get("chunk_id"),
-                message="No content change detected for this OneDrive document.",
-            )
-
-        next_version_number = (active_document.get("version_number") or 1) + 1
-        new_document_id = f"{active_document.get('source_document_id', active_document['document_id'])}-V{next_version_number}"
-
-        stored_filename = build_graph_storage_filename(
-            source_type="onedrive",
-            item_id=f"{request.item_id}_v{next_version_number}",
-            original_filename=request.name,
-        )
-
-        stored_document = save_document_bytes(stored_filename, content_bytes)
-
-        new_document = active_document.copy()
-        new_document.update(
-            {
-                "document_id": new_document_id,
-                "title": request.name,
-                "filename": stored_document.filename,
-                "storage_backend": stored_document.storage_backend,
-                "storage_uri": stored_document.storage_uri,
-                "file_type": get_uploaded_file_type(stored_document.filename),
-                "source": "onedrive",
-                "uploaded_by": request.user,
-                "uploaded_at": datetime.now().isoformat(timespec="minutes"),
-                "chunk_id": "pending_index",
-                "visual_extraction_status": get_visual_extraction_status(
-                    get_uploaded_file_type(stored_document.filename)
-                ),
-                "content_hash": new_content_hash,
-                "archived_at": None,
-                "replaced_by_document_id": None,
-            }
-        )
-
-        create_new_document_version(
-            previous_document_id=active_document["document_id"],
-            new_document=new_document,
-            archived_at=datetime.now().isoformat(timespec="minutes"),
-        )
-
     except HTTPException:
         raise
     except RuntimeError as error:
@@ -2569,16 +2617,113 @@ def refresh_onedrive_file(
             detail=f"OneDrive refresh failed: {error}",
         ) from error
 
-    return RefreshOneDriveFileResponse(
-        status="updated",
-        document_id=new_document_id,
-        previous_document_id=active_document["document_id"],
-        chunk_id="pending_index",
-        message=(
-            f"Detected OneDrive content change and created {new_document_id}. "
-            "Run Update for Pending Documents to refresh search results."
-        ),
+
+def run_onedrive_refresh_job(
+    job_id: str,
+    request: RefreshOneDriveFilesJobRequest,
+) -> None:
+    """Refresh selected OneDrive files in the background and store per-file results."""
+    update_job(
+        job_id,
+        JOB_STATUS_RUNNING,
+        f"Refreshing {len(request.files)} OneDrive file(s).",
     )
+
+    results = []
+
+    for file_item in request.files:
+        try:
+            refresh_result = refresh_onedrive_file_item(
+                item_id=file_item.item_id,
+                name=file_item.name,
+                connector_path=file_item.connector_path,
+                role=request.role,
+                user=request.user,
+                user_department=request.user_department,
+            )
+        except HTTPException as error:
+            results.append(
+                {
+                    "File": file_item.name,
+                    "Path": file_item.connector_path,
+                    "Status": "Rejected",
+                    "Message": str(error.detail),
+                }
+            )
+        except Exception as error:
+            results.append(
+                {
+                    "File": file_item.name,
+                    "Path": file_item.connector_path,
+                    "Status": "Error",
+                    "Message": str(error),
+                }
+            )
+        else:
+            status_label = (
+                "Updated"
+                if refresh_result.status == "updated"
+                else "No Change"
+            )
+            results.append(
+                {
+                    "File": file_item.name,
+                    "Path": file_item.connector_path,
+                    "Status": status_label,
+                    "Message": refresh_result.message,
+                }
+            )
+
+    updated_count = sum(1 for result in results if result["Status"] == "Updated")
+    unchanged_count = sum(1 for result in results if result["Status"] == "No Change")
+
+    update_job(
+        job_id,
+        JOB_STATUS_SUCCEEDED,
+        (
+            f"OneDrive refresh finished: {updated_count} updated, "
+            f"{unchanged_count} unchanged, {len(results)} checked."
+        ),
+        result={
+            "results": results,
+            "updated_count": updated_count,
+            "unchanged_count": unchanged_count,
+            "total_count": len(results),
+            "message": (
+                f"OneDrive refresh finished: {updated_count} updated, "
+                f"{unchanged_count} unchanged, {len(results)} checked."
+            ),
+        },
+    )
+
+
+@app.post("/admin/graph/onedrive/refresh-files-job", response_model=JobResponse)
+def create_onedrive_refresh_job(
+    request: RefreshOneDriveFilesJobRequest,
+    background_tasks: BackgroundTasks,
+) -> JobResponse:
+    """Create a durable job for batch OneDrive source refresh."""
+    if request.role == GENERAL_EMPLOYEE_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="General Employee cannot refresh connector documents.",
+        )
+
+    if not request.files:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one OneDrive file is required.",
+        )
+
+    job = create_job(
+        job_type=JOB_TYPE_ONEDRIVE_REFRESH,
+        created_by=request.user,
+        message=f"OneDrive refresh queued for {len(request.files)} file(s).",
+    )
+
+    background_tasks.add_task(run_onedrive_refresh_job, job["job_id"], request)
+
+    return JobResponse(**job)
 
 
 @app.post("/admin/graph/onenote/stage-page", response_model=StageOneNotePageResponse)

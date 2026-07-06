@@ -108,6 +108,7 @@ ONEDRIVE_FILES_URL = f"{API_BASE_URL}/admin/graph/onedrive/files"
 ONEDRIVE_STAGE_FILE_URL = f"{API_BASE_URL}/admin/graph/onedrive/stage-file"
 ONEDRIVE_STAGE_FILES_JOB_URL = f"{API_BASE_URL}/admin/graph/onedrive/stage-files-job"
 ONEDRIVE_REFRESH_FILE_URL = f"{API_BASE_URL}/admin/graph/onedrive/refresh-file"
+ONEDRIVE_REFRESH_FILES_JOB_URL = f"{API_BASE_URL}/admin/graph/onedrive/refresh-files-job"
 ONENOTE_PAGES_URL = f"{API_BASE_URL}/admin/graph/onenote/pages"
 ONENOTE_STAGE_PAGES_JOB_URL = f"{API_BASE_URL}/admin/graph/onenote/stage-pages-job"
 EVALUATION_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/retrieval_eval_results.json"
@@ -230,6 +231,30 @@ def request_onedrive_file_refresh(file_item: dict) -> dict:
             "connector_path": file_item["connector_path"],
         },
         timeout=120,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def submit_onedrive_refresh_job(file_items: list[dict]) -> dict:
+    """Submit selected OneDrive files as one durable backend refresh job."""
+    response = requests.post(
+        ONEDRIVE_REFRESH_FILES_JOB_URL,
+        json={
+            "role": st.session_state["role"],
+            "user": st.session_state["user"],
+            "user_department": st.session_state["department"],
+            "files": [
+                {
+                    "item_id": file_item["id"],
+                    "name": file_item["name"],
+                    "connector_path": file_item["connector_path"],
+                }
+                for file_item in file_items
+            ],
+        },
+        timeout=10,
     )
 
     response.raise_for_status()
@@ -775,6 +800,41 @@ def poll_active_onedrive_stage_job() -> None:
         st.session_state["onedrive_stage_status"] = "error"
 
     st.session_state.pop("active_onedrive_stage_job_id", None)
+    st.rerun()
+
+
+@st.fragment(run_every="2s")
+def poll_active_onedrive_refresh_job() -> None:
+    """Poll the active OneDrive refresh job without blocking Streamlit navigation."""
+    active_job_id = st.session_state.get("active_onedrive_refresh_job_id")
+
+    if not active_job_id:
+        return
+
+    try:
+        job = get_backend_job(active_job_id)
+    except requests.exceptions.RequestException as error:
+        st.warning(f"OneDrive refresh job status unavailable: {error}")
+        return
+
+    if job["status"] in ["queued", "running"]:
+        st.info(job["message"])
+        return
+
+    if job["status"] == "succeeded":
+        result = job["result"]
+        st.session_state["onedrive_refresh_results"] = result.get("results", [])
+        st.session_state["onedrive_refresh_message"] = result.get(
+            "message",
+            job["message"],
+        )
+        st.session_state["onedrive_refresh_status"] = "success"
+
+    elif job["status"] == "failed":
+        st.session_state["onedrive_refresh_message"] = job["message"]
+        st.session_state["onedrive_refresh_status"] = "error"
+
+    st.session_state.pop("active_onedrive_refresh_job_id", None)
     st.rerun()
 
 
@@ -1781,6 +1841,7 @@ with st.sidebar:
     poll_active_reindex_job()
     poll_active_index_update_job()
     poll_active_onedrive_stage_job()
+    poll_active_onedrive_refresh_job()
     poll_active_onenote_stage_job()
     poll_active_index_snapshot_job()
     poll_active_document_lifecycle_job()
@@ -2849,39 +2910,115 @@ elif selected_page in ["KB Management", "KB Status"]:
 
                     if refreshable_file_options:
                         st.divider()
-                        st.markdown("**Refresh Existing OneDrive Document**")
+                        st.markdown("**Refresh Existing OneDrive Documents**")
                         st.caption(
-                            "Checks the selected Graph file against the active KB version. "
-                            "If content changed, a new version is created and marked pending index."
+                            "Primary flow: batch-check approved OneDrive sources. "
+                            "Changed files create new pending-index versions; unchanged files are reported without changes."
                         )
 
-                        selected_refresh_label = st.selectbox(
-                            "Select OneDrive file to refresh",
+                        if st.session_state.get("onedrive_refresh_message"):
+                            refresh_status = st.session_state.get("onedrive_refresh_status", "info")
+
+                            if refresh_status == "success":
+                                st.success(st.session_state["onedrive_refresh_message"])
+                            elif refresh_status == "error":
+                                st.error(st.session_state["onedrive_refresh_message"])
+                            else:
+                                st.info(st.session_state["onedrive_refresh_message"])
+
+                        refresh_columns = st.columns(3)
+
+                        with refresh_columns[0]:
+                            if st.button(
+                                "Select All Refreshable",
+                                use_container_width=True,
+                                key="select_all_onedrive_refresh_files_button",
+                            ):
+                                st.session_state["selected_onedrive_files_to_refresh"] = list(
+                                    refreshable_file_options.keys()
+                                )
+                                st.rerun()
+
+                        with refresh_columns[1]:
+                            if st.button(
+                                "Clear Refresh Selection",
+                                use_container_width=True,
+                                key="clear_onedrive_refresh_selection_button",
+                            ):
+                                st.session_state["selected_onedrive_files_to_refresh"] = []
+                                st.rerun()
+
+                        with refresh_columns[2]:
+                            st.caption(f"{len(refreshable_file_options)} refreshable file(s)")
+
+                        selected_refresh_labels = st.multiselect(
+                            "Select OneDrive files to refresh",
                             list(refreshable_file_options.keys()),
-                            key="selected_onedrive_file_to_refresh",
+                            key="selected_onedrive_files_to_refresh",
                         )
 
                         if st.button(
-                            "Refresh Selected OneDrive File",
+                            "Refresh Selected OneDrive Files",
                             use_container_width=True,
-                            key="refresh_selected_onedrive_file_button",
+                            disabled=(
+                                not selected_refresh_labels
+                                or bool(st.session_state.get("active_onedrive_refresh_job_id"))
+                            ),
+                            key="submit_onedrive_refresh_job_button",
                         ):
+                            selected_refresh_files = [
+                                refreshable_file_options[selected_refresh_label]
+                                for selected_refresh_label in selected_refresh_labels
+                            ]
+
                             try:
-                                with st.spinner("Checking OneDrive content and version history..."):
-                                    refresh_result = request_onedrive_file_refresh(
-                                        refreshable_file_options[selected_refresh_label]
-                                    )
+                                job = submit_onedrive_refresh_job(selected_refresh_files)
                             except requests.exceptions.HTTPError as error:
                                 st.error(f"OneDrive refresh rejected by backend: {error.response.text}")
                             except requests.exceptions.RequestException as error:
-                                st.error(f"Could not refresh OneDrive file: {error}")
+                                st.error(f"Could not submit OneDrive refresh job: {error}")
                             else:
-                                if refresh_result["status"] == "updated":
-                                    st.success(refresh_result["message"])
-                                elif refresh_result["status"] == "no_change":
-                                    st.info(refresh_result["message"])
+                                st.session_state["active_onedrive_refresh_job_id"] = job["job_id"]
+                                st.session_state["onedrive_refresh_message"] = job["message"]
+                                st.session_state["onedrive_refresh_status"] = "info"
+                                st.rerun()
+
+                        if st.session_state.get("onedrive_refresh_results"):
+                            st.dataframe(
+                                st.session_state["onedrive_refresh_results"],
+                                use_container_width=True,
+                                hide_index=True,
+                                height=220,
+                            )
+
+                        with st.expander("Single File Refresh", expanded=False):
+                            selected_refresh_label = st.selectbox(
+                                "Select one OneDrive file to refresh",
+                                list(refreshable_file_options.keys()),
+                                key="selected_onedrive_file_to_refresh",
+                            )
+
+                            if st.button(
+                                "Refresh One File",
+                                use_container_width=True,
+                                key="refresh_selected_onedrive_file_button",
+                            ):
+                                try:
+                                    with st.spinner("Checking OneDrive content and version history..."):
+                                        refresh_result = request_onedrive_file_refresh(
+                                            refreshable_file_options[selected_refresh_label]
+                                        )
+                                except requests.exceptions.HTTPError as error:
+                                    st.error(f"OneDrive refresh rejected by backend: {error.response.text}")
+                                except requests.exceptions.RequestException as error:
+                                    st.error(f"Could not refresh OneDrive file: {error}")
                                 else:
-                                    st.warning(refresh_result["message"])
+                                    if refresh_result["status"] == "updated":
+                                        st.success(refresh_result["message"])
+                                    elif refresh_result["status"] == "no_change":
+                                        st.info(refresh_result["message"])
+                                    else:
+                                        st.warning(refresh_result["message"])
 
             with onenote_tab:
                 if st.button(
