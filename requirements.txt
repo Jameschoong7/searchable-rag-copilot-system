@@ -106,6 +106,8 @@ pydantic-settings
 pydantic_core
 Pygments
 pypdf
+PyMuPDF
+pytesseract
 PyPika
 pyproject_hooks
 python-dateutil
