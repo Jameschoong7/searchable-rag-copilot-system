@@ -3052,6 +3052,18 @@ if selected_page in ["KB Management", "KB Status"]:
         if get_index_status_label(document) == "Indexed"
     )
 
+    ocr_needed_count = sum(
+        1
+        for document in visible_documents
+        if "OCR needed" in document.get("visual_extraction_status", "")
+    )
+
+    ocr_extracted_count = sum(
+        1
+        for document in visible_documents
+        if "OCR text extracted" in document.get("visual_extraction_status", "")
+    )
+
     if (
         visible_pending_index_count > 0
         and st.session_state.get("index_update_job_status") == "success"
@@ -3069,7 +3081,7 @@ if selected_page in ["KB Management", "KB Status"]:
         )
     )
 
-    summary_columns = st.columns(4)
+    summary_columns = st.columns(5)
 
     with summary_columns[0]:
         render_status_card("Visible Docs", len(visible_documents))
@@ -3090,6 +3102,13 @@ if selected_page in ["KB Management", "KB Status"]:
 
     with summary_columns[3]:
         render_status_card("Indexed", visible_indexed_count, "success")
+
+    with summary_columns[4]:
+        render_status_card(
+            "OCR Review",
+            ocr_needed_count,
+            "attention" if ocr_needed_count else "neutral",
+        )
 
     if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
         if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
@@ -4130,7 +4149,9 @@ if selected_page in ["KB Management", "KB Status"]:
         source_options = sorted(
             {document["source"] for document in visible_documents}
         )
-
+        visual_status_options = sorted(
+            {document["visual_extraction_status"] for document in visible_documents}
+        )
         index_status_options = [
             FILTER_ALL,
             "Pending Index",
@@ -4162,7 +4183,7 @@ if selected_page in ["KB Management", "KB Status"]:
 
         with st.container(border=True):
 
-            filter_columns = st.columns(4 if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE else 3)
+            filter_columns = st.columns(5 if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE else 4)
 
             with filter_columns[0]:
                 selected_department = st.selectbox(
@@ -4182,14 +4203,24 @@ if selected_page in ["KB Management", "KB Status"]:
                     [FILTER_ALL] + source_options,
                 )
 
-            selected_index_status = FILTER_ALL
+            selected_visual_status = FILTER_ALL
 
+            with filter_columns[3]:
+                selected_visual_status = st.selectbox(
+                    "Visual Status",
+                    [FILTER_ALL] + visual_status_options,
+                )
+
+            selected_index_status = FILTER_ALL
+            
             if st.session_state["role"] != GENERAL_EMPLOYEE_ROLE:
-                with filter_columns[3]:
+                with filter_columns[4]:
                     selected_index_status = st.selectbox(
                         "Index Status",
                         index_status_options,
                     )
+            
+            
 
         if selected_department != FILTER_ALL:
             filtered_documents = [
@@ -4208,6 +4239,13 @@ if selected_page in ["KB Management", "KB Status"]:
                 document for document in filtered_documents
                 if document["source"] == selected_source
             ]
+
+        if selected_visual_status != FILTER_ALL:
+            filtered_documents = [
+                document
+                for document in filtered_documents
+                if document["visual_extraction_status"] == selected_visual_status
+            ]   
 
         if selected_index_status != FILTER_ALL:
             filtered_documents = [
