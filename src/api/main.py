@@ -8,6 +8,9 @@ import re
 from datetime import datetime
 import hashlib
 import json
+import zipfile
+import io
+from pathlib import Path
 
 
 # Create the shared FastAPI application used by both frontend platforms.
@@ -439,6 +442,16 @@ class UploadDocumentVersionResponse(UploadDocumentResponse):
 
     previous_document_id: str
     version_number: int
+
+
+class BatchZipStageResponse(BaseModel):
+    """Represent the result of staging supported files from one ZIP upload."""
+
+    status: str
+    staged_count: int
+    skipped_count: int
+    results: list[dict]
+    message: str
 
 
 class MetadataUpdateValidationRequest(BaseModel):
@@ -1282,6 +1295,154 @@ async def upload_document(
             f"Uploaded {stored_document.filename}, saved metadata record "
             f"{document_id}, and marked it pending index."
         ),
+    )
+
+
+@app.post("/admin/upload-zip-staging", response_model=BatchZipStageResponse)
+async def upload_zip_for_staging(
+    file: UploadFile = File(...),
+    role: str = Form(...),
+    user: str = Form(...),
+    user_department: str = Form(...),
+) -> BatchZipStageResponse:
+    """Extract supported files from a ZIP and stage each for metadata review."""
+    from src.connectors.graph_connector import (
+        build_graph_document_id,
+        build_graph_storage_filename,
+        stage_graph_file_for_review,
+    )
+    from src.metadata.repository import load_document_metadata
+
+    if role == GENERAL_EMPLOYEE_ROLE:
+        raise HTTPException(
+            status_code=403,
+            detail="General Employee cannot upload ZIP batches.",
+        )
+
+    original_zip_name = file.filename or "batch_upload.zip"
+
+    if not original_zip_name.lower().endswith(".zip"):
+        raise HTTPException(
+            status_code=400,
+            detail="Only ZIP files are supported for batch staging.",
+        )
+
+    zip_bytes = await file.read()
+
+    if not zip_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail="Uploaded ZIP cannot be empty.",
+        )
+
+    existing_documents = load_document_metadata(include_inactive=True)
+    existing_filenames = {
+        document["filename"]
+        for document in existing_documents
+    }
+
+    results = []
+
+    try:
+        zip_file = zipfile.ZipFile(io.BytesIO(zip_bytes))
+    except zipfile.BadZipFile as error:
+        raise HTTPException(
+            status_code=400,
+            detail="Uploaded file is not a valid ZIP archive.",
+        ) from error
+
+    for zip_info in zip_file.infolist():
+        if zip_info.is_dir():
+            continue
+
+        inner_path = zip_info.filename
+
+        if inner_path.startswith("__MACOSX/") or Path(inner_path).name.startswith("."):
+            continue
+
+        inner_filename = Path(inner_path).name
+
+        try:
+            file_type = get_uploaded_file_type(inner_filename)
+        except HTTPException:
+            results.append(
+                {
+                    "File": inner_path,
+                    "Status": "Skipped",
+                    "Message": "Unsupported file type.",
+                }
+            )
+            continue
+
+        content_bytes = zip_file.read(zip_info)
+
+        if not content_bytes:
+            results.append(
+                {
+                    "File": inner_path,
+                    "Status": "Skipped",
+                    "Message": "Empty file.",
+                }
+            )
+            continue
+
+        source_path = f"zip://{original_zip_name}/{inner_path}"
+        document_id = build_graph_document_id("ZIP", source_path)
+        stored_filename = build_graph_storage_filename(
+            source_type="zip",
+            item_id=source_path,
+            original_filename=inner_filename,
+        )
+
+        if stored_filename in existing_filenames:
+            results.append(
+                {
+                    "File": inner_path,
+                    "Status": "Skipped",
+                    "Message": "A metadata record already exists for this stored filename.",
+                }
+            )
+            continue
+
+        try:
+            metadata = stage_graph_file_for_review(
+                document_id=document_id,
+                title=Path(inner_filename).stem.replace("_", " "),
+                original_filename=stored_filename,
+                content_bytes=content_bytes,
+                source_path=source_path,
+                source_type="batch_zip",
+                uploaded_by=user,
+            )
+        except Exception as error:
+            results.append(
+                {
+                    "File": inner_path,
+                    "Status": "Error",
+                    "Message": str(error),
+                }
+            )
+        else:
+            existing_filenames.add(metadata["filename"])
+            results.append(
+                {
+                    "File": inner_path,
+                    "Status": "Staged",
+                    "Document ID": metadata["document_id"],
+                    "Department": metadata["department"],
+                    "Message": "Staged for metadata review.",
+                }
+            )
+
+    staged_count = sum(1 for result in results if result["Status"] == "Staged")
+    skipped_count = len(results) - staged_count
+
+    return BatchZipStageResponse(
+        status="success",
+        staged_count=staged_count,
+        skipped_count=skipped_count,
+        results=results,
+        message=f"Staged {staged_count} file(s) from ZIP; {skipped_count} skipped or failed.",
     )
 
 
