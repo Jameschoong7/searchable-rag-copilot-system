@@ -865,13 +865,13 @@ def query_knowledge_base(request: QueryRequest) -> QueryResponse:
             status_code=400,
             detail="Question cannot be empty.",
         )
-    
+
     if not is_meaningful_question(question):
         raise HTTPException(
             status_code=400,
             detail="Question must contain meaningful words, not only punctuation or symbols.",
         )
-    
+
     try:
         from src.rag.engine import generate_answer
 
@@ -1394,6 +1394,7 @@ async def upload_zip_for_staging(
             )
             continue
 
+        visual_status = get_visual_extraction_status(file_type, content_bytes)
         source_path = f"zip://{original_zip_name}/{inner_path}"
         document_id = build_graph_document_id("ZIP", source_path)
         stored_filename = build_graph_storage_filename(
@@ -1421,6 +1422,7 @@ async def upload_zip_for_staging(
                 source_path=source_path,
                 source_type="batch_zip",
                 uploaded_by=user,
+                visual_extraction_status=visual_status,
             )
         except Exception as error:
             results.append(
@@ -1438,6 +1440,7 @@ async def upload_zip_for_staging(
                     "Status": "Staged",
                     "Document ID": metadata["document_id"],
                     "Department": metadata["department"],
+                    "Visuals": metadata["visual_extraction_status"],
                     "Message": "Staged for metadata review.",
                 }
             )
@@ -2086,12 +2089,13 @@ def approve_pending_document(
         )
 
         updated_document = target_document.copy()
-        visual_status = get_visual_extraction_status(target_document["file_type"])
+        visual_status = (
+            target_document.get("visual_extraction_status")
+            or get_visual_extraction_status(target_document["file_type"])
+        )
 
-        if target_document.get("source") == "onenote":
+        if str(target_document.get("source", "")).lower() == "onenote":
             visual_status = "Text extracted from OneNote page"
-        elif target_document.get("source") == "onedrive":
-            visual_status = get_visual_extraction_status(target_document["file_type"])
 
         updated_document.update(
             {
@@ -2423,6 +2427,8 @@ def stage_onedrive_file(
             item_id=f"{request.item_id}{attempt_suffix}",
             original_filename=request.name,
         )
+        file_type = get_uploaded_file_type(stored_filename)
+        visual_status = get_visual_extraction_status(file_type, content_bytes)
 
         metadata = stage_graph_file_for_review(
             document_id=document_id,
@@ -2433,6 +2439,7 @@ def stage_onedrive_file(
             source_type="onedrive",
             uploaded_by=request.user,
             source_document_id=base_document_id,
+            visual_extraction_status=visual_status,
         )
 
     except HTTPException:
@@ -2578,6 +2585,8 @@ def stage_onedrive_file_item(
         item_id=f"{item_id}{attempt_suffix}",
         original_filename=name,
     )
+    file_type = get_uploaded_file_type(stored_filename)
+    visual_status = get_visual_extraction_status(file_type, content_bytes)
 
     return stage_graph_file_for_review(
         document_id=document_id,
@@ -2588,6 +2597,7 @@ def stage_onedrive_file_item(
         source_type="onedrive",
         uploaded_by=user,
         source_document_id=base_document_id,
+        visual_extraction_status=visual_status,
     )
 
 
@@ -2987,6 +2997,7 @@ def stage_onenote_page(
             source_type="onenote",
             uploaded_by=request.user,
             source_document_id=document_id,
+            visual_extraction_status="Text extracted from OneNote page",
         )
 
     except HTTPException:
@@ -3079,6 +3090,7 @@ def stage_onenote_page_item(
         source_type="onenote",
         uploaded_by=user,
         source_document_id=base_document_id,
+        visual_extraction_status="Text extracted from OneNote page",
     )
 
 

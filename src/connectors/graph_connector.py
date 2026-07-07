@@ -29,6 +29,7 @@ def stage_graph_file_for_review(
     source_type: str,
     uploaded_by: str = "graph_connector",
     source_document_id: str | None = None,
+    visual_extraction_status: str | None = None,
 ) -> dict:
     """Stage a downloaded Graph file with a real local/Blob-backed source file."""
     stored_document = save_document_bytes(
@@ -49,6 +50,9 @@ def stage_graph_file_for_review(
     metadata["storage_backend"] = stored_document.storage_backend
     metadata["storage_uri"] = stored_document.storage_uri
     metadata["content_hash"] = hashlib.sha256(content_bytes).hexdigest()
+
+    if visual_extraction_status:
+        metadata["visual_extraction_status"] = visual_extraction_status
 
     append_document_metadata(metadata)
 
