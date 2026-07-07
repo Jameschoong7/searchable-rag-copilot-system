@@ -84,6 +84,7 @@ UNARCHIVE_DOCUMENT_JOB_URL = f"{API_BASE_URL}/admin/unarchive-document-jobs"
 SETTINGS_URL = f"{API_BASE_URL}/admin/settings"
 UPLOAD_DOCUMENT_URL = f"{API_BASE_URL}/admin/upload-document"
 UPLOAD_DOCUMENT_VERSION_URL = f"{API_BASE_URL}/admin/upload-document-version"
+UPLOAD_ZIP_STAGING_URL = f"{API_BASE_URL}/admin/upload-zip-staging"
 APPROVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/approve-document"
 REJECT_STAGED_DOCUMENT_URL = f"{API_BASE_URL}/admin/reject-staged-document"
 QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
@@ -545,6 +546,29 @@ def request_backend_document_version_upload(
                 uploaded_file.name,
                 uploaded_file.getvalue(),
                 uploaded_file.type or "application/octet-stream",
+            )
+        },
+        timeout=180,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_backend_zip_staging(uploaded_zip_file) -> dict:
+    """Ask FastAPI to extract a ZIP and stage supported files for review."""
+    response = requests.post(
+        UPLOAD_ZIP_STAGING_URL,
+        data={
+            "role": st.session_state["role"],
+            "user": st.session_state["user"],
+            "user_department": st.session_state["department"],
+        },
+        files={
+            "file": (
+                uploaded_zip_file.name,
+                uploaded_zip_file.getvalue(),
+                uploaded_zip_file.type or "application/zip",
             )
         },
         timeout=180,
@@ -3059,8 +3083,8 @@ if selected_page in ["KB Management", "KB Status"]:
                         "Upload",
                         "Add new documents or replace an existing document version through the backend-controlled upload flow.",
                     )
-                    new_document_tab, new_version_tab = st.tabs(
-                        ["Upload New Document", "Upload New Version"]
+                    new_document_tab, new_version_tab, batch_zip_tab = st.tabs(
+                        ["Upload New Document", "Upload New Version", "Batch ZIP Upload"]
                     )
                     with new_document_tab:
                         st.markdown("**Upload & Categorize**")
@@ -3261,6 +3285,41 @@ if selected_page in ["KB Management", "KB Status"]:
                                         )
                                         st.session_state["upload_form_version"] += 1
                                         st.rerun()
+
+                    with batch_zip_tab:
+                        st.markdown("**Batch ZIP Upload**")
+                        uploaded_zip_file = st.file_uploader(
+                            "Upload ZIP",
+                            type=["zip"],
+                            key=f"zip_upload_file_{upload_form_version}",
+                        )
+
+                        submitted_zip_upload = st.button(
+                            "Stage ZIP for Review",
+                            type="primary",
+                            use_container_width=True,
+                            disabled=uploaded_zip_file is None,
+                            key=f"submit_zip_stage_{upload_form_version}",
+                        )
+
+                        if submitted_zip_upload:
+                            try:
+                                zip_result = request_backend_zip_staging(uploaded_zip_file)
+                            except requests.exceptions.HTTPError as error:
+                                st.error(f"ZIP staging rejected by backend: {error.response.text}")
+                            except requests.exceptions.RequestException as error:
+                                st.error(f"Could not stage ZIP upload: {error}")
+                            else:
+                                st.success(zip_result["message"])
+                                if zip_result.get("results"):
+                                    st.dataframe(
+                                        zip_result["results"],
+                                        use_container_width=True,
+                                        hide_index=True,
+                                        height=min(320, 38 * (len(zip_result["results"]) + 1)),
+                                    )
+                                if zip_result.get("staged_count", 0):
+                                    st.info("Review Queue now contains the staged ZIP document(s).")
         if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
             with onedrive_tab:
                 with st.container(border=True):
