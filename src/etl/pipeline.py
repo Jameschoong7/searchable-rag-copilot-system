@@ -25,6 +25,12 @@ from src.vector.factory import get_vector_backend
 # ── END AZURE SWAP ──
 
 
+from src.etl.visual_detection import (
+    detect_pdf_visual_status,
+    try_extract_pdf_ocr_text,
+)
+
+
 #load all values from .env into environment variables
 load_dotenv() 
 
@@ -63,6 +69,44 @@ def extract_docx_text(file_path: Path) -> str:
 
     return "\n".join(text_parts)
 
+
+def load_pdf_with_optional_ocr(file_path: Path) -> list[Document]:
+    """Load PDF text and append OCR text when the PDF likely needs visual extraction."""
+    loader = PyPDFLoader(str(file_path))
+    documents = loader.load()
+
+    pdf_bytes = file_path.read_bytes()
+    visual_status = detect_pdf_visual_status(pdf_bytes)
+
+    should_try_ocr = (
+        "OCR needed" in visual_status
+        or "OCR review recommended" in visual_status
+        or not any(document.page_content.strip() for document in documents)
+    )
+
+    if not should_try_ocr:
+        return documents
+
+    ocr_text, ocr_status = try_extract_pdf_ocr_text(pdf_bytes)
+
+    if not ocr_text.strip():
+        print(f"OCR skipped for {file_path.name}: {ocr_status}")
+        return documents
+
+    documents.append(
+        Document(
+            page_content=ocr_text,
+            metadata={
+                "source": str(file_path),
+                "extraction": "ocr",
+                "visual_extraction_status": ocr_status,
+            },
+        )
+    )
+
+    print(f"OCR text added for {file_path.name}: {ocr_status}")
+    return documents
+
 #function to handle E in ETL
 def load_documents(
     folder_path: str,
@@ -100,8 +144,7 @@ def load_documents(
             documents.extend(loader.load())
 
         elif suffix == ".pdf":
-            loader = PyPDFLoader(str(file_path))
-            documents.extend(loader.load())
+            documents.extend(load_pdf_with_optional_ocr(file_path))
 
         elif suffix == ".docx":
             docx_text = extract_docx_text(file_path)
@@ -131,8 +174,7 @@ def load_single_document(file_path: Path) -> list:
         return loader.load()
 
     if suffix == ".pdf":
-        loader = PyPDFLoader(str(file_path))
-        return loader.load()
+        return load_pdf_with_optional_ocr(file_path)
 
     if suffix == ".docx":
         docx_text = extract_docx_text(file_path)
