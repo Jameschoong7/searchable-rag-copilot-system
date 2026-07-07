@@ -64,6 +64,15 @@ from src.core.job_repository import (
     get_latest_job,
     update_job,
 )
+from src.core.answer_status import classify_answer_status_detail
+from src.core.chat_memory_repository import (
+    MESSAGE_ROLE_ASSISTANT,
+    MESSAGE_ROLE_USER,
+    append_chat_message,
+    get_or_create_chat_session,
+    list_chat_messages_for_session,
+    list_chat_sessions_for_user,
+)
 
 
 def is_meaningful_question(question: str) -> bool:
@@ -506,6 +515,7 @@ class ChatJobRequest(QueryRequest):
     """Represent a durable chat query submitted as a backend job."""
 
     user: str
+    session_id: str | None = None
 
 
 class JobResponse(BaseModel):
@@ -519,6 +529,30 @@ class JobResponse(BaseModel):
     created_by: str
     created_at: str
     updated_at: str
+
+
+class ChatSessionResponse(BaseModel):
+    """Represent one persisted chat conversation session."""
+
+    session_id: str
+    user: str
+    role: str
+    department: str
+    title: str
+    created_at: str
+    updated_at: str
+
+
+class ChatMessageResponse(BaseModel):
+    """Represent one persisted chat message."""
+
+    message_id: str
+    session_id: str
+    message_role: str
+    content: str
+    sources: list[str]
+    status: str
+    created_at: str
 
 
 class ApproveDocumentRequest(BaseModel):
@@ -556,6 +590,24 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
     """Run one chat query in the background and store the answer in the job table."""
     import time
 
+    question = request.question.strip()
+    chat_session = get_or_create_chat_session(
+        session_id=request.session_id,
+        user=request.user,
+        role=request.role,
+        department=request.department,
+        first_question=question,
+    )
+    session_id = chat_session["session_id"]
+
+    append_chat_message(
+        session_id=session_id,
+        message_role=MESSAGE_ROLE_USER,
+        content=question,
+        sources=[],
+        status="submitted",
+    )
+
     update_job(
         job_id,
         JOB_STATUS_RUNNING,
@@ -568,11 +620,24 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
         from src.rag.engine import generate_answer
 
         result = generate_answer(
-            question=request.question.strip(),
+            question=question,
             role=request.role,
             department=request.department,
             department_filter=request.department_filter,
             file_type_filter=request.file_type_filter,
+        )
+        answer_status_detail = classify_answer_status_detail(
+            result["answer"],
+            result["sources"],
+        )
+        answer_status = answer_status_detail["status"]
+
+        append_chat_message(
+            session_id=session_id,
+            message_role=MESSAGE_ROLE_ASSISTANT,
+            content=result["answer"],
+            sources=result["sources"],
+            status=answer_status,
         )
 
         update_job(
@@ -580,9 +645,12 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
             JOB_STATUS_SUCCEEDED,
             "Chat answer generated.",
             {
+                "session_id": session_id,
                 "question": result["question"],
                 "answer": result["answer"],
                 "sources": result["sources"],
+                "answer_status": answer_status,
+                "status_reason": answer_status_detail["reason"],
                 "role": request.role,
                 "department": request.department,
                 "department_filter": request.department_filter,
@@ -591,14 +659,25 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
             },
         )
     except Exception as error:
+        append_chat_message(
+            session_id=session_id,
+            message_role=MESSAGE_ROLE_ASSISTANT,
+            content=f"Chat query failed: {error}",
+            sources=[],
+            status="api_error",
+        )
+
         update_job(
             job_id,
             JOB_STATUS_FAILED,
             f"Chat query failed: {error}",
             {
-                "question": request.question,
+                "session_id": session_id,
+                "question": question,
                 "answer": "",
                 "sources": [],
+                "answer_status": "api_error",
+                "status_reason": "Backend chat job failed",
                 "role": request.role,
                 "department": request.department,
                 "department_filter": request.department_filter,
@@ -1894,6 +1973,27 @@ def create_chat_query_job(
     background_tasks.add_task(run_chat_query_job, job["job_id"], request)
 
     return JobResponse(**job)
+
+
+@app.get("/chat/sessions", response_model=list[ChatSessionResponse])
+def get_chat_sessions(user: str) -> list[ChatSessionResponse]:
+    """Return recent persisted chat sessions for one portal user."""
+    return [
+        ChatSessionResponse(**session)
+        for session in list_chat_sessions_for_user(user)
+    ]
+
+
+@app.get("/chat/sessions/{session_id}/messages", response_model=list[ChatMessageResponse])
+def get_chat_session_messages(
+    session_id: str,
+    user: str,
+) -> list[ChatMessageResponse]:
+    """Return persisted messages for a chat session owned by the requesting user."""
+    return [
+        ChatMessageResponse(**message)
+        for message in list_chat_messages_for_session(session_id, user)
+    ]
 
 
 @app.get("/admin/jobs/latest", response_model=JobResponse | None)

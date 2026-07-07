@@ -72,6 +72,7 @@ REINDEX_URL = f"{API_BASE_URL}/admin/reindex"
 API_URL = f"{API_BASE_URL}/query"
 API_HEALTH_URL = f"{API_BASE_URL}/health"
 CHAT_JOBS_URL = f"{API_BASE_URL}/chat/jobs"
+CHAT_SESSIONS_URL = f"{API_BASE_URL}/chat/sessions"
 BACKEND_JOBS_URL = f"{API_BASE_URL}/admin/jobs"
 REINDEX_JOBS_URL = f"{API_BASE_URL}/admin/reindex-jobs"
 INDEX_UPDATE_JOBS_URL = f"{API_BASE_URL}/admin/index-update-jobs"
@@ -615,12 +616,60 @@ def submit_chat_job(
             "department": st.session_state["department"],
             "department_filter": department_filter,
             "file_type_filter": file_type_filter,
+            "session_id": st.session_state.get("chat_session_id"),
         },
         timeout=10,
     )
 
     response.raise_for_status()
     return response.json()
+
+
+def get_backend_chat_sessions() -> list[dict]:
+    """Load recent persisted chat sessions for the signed-in user."""
+    response = requests.get(
+        CHAT_SESSIONS_URL,
+        params={"user": st.session_state["user"]},
+        timeout=10,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def get_backend_chat_session_messages(session_id: str) -> list[dict]:
+    """Load persisted messages for one selected chat session."""
+    response = requests.get(
+        f"{CHAT_SESSIONS_URL}/{session_id}/messages",
+        params={"user": st.session_state["user"]},
+        timeout=10,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def convert_persisted_message_to_chat_message(message: dict) -> dict:
+    """Convert a backend chat-memory row into Streamlit chat display state."""
+    if message["message_role"] == "user":
+        return {
+            "role": "user",
+            "content": message["content"],
+        }
+
+    context_text = (
+        "Loaded from persistent chat memory. "
+        "Follow-up answers still use current ACL-filtered retrieval."
+    )
+
+    return {
+        "role": "assistant",
+        "content": message["content"],
+        "sources": message.get("sources", []),
+        "context": context_text,
+        "status": message.get("status") or "success",
+        "feedback": "none",
+    }
 
 
 def get_backend_job(job_id: str) -> dict:
@@ -666,6 +715,9 @@ def poll_active_chat_job() -> None:
 
     if job["status"] == "succeeded":
         result = job["result"]
+        if result.get("session_id"):
+            st.session_state["chat_session_id"] = result["session_id"]
+
         answer_status_detail = classify_answer_status_detail(
             result["answer"],
             result["sources"],
@@ -703,6 +755,8 @@ def poll_active_chat_job() -> None:
 
     elif job["status"] == "failed":
         result = job.get("result", {})
+        if result.get("session_id"):
+            st.session_state["chat_session_id"] = result["session_id"]
 
         query_log_id = write_query_log(
             question=result.get("question", "Unknown question"),
@@ -3243,23 +3297,34 @@ if selected_page in ["KB Management", "KB Status"]:
                                             allowed_departments=allowed_departments,
                                         )
                                     except requests.exceptions.HTTPError as error:
-                                        st.error(f"Upload rejected by backend: {error.response.text}")
-                                        st.stop()
+                                        detail = (
+                                            error.response.text
+                                            if error.response is not None
+                                            else str(error)
+                                        )
+
+                                        if error.response is not None and error.response.status_code == 409:
+                                            st.warning(
+                                                "A metadata record already exists for this filename. "
+                                                "Use Upload New Version if this is an updated copy of an existing document, "
+                                                "or rename the file before uploading it as a new document."
+                                            )
+                                        else:
+                                            st.error(f"Upload rejected by backend: {detail}")
                                     except requests.exceptions.RequestException as error:
                                         st.error(f"Could not upload document through backend: {error}")
-                                        st.stop()
+                                    else:
+                                        index_owner_message = (
+                                            "Run Update for Pending Documents so the latest approved content is available in chat."
+                                            if st.session_state["role"] == SYSTEM_ADMIN_ROLE
+                                            else "System Admin action is required to update the search index before this content is available in chat."
+                                        )
 
-                                    index_owner_message = (
-                                        "Run Update for Pending Documents so the latest approved content is available in chat."
-                                        if st.session_state["role"] == SYSTEM_ADMIN_ROLE
-                                        else "System Admin action is required to update the search index before this content is available in chat."
-                                    )
-
-                                    st.session_state["upload_message"] = (
-                                        f"{upload_result['message']} {index_owner_message}"
-                                    )
-                                    st.session_state["upload_form_version"] += 1
-                                    st.rerun()
+                                        st.session_state["upload_message"] = (
+                                            f"{upload_result['message']} {index_owner_message}"
+                                        )
+                                        st.session_state["upload_form_version"] += 1
+                                        st.rerun()
 
                     with new_version_tab:
                         st.markdown("**Upload New Version**")
@@ -4619,6 +4684,69 @@ if selected_page == "Chat":
     if "chat_messages" not in st.session_state:
         st.session_state["chat_messages"] = []
 
+    if "chat_session_id" not in st.session_state:
+        st.session_state["chat_session_id"] = None
+
+    with st.container(border=True):
+        st.markdown('<div class="compact-section-title">Conversation</div>', unsafe_allow_html=True)
+        conversation_columns = st.columns([1, 3, 1])
+
+        with conversation_columns[0]:
+            if st.button(
+                "New Chat",
+                use_container_width=True,
+                disabled=st.session_state.get("chat_is_processing", False),
+            ):
+                st.session_state["chat_session_id"] = None
+                st.session_state["chat_messages"] = []
+                st.session_state.pop("active_chat_job_id", None)
+                st.session_state["chat_is_processing"] = False
+                st.rerun()
+
+        try:
+            persisted_sessions = get_backend_chat_sessions()
+        except requests.exceptions.RequestException:
+            persisted_sessions = []
+
+        session_labels = {
+            (
+                f"{session['title']} "
+                f"({session['updated_at']})"
+            ): session["session_id"]
+            for session in persisted_sessions
+        }
+
+        with conversation_columns[1]:
+            selected_session_label = st.selectbox(
+                "Recent Conversations",
+                ["Current conversation"] + list(session_labels.keys()),
+                label_visibility="collapsed",
+                disabled=st.session_state.get("chat_is_processing", False),
+            )
+
+        with conversation_columns[2]:
+            selected_session_id = session_labels.get(selected_session_label)
+
+            if st.button(
+                "Open",
+                use_container_width=True,
+                disabled=(
+                    selected_session_id is None
+                    or st.session_state.get("chat_is_processing", False)
+                ),
+            ):
+                try:
+                    persisted_messages = get_backend_chat_session_messages(selected_session_id)
+                except requests.exceptions.RequestException as error:
+                    st.warning(f"Could not load conversation: {error}")
+                else:
+                    st.session_state["chat_session_id"] = selected_session_id
+                    st.session_state["chat_messages"] = [
+                        convert_persisted_message_to_chat_message(message)
+                        for message in persisted_messages
+                    ]
+                    st.rerun()
+
     documents = load_document_metadata()
     visible_documents = [
         document for document in documents
@@ -4849,6 +4977,7 @@ if selected_page == "Chat":
     with clear_columns[0]:
         if st.button("Clear Chat", use_container_width=True, disabled=chat_is_processing):
             st.session_state["chat_messages"] = []
+            st.session_state["chat_session_id"] = None
             st.rerun()
 
     question = st.session_state.pop("pending_chat_question", None)
