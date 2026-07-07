@@ -1893,13 +1893,42 @@ st.markdown(
         margin-top: 0.35rem;
     }}
 
-    div[data-testid="stTabs"] button {{
-        font-weight: 650;
+    div[data-testid="stTabs"] [role="tablist"] {{
+        gap: 0.35rem;
+        border-bottom: 1px solid #d0d5dd;
+        margin-bottom: 0.85rem;
     }}
 
-    div[data-testid="stTabs"] button[aria-selected="true"] {{
+    div[data-testid="stTabs"] button[role="tab"] {{
+        min-height: 2.5rem;
+        padding: 0.55rem 0.9rem;
+        border: 1px solid #d0d5dd;
+        border-bottom-color: transparent;
+        border-radius: 8px 8px 0 0;
+        background: #f9fafb;
+        color: #475467 !important;
+        font-size: 0.9rem;
+        font-weight: 750;
+        letter-spacing: 0;
+    }}
+
+    div[data-testid="stTabs"] button[role="tab"] p {{
+        color: inherit !important;
+        font-size: inherit;
+        font-weight: inherit;
+    }}
+
+    div[data-testid="stTabs"] button[role="tab"]:hover {{
+        background: {brand_red_soft};
+        color: {brand_red_hover} !important;
+    }}
+
+    div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {{
+        background: #ffffff;
         color: {brand_red} !important;
-        border-bottom-color: {brand_red} !important;
+        border-color: {brand_red_border};
+        border-bottom-color: #ffffff;
+        box-shadow: inset 0 3px 0 {brand_red};
     }}
 
     div[data-testid="stDataFrame"] {{
@@ -4064,10 +4093,19 @@ if selected_page in ["KB Management", "KB Status"]:
                                 st.rerun()
 
                     with index_action_columns[1]:
+                        confirm_full_rebuild = st.checkbox(
+                            "Confirm full rebuild",
+                            key="confirm_full_rebuild",
+                            help="Full rebuild recreates the active search index from current active metadata.",
+                        )
+
                         if st.button(
                             "Full Rebuild",
                             use_container_width=True,
-                            disabled=bool(st.session_state.get("active_reindex_job_id")),
+                            disabled=(
+                                not confirm_full_rebuild
+                                or bool(st.session_state.get("active_reindex_job_id"))
+                            ),
                         ):
                             try:
                                 job = submit_reindex_job()
