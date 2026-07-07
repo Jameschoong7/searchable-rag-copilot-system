@@ -26,8 +26,6 @@ AZURE_OPENAI_EMBEDDING_BACKEND = "azure_openai"
 OLLAMA_LLM_BACKEND = "ollama"
 AZURE_OPENAI_LLM_BACKEND = "azure_openai"
 
-SIMULATED_SHAREPOINT_MODE = "simulated"
-
 DEFAULT_TOP_K = 5
 DEFAULT_MINIMUM_RELEVANCE_THRESHOLD = 0.25
 DEFAULT_GUARDRAIL_PROMPT = (
@@ -48,7 +46,6 @@ class AppConfig:
     graph_access_token: str | None
     graph_onedrive_root_path: str
     graph_onenote_notebook_filter: str | None
-    sharepoint_mode: str
     top_k: int
     minimum_relevance_threshold: float
     guardrail_prompt: str
@@ -112,11 +109,6 @@ def read_app_config() -> AppConfig:
             "/Enterprise Knowledge Base",
         ),
         graph_onenote_notebook_filter=os.getenv("GRAPH_ONENOTE_NOTEBOOK_FILTER"),
-        sharepoint_mode=read_config_value(
-            "SHAREPOINT_MODE",
-            SIMULATED_SHAREPOINT_MODE,
-            runtime_settings,
-        ),
         top_k=int(
             read_config_value(
                 "TOP_K",
@@ -183,11 +175,6 @@ def read_app_config_with_pending() -> AppConfig:
             "/Enterprise Knowledge Base",
         ),
         graph_onenote_notebook_filter=os.getenv("GRAPH_ONENOTE_NOTEBOOK_FILTER"),
-        sharepoint_mode=read_config_value(
-            "SHAREPOINT_MODE",
-            SIMULATED_SHAREPOINT_MODE,
-            merged_settings,
-        ),
         top_k=int(
             read_config_value(
                 "TOP_K",
