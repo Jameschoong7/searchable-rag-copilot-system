@@ -740,6 +740,13 @@ def poll_active_chat_job() -> None:
             f"Search department: {result.get('department_filter') or 'ACL-permitted shared scope'} | "
             f"File type: {result.get('file_type_filter')}"
         )
+        retrieval_question = result.get("retrieval_question")
+
+        if retrieval_question and retrieval_question != result["question"]:
+            context_text = (
+                f"{context_text} | "
+                f"Retrieval question: {retrieval_question}"
+            )
 
         st.session_state["chat_messages"].append(
             {

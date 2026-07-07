@@ -2,18 +2,17 @@
   "benchmark_type": "batch_incremental_update",
   "changed_document_count": 1,
   "updated_sources": [
-    "data/simulated/DOC-IT-001_v5_IT_Policy_Password.txt"
+    "data/simulated/exp_2.pdf"
   ],
   "cleanup_sources": [
-    "data/simulated/DOC-IT-001_v4_IT_Policy_Password.txt",
-    "data/simulated/DOC-IT-001_v5_IT_Policy_Password.txt"
+    "data/simulated/exp_2.pdf"
   ],
-  "elapsed_seconds": 28.897,
+  "elapsed_seconds": 10.078,
   "before": {
     "vector_backend": "azure_search",
-    "active_metadata_records": 17,
-    "simulated_source_files": 39,
-    "indexed_chunk_count": 92,
+    "active_metadata_records": 21,
+    "simulated_source_files": 49,
+    "indexed_chunk_count": 103,
     "index_size_bytes": null,
     "index_size_mb": null,
     "index_size_available": false,
@@ -23,31 +22,27 @@
   },
   "update_results": [
     {
-      "source": "data/simulated/DOC-IT-001_v5_IT_Policy_Password.txt",
+      "source": "data/simulated/exp_2.pdf",
       "deleted_vector_count": 0,
-      "document_objects_loaded": 1,
-      "chunks_indexed": 6
+      "document_objects_loaded": 2,
+      "chunks_indexed": 1
     }
   ],
   "cleanup_results": [
     {
-      "source": "data/simulated/DOC-IT-001_v4_IT_Policy_Password.txt",
-      "deleted_vector_count": 0
-    },
-    {
-      "source": "data/simulated/DOC-IT-001_v5_IT_Policy_Password.txt",
+      "source": "data/simulated/exp_2.pdf",
       "deleted_vector_count": 0
     }
   ],
   "total_deleted_vectors": 0,
-  "total_document_objects_loaded": 1,
-  "total_chunks_indexed": 6,
-  "estimated_unchanged_chunks_avoided": 86,
+  "total_document_objects_loaded": 2,
+  "total_chunks_indexed": 1,
+  "estimated_unchanged_chunks_avoided": 102,
   "after": {
     "vector_backend": "azure_search",
-    "active_metadata_records": 17,
-    "simulated_source_files": 39,
-    "indexed_chunk_count": 98,
+    "active_metadata_records": 21,
+    "simulated_source_files": 49,
+    "indexed_chunk_count": 103,
     "index_size_bytes": null,
     "index_size_mb": null,
     "index_size_available": false,
@@ -56,7 +51,7 @@
     "chroma_db_size_mb": null
   },
   "delta": {
-    "indexed_chunk_count": 6,
+    "indexed_chunk_count": 0,
     "index_size_bytes": null,
     "index_size_mb": null
   },

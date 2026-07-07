@@ -71,7 +71,12 @@ from src.core.chat_memory_repository import (
     append_chat_message,
     get_or_create_chat_session,
     list_chat_messages_for_session,
+    list_recent_chat_messages_for_session,
     list_chat_sessions_for_user,
+)
+from src.rag.chat_rewrite import (
+    MAX_REWRITE_HISTORY_MESSAGES,
+    rewrite_follow_up_question_with_ollama,
 )
 
 
@@ -599,6 +604,15 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
         first_question=question,
     )
     session_id = chat_session["session_id"]
+    recent_messages = list_recent_chat_messages_for_session(
+        session_id=session_id,
+        user=request.user,
+        limit=MAX_REWRITE_HISTORY_MESSAGES,
+    )
+    retrieval_question = rewrite_follow_up_question_with_ollama(
+        question,
+        recent_messages,
+    )
 
     append_chat_message(
         session_id=session_id,
@@ -620,7 +634,7 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
         from src.rag.engine import generate_answer
 
         result = generate_answer(
-            question=question,
+            question=retrieval_question,
             role=request.role,
             department=request.department,
             department_filter=request.department_filter,
@@ -646,7 +660,8 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
             "Chat answer generated.",
             {
                 "session_id": session_id,
-                "question": result["question"],
+                "question": question,
+                "retrieval_question": retrieval_question,
                 "answer": result["answer"],
                 "sources": result["sources"],
                 "answer_status": answer_status,
@@ -674,6 +689,7 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
             {
                 "session_id": session_id,
                 "question": question,
+                "retrieval_question": retrieval_question,
                 "answer": "",
                 "sources": [],
                 "answer_status": "api_error",

@@ -1508,5 +1508,386 @@
       "index_size_mb": null
     },
     "updated_by": "admin_jc"
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 1,
+    "updated_sources": [
+      "data/simulated/onedrive_4446DE05E285242C-sa9a40c58b0c24c51be06e18bd0c38c65_test_version.docx"
+    ],
+    "cleanup_sources": [
+      "data/simulated/onedrive_4446DE05E285242C-sa9a40c58b0c24c51be06e18bd0c38c65_test_version.docx"
+    ],
+    "elapsed_seconds": 7.25,
+    "before": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 18,
+      "simulated_source_files": 40,
+      "indexed_chunk_count": 98,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sa9a40c58b0c24c51be06e18bd0c38c65_test_version.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      }
+    ],
+    "cleanup_results": [
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sa9a40c58b0c24c51be06e18bd0c38c65_test_version.docx",
+        "deleted_vector_count": 0
+      }
+    ],
+    "total_deleted_vectors": 0,
+    "total_document_objects_loaded": 1,
+    "total_chunks_indexed": 1,
+    "estimated_unchanged_chunks_avoided": 97,
+    "after": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 18,
+      "simulated_source_files": 40,
+      "indexed_chunk_count": 98,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "delta": {
+      "indexed_chunk_count": 0,
+      "index_size_bytes": null,
+      "index_size_mb": null
+    },
+    "updated_by": "admin_jc"
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 1,
+    "updated_sources": [
+      "data/simulated/onedrive_4446DE05E285242C-sa9a40c58b0c24c51be06e18bd0c38c65_v2_test_version.docx"
+    ],
+    "cleanup_sources": [
+      "data/simulated/onedrive_4446DE05E285242C-sa9a40c58b0c24c51be06e18bd0c38c65_test_version.docx",
+      "data/simulated/onedrive_4446DE05E285242C-sa9a40c58b0c24c51be06e18bd0c38c65_v2_test_version.docx"
+    ],
+    "elapsed_seconds": 6.968,
+    "before": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 18,
+      "simulated_source_files": 41,
+      "indexed_chunk_count": 99,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sa9a40c58b0c24c51be06e18bd0c38c65_v2_test_version.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      }
+    ],
+    "cleanup_results": [
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sa9a40c58b0c24c51be06e18bd0c38c65_test_version.docx",
+        "deleted_vector_count": 1
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sa9a40c58b0c24c51be06e18bd0c38c65_v2_test_version.docx",
+        "deleted_vector_count": 0
+      }
+    ],
+    "total_deleted_vectors": 1,
+    "total_document_objects_loaded": 1,
+    "total_chunks_indexed": 1,
+    "estimated_unchanged_chunks_avoided": 98,
+    "after": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 18,
+      "simulated_source_files": 41,
+      "indexed_chunk_count": 99,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "delta": {
+      "indexed_chunk_count": 0,
+      "index_size_bytes": null,
+      "index_size_mb": null
+    },
+    "updated_by": "admin_jc"
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 1,
+    "updated_sources": [
+      "data/simulated/onedrive_4446DE05E285242C-sfee87f702dbe4705ba6f7d5d1b469dcc_v2_Test_version_2.docx"
+    ],
+    "cleanup_sources": [
+      "data/simulated/onedrive_4446DE05E285242C-sfee87f702dbe4705ba6f7d5d1b469dcc_Test_version_2.docx",
+      "data/simulated/onedrive_4446DE05E285242C-sfee87f702dbe4705ba6f7d5d1b469dcc_v2_Test_version_2.docx"
+    ],
+    "elapsed_seconds": 7.661,
+    "before": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 19,
+      "simulated_source_files": 43,
+      "indexed_chunk_count": 99,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sfee87f702dbe4705ba6f7d5d1b469dcc_v2_Test_version_2.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      }
+    ],
+    "cleanup_results": [
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sfee87f702dbe4705ba6f7d5d1b469dcc_Test_version_2.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sfee87f702dbe4705ba6f7d5d1b469dcc_v2_Test_version_2.docx",
+        "deleted_vector_count": 0
+      }
+    ],
+    "total_deleted_vectors": 0,
+    "total_document_objects_loaded": 1,
+    "total_chunks_indexed": 1,
+    "estimated_unchanged_chunks_avoided": 98,
+    "after": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 19,
+      "simulated_source_files": 43,
+      "indexed_chunk_count": 99,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "delta": {
+      "indexed_chunk_count": 0,
+      "index_size_bytes": null,
+      "index_size_mb": null
+    },
+    "updated_by": "admin_jc"
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 1,
+    "updated_sources": [
+      "data/simulated/onenote_0-5e888c35f60d4d54be28828c0601a7ff-14-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_r2_Leave_Policy_Notes.txt"
+    ],
+    "cleanup_sources": [
+      "data/simulated/onenote_0-5e888c35f60d4d54be28828c0601a7ff-14-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_r2_Leave_Policy_Notes.txt"
+    ],
+    "elapsed_seconds": 10.739,
+    "before": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 20,
+      "simulated_source_files": 43,
+      "indexed_chunk_count": 100,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/onenote_0-5e888c35f60d4d54be28828c0601a7ff-14-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_r2_Leave_Policy_Notes.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      }
+    ],
+    "cleanup_results": [
+      {
+        "source": "data/simulated/onenote_0-5e888c35f60d4d54be28828c0601a7ff-14-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_r2_Leave_Policy_Notes.txt",
+        "deleted_vector_count": 0
+      }
+    ],
+    "total_deleted_vectors": 0,
+    "total_document_objects_loaded": 1,
+    "total_chunks_indexed": 2,
+    "estimated_unchanged_chunks_avoided": 98,
+    "after": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 20,
+      "simulated_source_files": 43,
+      "indexed_chunk_count": 100,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "delta": {
+      "indexed_chunk_count": 0,
+      "index_size_bytes": null,
+      "index_size_mb": null
+    },
+    "updated_by": "admin_jc"
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 2,
+    "updated_sources": [
+      "data/simulated/DOC-UPLOAD-005_v12_Incident_Response_Policy.docx",
+      "data/simulated/Exp_2_solution.pdf"
+    ],
+    "cleanup_sources": [
+      "data/simulated/DOC-UPLOAD-005_v11_Incident_Response_Policy.docx",
+      "data/simulated/DOC-UPLOAD-005_v12_Incident_Response_Policy.docx",
+      "data/simulated/Exp_2_solution.pdf"
+    ],
+    "elapsed_seconds": 91.643,
+    "before": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 20,
+      "simulated_source_files": 48,
+      "indexed_chunk_count": 102,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/DOC-UPLOAD-005_v12_Incident_Response_Policy.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 14
+      },
+      {
+        "source": "data/simulated/Exp_2_solution.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 2,
+        "chunks_indexed": 1
+      }
+    ],
+    "cleanup_results": [
+      {
+        "source": "data/simulated/DOC-UPLOAD-005_v11_Incident_Response_Policy.docx",
+        "deleted_vector_count": 14
+      },
+      {
+        "source": "data/simulated/DOC-UPLOAD-005_v12_Incident_Response_Policy.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/Exp_2_solution.pdf",
+        "deleted_vector_count": 0
+      }
+    ],
+    "total_deleted_vectors": 14,
+    "total_document_objects_loaded": 3,
+    "total_chunks_indexed": 15,
+    "estimated_unchanged_chunks_avoided": 87,
+    "after": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 20,
+      "simulated_source_files": 48,
+      "indexed_chunk_count": 103,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "delta": {
+      "indexed_chunk_count": 1,
+      "index_size_bytes": null,
+      "index_size_mb": null
+    },
+    "updated_by": "admin_jc"
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 1,
+    "updated_sources": [
+      "data/simulated/exp_2.pdf"
+    ],
+    "cleanup_sources": [
+      "data/simulated/exp_2.pdf"
+    ],
+    "elapsed_seconds": 10.078,
+    "before": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 21,
+      "simulated_source_files": 49,
+      "indexed_chunk_count": 103,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/exp_2.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 2,
+        "chunks_indexed": 1
+      }
+    ],
+    "cleanup_results": [
+      {
+        "source": "data/simulated/exp_2.pdf",
+        "deleted_vector_count": 0
+      }
+    ],
+    "total_deleted_vectors": 0,
+    "total_document_objects_loaded": 2,
+    "total_chunks_indexed": 1,
+    "estimated_unchanged_chunks_avoided": 102,
+    "after": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 21,
+      "simulated_source_files": 49,
+      "indexed_chunk_count": 103,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "delta": {
+      "indexed_chunk_count": 0,
+      "index_size_bytes": null,
+      "index_size_mb": null
+    },
+    "updated_by": "admin_jc"
   }
 ]

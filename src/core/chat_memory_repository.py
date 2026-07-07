@@ -299,3 +299,44 @@ def list_chat_messages_for_session(session_id: str, user: str) -> list[dict]:
         messages.append(message)
 
     return messages
+
+
+def list_recent_chat_messages_for_session(
+    session_id: str,
+    user: str,
+    limit: int,
+) -> list[dict]:
+    """Return the most recent messages for an owned session in display order."""
+    session = get_chat_session(session_id)
+
+    if session is None or session["user"] != user:
+        return []
+
+    with sqlite3.connect(CHAT_MEMORY_DB_PATH) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            """
+            SELECT
+                message_id,
+                session_id,
+                message_role,
+                content,
+                sources_json,
+                status,
+                created_at
+            FROM chat_messages
+            WHERE session_id = ?
+            ORDER BY rowid DESC
+            LIMIT ?
+            """,
+            (session_id, limit),
+        ).fetchall()
+
+    messages = []
+
+    for row in reversed(rows):
+        message = dict(row)
+        message["sources"] = json.loads(message.pop("sources_json"))
+        messages.append(message)
+
+    return messages
