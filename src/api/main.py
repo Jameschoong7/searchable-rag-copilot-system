@@ -809,9 +809,17 @@ def get_uploaded_file_type(filename: str) -> str:
     )
 
 
-def get_visual_extraction_status(file_type: str) -> str:
+def get_visual_extraction_status(file_type: str, file_bytes: bytes | None = None) -> str:
     """Return the extraction status label for a supported uploaded file type."""
     if file_type == "PDF":
+        if file_bytes:
+            try:
+                from src.etl.visual_detection import detect_pdf_visual_status
+
+                return detect_pdf_visual_status(file_bytes)
+            except Exception:
+                return "PDF text extraction - visual status unknown"
+
         return "PDF text extraction"
 
     if file_type == "DOCX":
@@ -1273,7 +1281,7 @@ async def upload_document(
         "uploaded_at": datetime.now().isoformat(timespec="minutes"),
         "page_number": None,
         "chunk_id": "pending_index",
-        "visual_extraction_status": get_visual_extraction_status(file_type),
+        "visual_extraction_status": get_visual_extraction_status(file_type, file_bytes),
         "source_document_id": document_id,
         "version_number": 1,
         "is_active": 1,
@@ -1537,7 +1545,7 @@ async def upload_document_version(
             "uploaded_at": datetime.now().isoformat(timespec="minutes"),
             "page_number": None,
             "chunk_id": "pending_index",
-            "visual_extraction_status": get_visual_extraction_status(file_type),
+            "visual_extraction_status": get_visual_extraction_status(file_type, file_bytes),
             "content_hash": hashlib.sha256(file_bytes).hexdigest(),
         }
     )
@@ -2761,7 +2769,7 @@ def refresh_onedrive_file_item(
             "uploaded_by": user,
             "uploaded_at": datetime.now().isoformat(timespec="minutes"),
             "chunk_id": "pending_index",
-            "visual_extraction_status": get_visual_extraction_status(file_type),
+            "visual_extraction_status": get_visual_extraction_status(file_type, content_bytes),
             "content_hash": new_content_hash,
             "archived_at": None,
             "replaced_by_document_id": None,
