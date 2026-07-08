@@ -8,6 +8,7 @@ import re
 from datetime import datetime
 import hashlib
 import json
+import os
 import zipfile
 import io
 from pathlib import Path
@@ -103,6 +104,100 @@ def health_check() -> dict:
         "status": "ok",
         "service": "Searchable RAG Copilot API",
     }
+
+
+@app.get("/admin/llm/config-health")
+def get_llm_config_health() -> dict:
+    """Check configured LLM fields without calling the model or spending tokens."""
+    from src.core.config import (
+        AZURE_OPENAI_LLM_BACKEND,
+        OLLAMA_LLM_BACKEND,
+    )
+
+    app_config = read_app_config()
+    runtime_info = get_llm_runtime_info(app_config)
+    checks: list[dict[str, str | bool]] = []
+
+    if app_config.llm_backend == AZURE_OPENAI_LLM_BACKEND:
+        checks = [
+            {
+                "name": "Endpoint",
+                "ok": bool(os.getenv("AZURE_OPENAI_ENDPOINT")),
+                "detail": "Configured" if os.getenv("AZURE_OPENAI_ENDPOINT") else "Missing AZURE_OPENAI_ENDPOINT",
+            },
+            {
+                "name": "API key",
+                "ok": bool(os.getenv("AZURE_OPENAI_API_KEY")),
+                "detail": "Configured" if os.getenv("AZURE_OPENAI_API_KEY") else "Missing AZURE_OPENAI_API_KEY",
+            },
+            {
+                "name": "Deployment",
+                "ok": bool(os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT")),
+                "detail": runtime_info["llm_deployment"],
+            },
+        ]
+    elif app_config.llm_backend == OLLAMA_LLM_BACKEND:
+        checks = [
+            {
+                "name": "Base URL",
+                "ok": bool(os.getenv("OLLAMA_BASE_URL")),
+                "detail": "Configured" if os.getenv("OLLAMA_BASE_URL") else "Missing OLLAMA_BASE_URL",
+            },
+            {
+                "name": "Model",
+                "ok": bool(os.getenv("OLLAMA_MODEL")),
+                "detail": runtime_info["llm_deployment"],
+            },
+        ]
+    else:
+        checks = [
+            {
+                "name": "Backend",
+                "ok": False,
+                "detail": f"Unsupported LLM backend: {app_config.llm_backend}",
+            }
+        ]
+
+    is_ready = all(bool(check["ok"]) for check in checks)
+
+    return {
+        "status": "ready" if is_ready else "not_ready",
+        "backend": runtime_info["llm_backend"],
+        "deployment": runtime_info["llm_deployment"],
+        "checks": checks,
+        "live_test": "not_run",
+    }
+
+
+@app.post("/admin/llm/live-test")
+def run_llm_live_test() -> dict:
+    """Run an explicit tiny LLM call when an admin chooses to spend test tokens."""
+    import time
+
+    from src.rag.llm_factory import create_chat_llm
+
+    runtime_info = get_llm_runtime_info()
+    start_time = time.perf_counter()
+
+    try:
+        llm = create_chat_llm()
+        output = str(llm.invoke("Reply with exactly: llm ok")).strip()
+
+        return {
+            "status": "connected",
+            "backend": runtime_info["llm_backend"],
+            "deployment": runtime_info["llm_deployment"],
+            "latency_seconds": round(time.perf_counter() - start_time, 3),
+            "output": output,
+        }
+    except Exception as error:
+        return {
+            "status": "failed",
+            "backend": runtime_info["llm_backend"],
+            "deployment": runtime_info["llm_deployment"],
+            "latency_seconds": round(time.perf_counter() - start_time, 3),
+            "error": str(error),
+        }
 
 
 class QueryRequest(BaseModel):

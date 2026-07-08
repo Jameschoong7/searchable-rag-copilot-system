@@ -83,6 +83,8 @@ UNARCHIVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/unarchive-document"
 ARCHIVE_DOCUMENT_JOB_URL = f"{API_BASE_URL}/admin/archive-document-jobs"
 UNARCHIVE_DOCUMENT_JOB_URL = f"{API_BASE_URL}/admin/unarchive-document-jobs"
 SETTINGS_URL = f"{API_BASE_URL}/admin/settings"
+LLM_CONFIG_HEALTH_URL = f"{API_BASE_URL}/admin/llm/config-health"
+LLM_LIVE_TEST_URL = f"{API_BASE_URL}/admin/llm/live-test"
 UPLOAD_DOCUMENT_URL = f"{API_BASE_URL}/admin/upload-document"
 UPLOAD_DOCUMENT_VERSION_URL = f"{API_BASE_URL}/admin/upload-document-version"
 UPLOAD_ZIP_STAGING_URL = f"{API_BASE_URL}/admin/upload-zip-staging"
@@ -408,6 +410,28 @@ def request_settings_update(settings: dict[str, str]) -> dict:
             "settings": settings,
         },
         timeout=30,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_llm_config_health() -> dict:
+    """Check LLM configuration without making a model call."""
+    response = requests.get(
+        LLM_CONFIG_HEALTH_URL,
+        timeout=15,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_llm_live_test() -> dict:
+    """Run the explicit tiny LLM connection test from Settings."""
+    response = requests.post(
+        LLM_LIVE_TEST_URL,
+        timeout=60,
     )
 
     response.raise_for_status()
@@ -5154,10 +5178,75 @@ if selected_page == "Settings":
         mode_columns[1].metric("Vector", current_settings["vector_backend"])
         mode_columns[2].metric("Embedding", current_settings["embedding_backend"])
         mode_columns[3].metric("LLM", current_settings["llm_backend"])
-        st.caption(
-            "Active generation deployment: "
-            f"{runtime_info.get('llm_deployment', 'Not configured')}"
-        )
+
+    with st.container(border=True):
+        st.subheader("LLM Health")
+
+        try:
+            llm_config_health = request_llm_config_health()
+        except requests.exceptions.RequestException as error:
+            st.warning(f"Could not check LLM configuration: {error}")
+            llm_config_health = None
+
+        if llm_config_health:
+            health_status = (
+                "Ready"
+                if llm_config_health["status"] == "ready"
+                else "Needs attention"
+            )
+            health_columns = st.columns([2.4, 2.4, 1.2])
+
+            with health_columns[0]:
+                st.caption(
+                    f"{health_status} - "
+                    f"{llm_config_health['backend']} / "
+                    f"{llm_config_health['deployment']}"
+                )
+
+            with health_columns[1]:
+                st.caption("Config check is token-free. Live test is manual.")
+
+            with health_columns[2]:
+                run_live_test = st.button(
+                    "Test",
+                    use_container_width=True,
+                    help="Sends one tiny prompt to the active LLM backend. This may consume a small number of tokens.",
+                )
+
+            with st.expander("Details", expanded=False):
+                st.dataframe(
+                    pd.DataFrame(llm_config_health["checks"]),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+        else:
+            run_live_test = st.button(
+                "Run Live Test",
+                use_container_width=True,
+                help="Sends one tiny prompt to the active LLM backend. This may consume a small number of tokens.",
+            )
+
+        if run_live_test:
+            try:
+                live_test_result = request_llm_live_test()
+            except requests.exceptions.RequestException as error:
+                st.error(f"LLM live test request failed: {error}")
+            else:
+                if live_test_result["status"] == "connected":
+                    st.success(
+                        "LLM connected "
+                        f"({live_test_result['backend']} / "
+                        f"{live_test_result['deployment']}, "
+                        f"{live_test_result['latency_seconds']}s)."
+                    )
+                    st.caption(f"Model response: {live_test_result['output']}")
+                else:
+                    st.error(
+                        "LLM live test failed "
+                        f"({live_test_result['backend']} / "
+                        f"{live_test_result['deployment']})."
+                    )
+                    st.caption(live_test_result.get("error", "Unknown error"))
 
     with st.form("runtime_settings_form", border=True):
         st.subheader("Configure Backend")
