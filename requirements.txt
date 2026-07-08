@@ -60,6 +60,7 @@ jsonpointer
 jsonschema
 jsonschema-specifications
 kubernetes
+langchain-openai
 lxml
 markdown-it-py
 MarkupSafe
@@ -88,6 +89,7 @@ nvidia-nvshmem-cu13
 nvidia-nvtx
 oauthlib
 onnxruntime
+openai
 opentelemetry-api
 opentelemetry-exporter-otlp-proto-common
 opentelemetry-exporter-otlp-proto-grpc

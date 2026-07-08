@@ -1,7 +1,6 @@
-import os
 import re
 
-from langchain_community.llms import Ollama
+from src.rag.llm_factory import create_chat_llm
 
 
 MAX_REWRITE_HISTORY_MESSAGES = 6
@@ -86,20 +85,17 @@ def rewrite_follow_up_question(
     return clean_rewrite_output(str(rewritten), clean_question)
 
 
-def rewrite_follow_up_question_with_ollama(
+def rewrite_follow_up_question_with_configured_llm(
     question: str,
     recent_messages: list[dict],
 ) -> str:
-    """Use the configured local LLM to rewrite a follow-up, falling back safely."""
+    """Use the configured LLM to rewrite a follow-up, falling back safely."""
     if not recent_messages:
         return question.strip()
 
     try:
-        llm = Ollama(
-            base_url=os.getenv("OLLAMA_BASE_URL"),
-            model=os.getenv("OLLAMA_MODEL"),
-            temperature=0,
-        )
+        llm = create_chat_llm()
+
         return rewrite_follow_up_question(
             question,
             recent_messages,

@@ -76,7 +76,7 @@ from src.core.chat_memory_repository import (
 )
 from src.rag.chat_rewrite import (
     MAX_REWRITE_HISTORY_MESSAGES,
-    rewrite_follow_up_question_with_ollama,
+    rewrite_follow_up_question_with_configured_llm,
 )
 
 
@@ -521,6 +521,7 @@ class ChatJobRequest(QueryRequest):
 
     user: str
     session_id: str | None = None
+    use_memory: bool = True
 
 
 class JobResponse(BaseModel):
@@ -604,15 +605,18 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
         first_question=question,
     )
     session_id = chat_session["session_id"]
-    recent_messages = list_recent_chat_messages_for_session(
-        session_id=session_id,
-        user=request.user,
-        limit=MAX_REWRITE_HISTORY_MESSAGES,
-    )
-    retrieval_question = rewrite_follow_up_question_with_ollama(
-        question,
-        recent_messages,
-    )
+    retrieval_question = question
+
+    if request.use_memory:
+        recent_messages = list_recent_chat_messages_for_session(
+            session_id=session_id,
+            user=request.user,
+            limit=MAX_REWRITE_HISTORY_MESSAGES,
+        )
+        retrieval_question = rewrite_follow_up_question_with_configured_llm(
+            question,
+            recent_messages,
+        )
 
     append_chat_message(
         session_id=session_id,
@@ -662,6 +666,7 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
                 "session_id": session_id,
                 "question": question,
                 "retrieval_question": retrieval_question,
+                "use_memory": request.use_memory,
                 "answer": result["answer"],
                 "sources": result["sources"],
                 "answer_status": answer_status,
@@ -690,6 +695,7 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
                 "session_id": session_id,
                 "question": question,
                 "retrieval_question": retrieval_question,
+                "use_memory": request.use_memory,
                 "answer": "",
                 "sources": [],
                 "answer_status": "api_error",

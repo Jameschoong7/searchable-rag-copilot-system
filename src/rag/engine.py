@@ -7,6 +7,7 @@ from pathlib import Path
 from src.metadata.repository import load_document_metadata
 from src.vector.factory import get_vector_backend
 from src.core.config import read_app_config
+from src.rag.llm_factory import create_chat_llm
 
 
 from langchain_community.llms import Ollama
@@ -416,21 +417,7 @@ def generate_answer(
     {question}
     """.strip()
 
-    llm = Ollama(
-        base_url= os.getenv("OLLAMA_BASE_URL"),
-        model = os.getenv("OLLAMA_MODEL"),
-        temperature=0,
-    )
-    # ── AZURE SWAP ──
-    # Replace Ollama(...) above with:
-    #   AzureChatOpenAI(
-    #       azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
-    #       azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    #       api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-    #       api_version="2024-02-01"
-    #   )
-    # Requires: AZURE_* values in .env
-    # ── END AZURE SWAP ──
+    llm = create_chat_llm()
 
     #send grounded prompt to LLM and get response
     answer = llm.invoke(prompt)
