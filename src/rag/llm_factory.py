@@ -8,6 +8,10 @@ from src.core.config import (
     OLLAMA_LLM_BACKEND,
     read_app_config,
 )
+from src.core.llm_usage_repository import (
+    estimate_openai_cost_usd,
+    record_llm_usage,
+)
 
 
 class FoundryOpenAIModel:
@@ -34,11 +38,30 @@ class FoundryOpenAIModel:
             api_key=api_key,
         )
 
-    def invoke(self, prompt: str) -> str:
+    def invoke(self, prompt: str, operation: str = "chat") -> str:
         """Send one prompt to the configured Foundry deployment and return text."""
         response = self.client.responses.create(
             model=self.deployment,
             input=prompt,
+        )
+        usage = getattr(response, "usage", None)
+        input_tokens = getattr(usage, "input_tokens", None) if usage else None
+        output_tokens = getattr(usage, "output_tokens", None) if usage else None
+        total_tokens = getattr(usage, "total_tokens", None) if usage else None
+        estimated_cost = estimate_openai_cost_usd(
+            deployment=self.deployment,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+
+        record_llm_usage(
+            backend=AZURE_OPENAI_LLM_BACKEND,
+            deployment=self.deployment,
+            operation=operation,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+            estimated_cost_usd=estimated_cost,
         )
 
         return response.output_text
@@ -59,3 +82,11 @@ def create_chat_llm():
         return FoundryOpenAIModel()
 
     raise RuntimeError(f"Unsupported LLM_BACKEND: {config.llm_backend}")
+
+
+def invoke_configured_llm(llm, prompt: str, operation: str = "chat") -> str:
+    """Invoke a configured LLM with usage labels when the backend supports them."""
+    try:
+        return llm.invoke(prompt, operation=operation)
+    except TypeError:
+        return llm.invoke(prompt)

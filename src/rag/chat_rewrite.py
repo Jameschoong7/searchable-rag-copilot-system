@@ -1,6 +1,6 @@
 import re
 
-from src.rag.llm_factory import create_chat_llm
+from src.rag.llm_factory import create_chat_llm, invoke_configured_llm
 
 
 MAX_REWRITE_HISTORY_MESSAGES = 6
@@ -99,7 +99,11 @@ def rewrite_follow_up_question_with_configured_llm(
         return rewrite_follow_up_question(
             question,
             recent_messages,
-            llm.invoke,
+            lambda prompt: invoke_configured_llm(
+                llm,
+                prompt,
+                operation="memory_rewrite",
+            ),
         )
     except Exception:
         return question.strip()

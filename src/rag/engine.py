@@ -7,7 +7,7 @@ from pathlib import Path
 from src.metadata.repository import load_document_metadata
 from src.vector.factory import get_vector_backend
 from src.core.config import read_app_config
-from src.rag.llm_factory import create_chat_llm
+from src.rag.llm_factory import create_chat_llm, invoke_configured_llm
 
 
 from langchain_community.llms import Ollama
@@ -420,7 +420,7 @@ def generate_answer(
     llm = create_chat_llm()
 
     #send grounded prompt to LLM and get response
-    answer = llm.invoke(prompt)
+    answer = invoke_configured_llm(llm, prompt, operation="rag_answer")
 
     return {
         "question": question,

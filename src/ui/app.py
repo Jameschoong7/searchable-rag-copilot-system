@@ -85,6 +85,7 @@ UNARCHIVE_DOCUMENT_JOB_URL = f"{API_BASE_URL}/admin/unarchive-document-jobs"
 SETTINGS_URL = f"{API_BASE_URL}/admin/settings"
 LLM_CONFIG_HEALTH_URL = f"{API_BASE_URL}/admin/llm/config-health"
 LLM_LIVE_TEST_URL = f"{API_BASE_URL}/admin/llm/live-test"
+LLM_USAGE_URL = f"{API_BASE_URL}/admin/llm/usage"
 UPLOAD_DOCUMENT_URL = f"{API_BASE_URL}/admin/upload-document"
 UPLOAD_DOCUMENT_VERSION_URL = f"{API_BASE_URL}/admin/upload-document-version"
 UPLOAD_ZIP_STAGING_URL = f"{API_BASE_URL}/admin/upload-zip-staging"
@@ -432,6 +433,18 @@ def request_llm_live_test() -> dict:
     response = requests.post(
         LLM_LIVE_TEST_URL,
         timeout=60,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_llm_usage_records() -> dict:
+    """Load recent LLM usage records without making a model call."""
+    response = requests.get(
+        LLM_USAGE_URL,
+        params={"limit": 25},
+        timeout=15,
     )
 
     response.raise_for_status()
@@ -5247,6 +5260,52 @@ if selected_page == "Settings":
                         f"{live_test_result['deployment']})."
                     )
                     st.caption(live_test_result.get("error", "Unknown error"))
+
+        with st.expander("Usage Records", expanded=False):
+            try:
+                usage_response = request_llm_usage_records()
+            except requests.exceptions.RequestException as error:
+                st.warning(f"Could not load LLM usage records: {error}")
+            else:
+                usage_records = usage_response.get("records", [])
+
+                if not usage_records:
+                    st.caption("No LLM usage records yet.")
+                else:
+                    usage_df = pd.DataFrame(usage_records)
+                    usage_df = usage_df.rename(
+                        columns={
+                            "created_at": "Time",
+                            "backend": "Backend",
+                            "deployment": "Deployment",
+                            "operation": "Operation",
+                            "input_tokens": "Input Tokens",
+                            "output_tokens": "Output Tokens",
+                            "total_tokens": "Total Tokens",
+                            "estimated_cost_usd": "Estimated Cost USD",
+                        }
+                    )
+                    st.dataframe(
+                        usage_df,
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                    known_costs = [
+                        record["estimated_cost_usd"]
+                        for record in usage_records
+                        if record.get("estimated_cost_usd") is not None
+                    ]
+
+                    if known_costs:
+                        st.caption(
+                            "Recent estimated cost: "
+                            f"${sum(known_costs):.6f} across "
+                            f"{len(known_costs)} priced call(s)."
+                        )
+                    else:
+                        st.caption(
+                            "Token or pricing data was not available for these records."
+                        )
 
     with st.form("runtime_settings_form", border=True):
         st.subheader("Configure Backend")

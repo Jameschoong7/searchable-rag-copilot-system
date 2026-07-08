@@ -174,14 +174,20 @@ def run_llm_live_test() -> dict:
     """Run an explicit tiny LLM call when an admin chooses to spend test tokens."""
     import time
 
-    from src.rag.llm_factory import create_chat_llm
+    from src.rag.llm_factory import create_chat_llm, invoke_configured_llm
 
     runtime_info = get_llm_runtime_info()
     start_time = time.perf_counter()
 
     try:
         llm = create_chat_llm()
-        output = str(llm.invoke("Reply with exactly: llm ok")).strip()
+        output = str(
+            invoke_configured_llm(
+                llm,
+                "Reply with exactly: llm ok",
+                operation="live_test",
+            )
+        ).strip()
 
         return {
             "status": "connected",
@@ -198,6 +204,16 @@ def run_llm_live_test() -> dict:
             "latency_seconds": round(time.perf_counter() - start_time, 3),
             "error": str(error),
         }
+
+
+@app.get("/admin/llm/usage")
+def get_recent_llm_usage(limit: int = 25) -> dict:
+    """Return recent LLM usage records for admin cost review."""
+    from src.core.llm_usage_repository import list_recent_llm_usage
+
+    return {
+        "records": list_recent_llm_usage(limit=limit),
+    }
 
 
 class QueryRequest(BaseModel):
