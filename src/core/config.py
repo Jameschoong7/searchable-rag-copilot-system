@@ -243,6 +243,31 @@ def get_config_as_settings_dict(config: AppConfig) -> dict[str, str]:
     }
 
 
+def get_llm_runtime_info(config: AppConfig | None = None) -> dict[str, str]:
+    """Return non-secret LLM runtime details for UI/demo transparency."""
+    active_config = config or read_app_config()
+
+    if active_config.llm_backend == AZURE_OPENAI_LLM_BACKEND:
+        return {
+            "llm_backend": active_config.llm_backend,
+            "llm_deployment": os.getenv(
+                "AZURE_OPENAI_CHAT_DEPLOYMENT",
+                "Not configured",
+            ),
+        }
+
+    if active_config.llm_backend == OLLAMA_LLM_BACKEND:
+        return {
+            "llm_backend": active_config.llm_backend,
+            "llm_deployment": os.getenv("OLLAMA_MODEL", "Not configured"),
+        }
+
+    return {
+        "llm_backend": active_config.llm_backend,
+        "llm_deployment": "Unsupported backend",
+    }
+
+
 def validate_runtime_settings(settings: dict[str, str]) -> None:
     """Validate admin-provided runtime settings before saving them."""
     for key, allowed_values in ALLOWED_SETTING_VALUES.items():

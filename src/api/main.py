@@ -32,6 +32,7 @@ from src.core.constants import (
 from src.core.config import (
     find_changed_settings,
     get_config_as_settings_dict,
+    get_llm_runtime_info,
     read_app_config,
     read_app_config_with_pending,
     settings_require_rebuild,
@@ -491,6 +492,7 @@ class SettingsResponse(BaseModel):
     """Represent current backend-owned runtime settings."""
 
     settings: dict[str, str]
+    runtime_info: dict[str, str] = {}
     pending_settings: dict[str, str] = {}
     rebuild_required: bool = False
     changed_keys: list[str] = []
@@ -596,6 +598,7 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
     """Run one chat query in the background and store the answer in the job table."""
     import time
 
+    llm_runtime_info = get_llm_runtime_info()
     question = request.question.strip()
     chat_session = get_or_create_chat_session(
         session_id=request.session_id,
@@ -675,6 +678,8 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
                 "department": request.department,
                 "department_filter": request.department_filter,
                 "file_type_filter": request.file_type_filter,
+                "llm_backend": llm_runtime_info["llm_backend"],
+                "llm_deployment": llm_runtime_info["llm_deployment"],
                 "latency_seconds": round(time.perf_counter() - start_time, 3),
             },
         )
@@ -704,6 +709,8 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
                 "department": request.department,
                 "department_filter": request.department_filter,
                 "file_type_filter": request.file_type_filter,
+                "llm_backend": llm_runtime_info["llm_backend"],
+                "llm_deployment": llm_runtime_info["llm_deployment"],
                 "latency_seconds": round(time.perf_counter() - start_time, 3),
             },
         )
@@ -1001,11 +1008,13 @@ def query_knowledge_base(request: QueryRequest) -> QueryResponse:
 @app.get("/admin/settings", response_model=SettingsResponse)
 def get_admin_settings() -> SettingsResponse:
     """Return current backend-owned runtime settings for the admin UI."""
-    current_settings = get_config_as_settings_dict(read_app_config())
+    app_config = read_app_config()
+    current_settings = get_config_as_settings_dict(app_config)
     pending_settings = load_pending_runtime_settings()
 
     return SettingsResponse(
         settings=current_settings,
+        runtime_info=get_llm_runtime_info(app_config),
         pending_settings=pending_settings,
         rebuild_required=bool(pending_settings),
         changed_keys=list(pending_settings.keys()),

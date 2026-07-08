@@ -617,6 +617,7 @@ def submit_chat_job(
             "department_filter": department_filter,
             "file_type_filter": file_type_filter,
             "session_id": st.session_state.get("chat_session_id"),
+            "use_memory": st.session_state.get("chat_memory_enabled", True),
         },
         timeout=10,
     )
@@ -738,7 +739,10 @@ def poll_active_chat_job() -> None:
         context_text = (
             f"Access context: {result['role']} / {result['department']} | "
             f"Search department: {result.get('department_filter') or 'ACL-permitted shared scope'} | "
-            f"File type: {result.get('file_type_filter')}"
+            f"File type: {result.get('file_type_filter')} | "
+            f"Memory: {'On' if result.get('use_memory', True) else 'Off'} | "
+            f"LLM: {result.get('llm_backend', 'unknown')} / "
+            f"{result.get('llm_deployment', 'unknown')}"
         )
         retrieval_question = result.get("retrieval_question")
 
@@ -2064,6 +2068,23 @@ st.markdown(
         padding: 14px;
         border-radius: 8px;
         box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+    }}
+
+    .element-container:has(.chat-history-panel-marker) + .element-container div[data-testid="stVerticalBlockBorderWrapper"],
+    .element-container:has(.chat-main-panel-marker) + .element-container div[data-testid="stVerticalBlockBorderWrapper"] {{
+        background: #ffffff !important;
+        border-color: #b8c0cc !important;
+        box-shadow: 0 10px 26px rgba(16, 24, 40, 0.08) !important;
+    }}
+
+    .element-container:has(.chat-main-panel-marker) + .element-container div[data-testid="stVerticalBlockBorderWrapper"] {{
+        border-top: 3px solid {brand_red} !important;
+    }}
+
+    .element-container:has(.chat-message-panel-marker) + .element-container div[data-testid="stVerticalBlockBorderWrapper"] {{
+        background: #eef2f7 !important;
+        border-color: #c7d0dd !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75) !important;
     }}
 
     .compact-section-title {{
@@ -4669,90 +4690,34 @@ if selected_page in ["KB Management", "KB Status"]:
 
 
 if selected_page == "Chat":
-    chat_title_columns = st.columns([2.6, 1])
-
-    with chat_title_columns[0]:
-        st.header("Copilot Chat")
-
-    with chat_title_columns[1]:
-        st.markdown(
-            f"""
-            <div style="text-align:right; padding-top:0.35rem;">
-                <span class="status-pill" style="
-                    color:#344054;
-                    background:#ffffff;
-                    border-color:#d0d5dd;
-                ">{escape(st.session_state["role"])} / {escape(st.session_state["department"])}</span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
     if "chat_messages" not in st.session_state:
         st.session_state["chat_messages"] = []
 
     if "chat_session_id" not in st.session_state:
         st.session_state["chat_session_id"] = None
 
-    with st.container(border=True):
-        st.markdown('<div class="compact-section-title">Conversation</div>', unsafe_allow_html=True)
-        conversation_columns = st.columns([1, 3, 1])
+    if "chat_memory_enabled" not in st.session_state:
+        st.session_state["chat_memory_enabled"] = True
 
-        with conversation_columns[0]:
-            if st.button(
-                "New Chat",
-                use_container_width=True,
-                disabled=st.session_state.get("chat_is_processing", False),
-            ):
-                st.session_state["chat_session_id"] = None
-                st.session_state["chat_messages"] = []
-                st.session_state.pop("active_chat_job_id", None)
-                st.session_state["chat_is_processing"] = False
-                st.rerun()
+    active_session_label = (
+        "Current conversation"
+        if not st.session_state["chat_session_id"]
+        else f"Session {st.session_state['chat_session_id'][:8]}"
+    )
+    memory_label = "Memory on" if st.session_state["chat_memory_enabled"] else "Memory off"
 
-        try:
-            persisted_sessions = get_backend_chat_sessions()
-        except requests.exceptions.RequestException:
-            persisted_sessions = []
+    try:
+        persisted_sessions = get_backend_chat_sessions()
+    except requests.exceptions.RequestException:
+        persisted_sessions = []
 
-        session_labels = {
-            (
-                f"{session['title']} "
-                f"({session['updated_at']})"
-            ): session["session_id"]
-            for session in persisted_sessions
-        }
-
-        with conversation_columns[1]:
-            selected_session_label = st.selectbox(
-                "Recent Conversations",
-                ["Current conversation"] + list(session_labels.keys()),
-                label_visibility="collapsed",
-                disabled=st.session_state.get("chat_is_processing", False),
-            )
-
-        with conversation_columns[2]:
-            selected_session_id = session_labels.get(selected_session_label)
-
-            if st.button(
-                "Open",
-                use_container_width=True,
-                disabled=(
-                    selected_session_id is None
-                    or st.session_state.get("chat_is_processing", False)
-                ),
-            ):
-                try:
-                    persisted_messages = get_backend_chat_session_messages(selected_session_id)
-                except requests.exceptions.RequestException as error:
-                    st.warning(f"Could not load conversation: {error}")
-                else:
-                    st.session_state["chat_session_id"] = selected_session_id
-                    st.session_state["chat_messages"] = [
-                        convert_persisted_message_to_chat_message(message)
-                        for message in persisted_messages
-                    ]
-                    st.rerun()
+    session_labels = {
+        (
+            f"{session['title']} "
+            f"({session['updated_at']})"
+        ): session["session_id"]
+        for session in persisted_sessions
+    }
 
     documents = load_document_metadata()
     visible_documents = [
@@ -4767,225 +4732,342 @@ if selected_page == "Chat":
         {document["file_type"] for document in visible_documents}
     )
 
-    with st.container(border=True):
-        st.markdown('<div class="compact-section-title">Search Scope</div>', unsafe_allow_html=True)
-        filter_columns = st.columns([1, 1, 2])
-        if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
-            with filter_columns[0]:
-                department_filter = st.selectbox(
-                    "Department",
-                    [FILTER_ALL] + available_departments,
-                )
+    if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+        department_filter = FILTER_ALL
+        file_type_filter = FILTER_ALL
+    elif st.session_state["role"] == PROJECT_MANAGER_ROLE:
+        department_filter = None
+        file_type_filter = FILTER_ALL
+    else:
+        department_filter = None
+        file_type_filter = FILTER_ALL
 
-            with filter_columns[1]:
-                file_type_filter = st.selectbox(
-                    "File Type",
-                    [FILTER_ALL] + available_file_types,
-                )
+    chat_is_processing = st.session_state.get("chat_is_processing", False)
+    workspace_columns = st.columns([1.1, 3.9], gap="medium")
 
-            filter_status = (
-                f"Selected filter: Department = {department_filter}, "
-                f"File Type = {file_type_filter}"
-            )
-
-        elif st.session_state["role"] == PROJECT_MANAGER_ROLE:
-            department_filter = None
-
-            with filter_columns[0]:
-                st.text_input(
-                    "Department",
-                    value=(
-                        f"{st.session_state['department']} + "
-                        "ACL shared docs"
-                    ),
-                    disabled=True,
-                )
-
-            with filter_columns[1]:
-                file_type_filter = st.selectbox(
-                    "File Type",
-                    [FILTER_ALL] + available_file_types,
-                )
-
-            filter_status = (
-                f"Selected filter: Department = {st.session_state['department']} + "
-                f"ACL-permitted shared documents, File Type = {file_type_filter}"
-            )
-
-        else:
-            department_filter = None
-            file_type_filter = FILTER_ALL
-
-            with filter_columns[0]:
-                st.text_input(
-                    "Department",
-                    value=st.session_state["department"],
-                    disabled=True,
-                )
-
-            with filter_columns[1]:
-                st.text_input(
-                    "File Type",
-                    value="Not available",
-                    disabled=True,
-                )
-
-            filter_status = (
-                "Scope: own department plus shared documents allowed by ACL. "
-                "Advanced filters are not available for General Employee role."
-            )
-
-        with filter_columns[2]:
-            st.text_input(
-                "Active Scope",
-                value=filter_status,
-                disabled=True,
-            )
-
-    chat_container = st.container(height=520, border=True)
-
-    with chat_container:
-        if not st.session_state["chat_messages"]:
+    with workspace_columns[0]:
+        st.markdown('<span class="chat-history-panel-marker"></span>', unsafe_allow_html=True)
+        with st.container(border=True):
             st.markdown(
-                f"<div style='text-align: center; color: #667085; margin-top: 2.5rem;'>"
-                f"<div style='font-weight:750; color:#101828; margin-bottom:0.25rem;'>"
-                f"Hello {escape(st.session_state['user'])}</div>"
-                f"<div>Ask a grounded question from your permitted knowledge scope.</div>"
-                f"</div>",
+                """
+                <div style="font-size:0.95rem; font-weight:850; color:#101828; margin-bottom:0.35rem;">
+                    Conversations
+                </div>
+                """,
                 unsafe_allow_html=True,
             )
 
-        for message in st.session_state["chat_messages"]:
-            with st.chat_message(message["role"]):
-                if message["role"] == "assistant" and message.get("status"):
-                    show_status_message(message["status"])
-                    if st.session_state["role"] != SYSTEM_ADMIN_ROLE:
-                        show_escalation_guidance(message["status"])
+            if st.button(
+                "New Chat",
+                use_container_width=True,
+                disabled=chat_is_processing,
+            ):
+                st.session_state["chat_session_id"] = None
+                st.session_state["chat_messages"] = []
+                st.session_state.pop("active_chat_job_id", None)
+                st.session_state["chat_is_processing"] = False
+                st.rerun()
 
-                st.write(message["content"])
+            st.toggle(
+                "Use Memory",
+                key="chat_memory_enabled",
+                help=(
+                    "When enabled, the backend uses the last 6 messages to rewrite "
+                    "follow-up questions before normal ACL-filtered retrieval."
+                ),
+                disabled=chat_is_processing,
+            )
 
-                if message.get("sources") or message.get("context"):
-                    meta_col1, meta_col2 = st.columns(2)
-                    if message.get("sources"):
-                        source_label = (
-                            "Sources Checked"
-                            if message.get("status") == "not_found"
-                            else "Sources"
-                        )
+            st.markdown(
+                f"""
+                <div style="
+                    margin:0.35rem 0 0.55rem 0;
+                    padding:0.55rem;
+                    background:#f9fafb;
+                    border:1px solid #eaecf0;
+                    border-radius:8px;
+                ">
+                    <div style="font-size:0.72rem; color:#667085; font-weight:750;">Active</div>
+                    <div style="font-size:0.86rem; color:#101828; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                        {escape(active_session_label)}
+                    </div>
+                    <div style="font-size:0.76rem; color:#667085; margin-top:0.2rem;">
+                        {escape(memory_label)}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-                        with meta_col1:
-                            with st.expander(source_label):
-                                for source in message["sources"]:
-                                    st.code(source, language=None)
+            if not persisted_sessions:
+                st.caption("No saved conversations yet.")
+            else:
+                selected_session_label = st.selectbox(
+                    "Recent",
+                    ["Select conversation"] + list(session_labels.keys()),
+                    label_visibility="collapsed",
+                    disabled=chat_is_processing,
+                )
+                selected_session_id = session_labels.get(selected_session_label)
 
-                    if message.get("context"):
-                        with meta_col2:
-                            with st.expander("Query Context"):
-                                st.caption(message["context"])
-                if (
-                    message["role"] == "assistant"
-                    and message.get("query_log_id")
-                    and message.get("feedback", "none") == "none"
+                if st.button(
+                    "Open",
+                    use_container_width=True,
+                    disabled=selected_session_id is None or chat_is_processing,
                 ):
-                    feedback_columns = st.columns(2)
+                    try:
+                        persisted_messages = get_backend_chat_session_messages(selected_session_id)
+                    except requests.exceptions.RequestException as error:
+                        st.warning(f"Could not load conversation: {error}")
+                    else:
+                        st.session_state["chat_session_id"] = selected_session_id
+                        st.session_state["chat_messages"] = [
+                            convert_persisted_message_to_chat_message(message)
+                            for message in persisted_messages
+                        ]
+                        st.rerun()
 
-                    with feedback_columns[0]:
-                        if st.button(
-                            "Helpful",
-                            key=f"helpful_{message['query_log_id']}",
-                            use_container_width=True,
-                        ):
-                            update_query_feedback(message["query_log_id"], "helpful")
-                            message["feedback"] = "helpful"
-                            st.rerun()
+            if st.button("Clear Current", use_container_width=True, disabled=chat_is_processing):
+                st.session_state["chat_messages"] = []
+                st.session_state["chat_session_id"] = None
+                st.rerun()
 
-                    with feedback_columns[1]:
-                        if st.button(
-                            "Report Issue",
-                            key=f"issue_{message['query_log_id']}",
-                            use_container_width=True,
-                        ):
-                            update_query_feedback(message["query_log_id"], "reported_issue")
-                            message["feedback"] = "reported_issue"
-                            st.rerun()
+    with workspace_columns[1]:
+        st.markdown('<span class="chat-main-panel-marker"></span>', unsafe_allow_html=True)
+        with st.container(border=True):
+            chat_header_columns = st.columns([2.7, 1, 1])
 
-                elif message["role"] == "assistant" and message.get("feedback") == "helpful":
-                    st.caption("Feedback recorded: helpful")
-
-                elif message["role"] == "assistant" and message.get("feedback") == "reported_issue":
-                    st.caption("Feedback recorded: reported issue")
-
-        if st.session_state.get("active_chat_job_id"):
-            with st.chat_message("assistant"):
+            with chat_header_columns[0]:
                 st.markdown(
-                    """
-                    <div class="typing-indicator">
-                        <span class="typing-dot"></span>
-                        <span class="typing-dot"></span>
-                        <span class="typing-dot"></span>
-                        <span>Drafting an answer from permitted knowledge-base content.</span>
+                    f"""
+                    <div style="padding:0.05rem 0 0.35rem 0;">
+                        <div style="display:flex; align-items:center; gap:0.45rem; flex-wrap:wrap;">
+                            <span style="font-size:1.35rem; font-weight:875; color:#101828;">Copilot Chat</span>
+                            <span class="status-pill" style="
+                                font-size:0.74rem;
+                                padding:0.16rem 0.42rem;
+                                color:#344054;
+                                background:#ffffff;
+                                border-color:#d0d5dd;
+                            ">{escape(st.session_state["role"])} / {escape(st.session_state["department"])}</span>
+                        </div>
+                        <div style="font-size:0.82rem; color:#667085; margin-top:0.16rem;">
+                            Ask from your permitted knowledge scope. Answers refresh retrieval and citations each time.
+                        </div>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
 
-    chat_is_processing = st.session_state.get("chat_is_processing", False)
+            if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+                with chat_header_columns[1]:
+                    department_filter = st.selectbox(
+                        "Department",
+                        [FILTER_ALL] + available_departments,
+                        label_visibility="collapsed",
+                    )
 
-    with st.form("chat_question_form", border=False):
-        question_columns = st.columns([6, 1])
+                with chat_header_columns[2]:
+                    file_type_filter = st.selectbox(
+                        "File Type",
+                        [FILTER_ALL] + available_file_types,
+                        label_visibility="collapsed",
+                    )
 
-        with question_columns[0]:
-            st.text_input(
-                "Message",
-                key="chat_question",
-                placeholder="Type or select an example question...",
-                label_visibility="collapsed",
-            )
-
-        with question_columns[1]:
-            st.form_submit_button(
-                "Send",
-                type="primary",
-                use_container_width=True,
-                on_click=submit_chat_question,
-                disabled=chat_is_processing,
-            )
-
-    example_prompts = ROLE_AWARE_CHAT_PROMPTS[st.session_state["role"]]
-
-    with st.expander("Suggested Questions", expanded=False):
-        total_cols = len(example_prompts) + (1 if st.session_state["role"] == GENERAL_EMPLOYEE_ROLE else 0)
-        example_columns = st.columns(total_cols)
-
-        for i, (label, prompt) in enumerate(example_prompts.items()):
-            with example_columns[i]:
-                st.button(
-                    label,
-                    key=f"example_prompt_{label}",
-                    on_click=select_example_chat_prompt,
-                    args=(prompt,),
-                    use_container_width=True,
-                    disabled=chat_is_processing,
+                filter_status = (
+                    f"Scope: Department = {department_filter}, "
+                    f"File Type = {file_type_filter}"
                 )
 
-        if st.session_state["role"] == GENERAL_EMPLOYEE_ROLE:
-            with example_columns[-1]:
-                st.button(
-                    "Restricted IT Policy",
-                    key="acl_demo_prompt",
-                    on_click=select_example_chat_prompt,
-                    args=("What are the password policy requirements?",),
-                    use_container_width=True,
-                    disabled=chat_is_processing,
+            elif st.session_state["role"] == PROJECT_MANAGER_ROLE:
+                with chat_header_columns[1]:
+                    st.text_input(
+                        "Department",
+                        value=f"{st.session_state['department']} + shared",
+                        disabled=True,
+                        label_visibility="collapsed",
+                    )
+
+                with chat_header_columns[2]:
+                    file_type_filter = st.selectbox(
+                        "File Type",
+                        [FILTER_ALL] + available_file_types,
+                        label_visibility="collapsed",
+                    )
+
+                filter_status = (
+                    f"Scope: {st.session_state['department']} + shared ACL docs, "
+                    f"File Type = {file_type_filter}"
                 )
 
-    clear_columns = st.columns([1, 5])
+            else:
+                with chat_header_columns[1]:
+                    st.text_input(
+                        "Department",
+                        value=st.session_state["department"],
+                        disabled=True,
+                        label_visibility="collapsed",
+                    )
 
-    with clear_columns[0]:
-        if st.button("Clear Chat", use_container_width=True, disabled=chat_is_processing):
-            st.session_state["chat_messages"] = []
-            st.session_state["chat_session_id"] = None
-            st.rerun()
+                with chat_header_columns[2]:
+                    st.text_input(
+                        "File Type",
+                        value="All allowed",
+                        disabled=True,
+                        label_visibility="collapsed",
+                    )
+
+                filter_status = "Scope: own department plus ACL-shared documents"
+
+            st.markdown(
+                f"""
+                <div style="
+                    border-top:1px solid #eaecf0;
+                    margin:0.2rem 0 0.65rem 0;
+                    padding-top:0.55rem;
+                    color:#667085;
+                    font-size:0.82rem;
+                ">{escape(filter_status)}</div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            st.markdown('<span class="chat-message-panel-marker"></span>', unsafe_allow_html=True)
+            chat_container = st.container(height=560, border=True)
+
+            with chat_container:
+                if not st.session_state["chat_messages"]:
+                    st.markdown(
+                        f"<div style='text-align: center; color: #667085; margin-top: 2.5rem;'>"
+                        f"<div style='font-weight:750; color:#101828; margin-bottom:0.25rem;'>"
+                        f"Hello {escape(st.session_state['user'])}</div>"
+                        f"<div>Ask a grounded question from your permitted knowledge scope.</div>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                for message in st.session_state["chat_messages"]:
+                    with st.chat_message(message["role"]):
+                        if message["role"] == "assistant" and message.get("status"):
+                            show_status_message(message["status"])
+                            if st.session_state["role"] != SYSTEM_ADMIN_ROLE:
+                                show_escalation_guidance(message["status"])
+
+                        st.write(message["content"])
+
+                        if message.get("sources") or message.get("context"):
+                            meta_col1, meta_col2 = st.columns(2)
+                            if message.get("sources"):
+                                source_label = (
+                                    "Sources Checked"
+                                    if message.get("status") == "not_found"
+                                    else "Sources"
+                                )
+
+                                with meta_col1:
+                                    with st.expander(source_label):
+                                        for source in message["sources"]:
+                                            st.code(source, language=None)
+
+                            if message.get("context"):
+                                with meta_col2:
+                                    with st.expander("Query Context"):
+                                        st.caption(message["context"])
+
+                        if (
+                            message["role"] == "assistant"
+                            and message.get("query_log_id")
+                            and message.get("feedback", "none") == "none"
+                        ):
+                            feedback_columns = st.columns(2)
+
+                            with feedback_columns[0]:
+                                if st.button(
+                                    "Helpful",
+                                    key=f"helpful_{message['query_log_id']}",
+                                    use_container_width=True,
+                                ):
+                                    update_query_feedback(message["query_log_id"], "helpful")
+                                    message["feedback"] = "helpful"
+                                    st.rerun()
+
+                            with feedback_columns[1]:
+                                if st.button(
+                                    "Report Issue",
+                                    key=f"issue_{message['query_log_id']}",
+                                    use_container_width=True,
+                                ):
+                                    update_query_feedback(message["query_log_id"], "reported_issue")
+                                    message["feedback"] = "reported_issue"
+                                    st.rerun()
+
+                        elif message["role"] == "assistant" and message.get("feedback") == "helpful":
+                            st.caption("Feedback recorded: helpful")
+
+                        elif message["role"] == "assistant" and message.get("feedback") == "reported_issue":
+                            st.caption("Feedback recorded: reported issue")
+
+                if st.session_state.get("active_chat_job_id"):
+                    with st.chat_message("assistant"):
+                        st.markdown(
+                            """
+                            <div class="typing-indicator">
+                                <span class="typing-dot"></span>
+                                <span class="typing-dot"></span>
+                                <span class="typing-dot"></span>
+                                <span>Drafting an answer from permitted knowledge-base content.</span>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+
+            with st.form("chat_question_form", border=False):
+                question_columns = st.columns([6, 1])
+
+                with question_columns[0]:
+                    st.text_input(
+                        "Message",
+                        key="chat_question",
+                        placeholder="Type or select an example question...",
+                        label_visibility="collapsed",
+                    )
+
+                with question_columns[1]:
+                    st.form_submit_button(
+                        "Send",
+                        type="primary",
+                        use_container_width=True,
+                        on_click=submit_chat_question,
+                        disabled=chat_is_processing,
+                    )
+
+            example_prompts = ROLE_AWARE_CHAT_PROMPTS[st.session_state["role"]]
+
+            with st.expander("Suggested Questions", expanded=False):
+                total_cols = len(example_prompts) + (1 if st.session_state["role"] == GENERAL_EMPLOYEE_ROLE else 0)
+                example_columns = st.columns(total_cols)
+
+                for i, (label, prompt) in enumerate(example_prompts.items()):
+                    with example_columns[i]:
+                        st.button(
+                            label,
+                            key=f"example_prompt_{label}",
+                            on_click=select_example_chat_prompt,
+                            args=(prompt,),
+                            use_container_width=True,
+                            disabled=chat_is_processing,
+                        )
+
+                if st.session_state["role"] == GENERAL_EMPLOYEE_ROLE:
+                    with example_columns[-1]:
+                        st.button(
+                            "Restricted IT Policy",
+                            key="acl_demo_prompt",
+                            on_click=select_example_chat_prompt,
+                            args=("What are the password policy requirements?",),
+                            use_container_width=True,
+                            disabled=chat_is_processing,
+                        )
 
     question = st.session_state.pop("pending_chat_question", None)
 
@@ -5054,6 +5136,7 @@ if selected_page == "Settings":
     try:
         settings_response = request_admin_settings()
         current_settings = settings_response["settings"]
+        runtime_info = settings_response.get("runtime_info", {})
     except requests.exceptions.RequestException as error:
         st.error(f"Could not load backend settings: {error}")
         st.stop()
@@ -5071,6 +5154,10 @@ if selected_page == "Settings":
         mode_columns[1].metric("Vector", current_settings["vector_backend"])
         mode_columns[2].metric("Embedding", current_settings["embedding_backend"])
         mode_columns[3].metric("LLM", current_settings["llm_backend"])
+        st.caption(
+            "Active generation deployment: "
+            f"{runtime_info.get('llm_deployment', 'Not configured')}"
+        )
 
     with st.form("runtime_settings_form", border=True):
         st.subheader("Configure Backend")
