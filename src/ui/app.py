@@ -38,6 +38,7 @@ from src.core.constants import (
 )
 
 from src.core.answer_status import classify_answer_status_detail
+from src.core.knowledge_advisor import build_knowledge_advisor_rows
 from src.core.user_repository import authenticate_user
 
 
@@ -2580,6 +2581,80 @@ if selected_page == "Performance":
                 )
             else:
                 st.info("No logged chat outcomes yet. Submit a Chat query to populate this table.")
+
+    with st.container(border=True):
+        st.subheader("AI Knowledge Quality Advisor")
+
+        advisor_rows = build_knowledge_advisor_rows(
+            query_log_summary["recent_outcome_rows"],
+            all_documents,
+        )
+        high_priority_count = sum(
+            1 for row in advisor_rows if row["Priority"] == "High"
+        )
+        missing_or_retrieval_count = sum(
+            1
+            for row in advisor_rows
+            if row["Issue Type"] in [
+                "Missing Knowledge",
+                "Candidate Retrieval Gap",
+                "Possible Retrieval Miss",
+            ]
+        )
+        access_or_ocr_count = sum(
+            1
+            for row in advisor_rows
+            if row["Issue Type"] in ["Permission Block", "OCR Quality"]
+        )
+
+        advisor_metric_columns = st.columns(4)
+
+        with advisor_metric_columns[0]:
+            render_status_card(
+                "Recommendations",
+                len(advisor_rows),
+                "attention" if advisor_rows else "success",
+            )
+
+        with advisor_metric_columns[1]:
+            render_status_card(
+                "High Priority",
+                high_priority_count,
+                "danger" if high_priority_count else "neutral",
+            )
+
+        with advisor_metric_columns[2]:
+            render_status_card(
+                "Knowledge Gaps",
+                missing_or_retrieval_count,
+                "attention" if missing_or_retrieval_count else "neutral",
+            )
+
+        with advisor_metric_columns[3]:
+            render_status_card(
+                "Access / OCR",
+                access_or_ocr_count,
+                "info" if access_or_ocr_count else "neutral",
+            )
+
+        with st.expander("Recommended Admin Actions", expanded=False):
+            if advisor_rows:
+                st.dataframe(
+                    advisor_rows,
+                    use_container_width=True,
+                    hide_index=True,
+                    height=min(360, 38 * (len(advisor_rows) + 1)),
+                )
+                st.caption(
+                    "Advisor v1 uses transparent rules over recent chat outcomes, "
+                    "user feedback, source lists, and document metadata. It does not "
+                    "change retrieval or permissions."
+                )
+            else:
+                st.success(
+                    "No recent weak outcomes need review. New not-found, permission, "
+                    "reported-issue, OCR, or backend-error signals will appear here."
+                )
 
     with st.container(border=True):
         st.subheader("Source Refresh")
