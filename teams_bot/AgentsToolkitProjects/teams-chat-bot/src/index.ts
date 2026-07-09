@@ -45,13 +45,63 @@ const app = new App({
   skipAuth: !process.env.CLIENT_ID,
 });
 
+type DemoProfile = {
+  user: string;
+  role: string;
+  department: string;
+  label: string;
+};
+
+const DEFAULT_PROFILE: DemoProfile = {
+  user: "teams_employee_hr",
+  role: "General Employee",
+  department: "HR",
+  label: "General Employee / HR",
+};
+
+const DEMO_PROFILES: Record<string, DemoProfile> = {
+  "/use-hr": DEFAULT_PROFILE,
+  "/use-it-manager": {
+    user: "teams_pm_it",
+    role: "Project Manager",
+    department: "IT",
+    label: "Project Manager / IT",
+  },
+  "/use-admin": {
+    user: "teams_admin_jc",
+    role: "System Admin",
+    department: "IT",
+    label: "System Admin / IT",
+  },
+};
+
+const conversationProfiles = new Map<string, DemoProfile>();
+
+function getConversationProfile(conversationId: string): DemoProfile {
+  return conversationProfiles.get(conversationId) || DEFAULT_PROFILE;
+}
+
+function formatProfileHelp(profile: DemoProfile): string {
+  return [
+    `Current access profile: ${profile.label}.`,
+    "",
+    "Available demo commands:",
+    "- /profile",
+    "- /use-hr",
+    "- /use-it-manager",
+    "- /use-admin",
+  ].join("\n");
+}
+
 app.on("install.add", async ({ send }) => {
   await send(
     [
       "Searchable RAG Copilot is connected.",
       "",
-      "Current access profile: General Employee / HR.",
+      `Current access profile: ${DEFAULT_PROFILE.label}.`,
       "You can ask HR knowledge-base questions here. Access to restricted department documents is controlled by the shared backend.",
+      "",
+      "Use /profile to view or change the current demo profile.",
     ].join("\n")
   );
 });
@@ -64,6 +114,22 @@ app.on("message", async ({ send, activity }) => {
     return;
   }
 
+  const conversationId = activity.conversation.id;
+  const command = question.toLowerCase();
+
+  if (command === "/profile") {
+    await send(formatProfileHelp(getConversationProfile(conversationId)));
+    return;
+  }
+
+  if (DEMO_PROFILES[command]) {
+    conversationProfiles.set(conversationId, DEMO_PROFILES[command]);
+    await send(`Switched access profile to ${DEMO_PROFILES[command].label}.`);
+    return;
+  }
+
+  const profile = getConversationProfile(conversationId);
+
   await send({ type: "typing" });
 
   const apiBaseUrl = process.env.RAG_API_BASE_URL || "http://127.0.0.1:8000";
@@ -75,9 +141,9 @@ app.on("message", async ({ send, activity }) => {
     },
     body: JSON.stringify({
       question,
-      role: "General Employee",
-      department: "HR",
-      user: "teams_employee_hr",
+      role: profile.role,
+      department: profile.department,
+      user: profile.user,
       session_id: undefined,
       use_memory: true,
     }),
