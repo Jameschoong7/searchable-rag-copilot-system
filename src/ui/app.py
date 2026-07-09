@@ -4224,12 +4224,18 @@ if selected_page in ["KB Management", "KB Status"]:
                         show_index_sync_hint=False,
                     )
                     index_action_columns = st.columns(2)
+                    index_update_running = bool(st.session_state.get("active_index_update_job_id"))
+                    full_rebuild_running = bool(st.session_state.get("active_reindex_job_id"))
+                    search_index_job_running = index_update_running or full_rebuild_running
+
+                    if search_index_job_running:
+                        st.info("Search index work is already running. Other index actions are disabled until it finishes.")
 
                     with index_action_columns[0]:
                         if st.button(
                             "Run Update for Pending Documents",
                             use_container_width=True,
-                            disabled=bool(st.session_state.get("active_index_update_job_id")),
+                            disabled=search_index_job_running,
                         ):
                             try:
                                 job = submit_index_update_job()
@@ -4253,7 +4259,7 @@ if selected_page in ["KB Management", "KB Status"]:
                             use_container_width=True,
                             disabled=(
                                 not confirm_full_rebuild
-                                or bool(st.session_state.get("active_reindex_job_id"))
+                                or search_index_job_running
                             ),
                         ):
                             try:
@@ -5414,8 +5420,20 @@ if selected_page == "Settings":
                 "A vector or embedding mode change was detected. Run a full rebuild when ready "
                 "to activate the selected retrieval configuration."
             )
+            settings_index_job_running = (
+                bool(st.session_state.get("active_reindex_job_id"))
+                or bool(st.session_state.get("active_index_update_job_id"))
+            )
 
-            if st.button("Run Rebuild Now", type="primary", use_container_width=True):
+            if settings_index_job_running:
+                st.info("Search index work is already running. Rebuild is disabled until the current job finishes.")
+
+            if st.button(
+                "Run Rebuild Now",
+                type="primary",
+                use_container_width=True,
+                disabled=settings_index_job_running,
+            ):
                 try:
                     job = submit_reindex_job()
                 except requests.exceptions.RequestException as error:

@@ -8,6 +8,7 @@ import shutil
 from pathlib import Path
 
 
+@lru_cache(maxsize=1)
 def load_embedding_model() -> HuggingFaceEmbeddings:
     """Load the same embedding model used for local Chroma indexing and retrieval."""
     return HuggingFaceEmbeddings(

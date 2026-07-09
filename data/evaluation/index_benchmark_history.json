@@ -1889,5 +1889,772 @@
       "index_size_mb": null
     },
     "updated_by": "admin_jc"
+  },
+  {
+    "benchmark_type": "batch_incremental_update",
+    "changed_document_count": 60,
+    "updated_sources": [
+      "data/simulated/onedrive_4446DE05E285242C-s05474346b49c4ed5b4f5291cc79dc297_physical_security_guide.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s07c30765f8324866950b2e340ede8ccf_frontend_ui_quality_standard.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s07cd36cc9dd142ecac29a63401c7e27c_azure_cost_safety_notes.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s0e951a22e0c946518725b531a265dda6_release_management_sop.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-s14e9a982e8b14b4589bbf1c9a6d83f93_r2_text.txt",
+      "data/simulated/onedrive_4446DE05E285242C-s25fb0b8aa62b446c93c2b0ae99180c6c_knowledge_base_admin_sop.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-s298826c77f0843baa81b191ad69bfeb4_key_management_notes.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-s3a49e8cb168e4c15ad2734e36992026f_api_design_guide.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s3bfea450576a425fa258a087afc32ee8_vpn_access_runbook.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-s3c2eba02699c49cea7f200414d11437f_facilities_request_guide.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-s3dd2e5682f534676bea50e652ac21cdd_change_advisory_board_notes.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s48689cff33b9474c807e6bd2b0850632_coding_standards.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s4b34ae68f24b4bbd89afd766b2500ae2_expense_claim_guide.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s53283d7dff0d4961b99e3290243047d0_operational_risk_register.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s55590c1529b6436ca12d18995c0e5146_business_continuity_plan.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-s6bcbac05ef034ee09129e8017896481f_test.txt",
+      "data/simulated/onedrive_4446DE05E285242C-s6d1598ff7b93464b898b0468e0729905_software_request_standard.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-s6ea5a2a398e24bb6b752f2c554b2476a_disciplinary_process_guide.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s6ff6f2c2ffc74a8e8c8d11e9dbccf10b_access_control_policy.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s78659e385f994a7e918854a9f4639586_model_evaluation_notes.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-s7a98b3c2455e4d5081325a2f64a9beae_shift_handover_checklist.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s842c5538dd08422092af5fcc1242b2c2_vendor_security_review.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s8a9a6e6b72d742dd87d0dd94a87e22ee_rag_architecture_decision_record.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-s8bab7739d6524d67abe38104d4a91132_r3_Document.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s8be82ff538e24c849c30622dcddcee3a_training_reimbursement_sop.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-sa1b03321f53c4b2a83b6ddef5ffe4fef_leave_policy_2026.docx",
+      "data/simulated/onedrive_4446DE05E285242C-sa829757f282f4c28a07925de7ef67d64_device_setup_checklist.docx",
+      "data/simulated/onedrive_4446DE05E285242C-sada0243e2d7b4786847eb0b95cd57875_service_escalation_sop.docx",
+      "data/simulated/onedrive_4446DE05E285242C-sb64a0039b32f4f0490e82c96fad5c044_security_awareness_faq.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-scb53cccca9204b1c933850c7a177c490_incident_response_playbook.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-scba3929e4b43446ea85b455ed6f9d3cc_remote_work_arrangement.docx",
+      "data/simulated/onedrive_4446DE05E285242C-sd129f086fcd44cfdac255a4965eb5a41_incident_ticket_triage.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-sdbc227fb2e7d49c2bc5c80057263ec3d_email_security_guide.docx",
+      "data/simulated/onedrive_4446DE05E285242C-sdc254cb592d8460e912d8d3748a32458_knowledge_article_quality_guide.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-se207521b976545f783ba5121809a0492_secure_code_review_checklist.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-se26098939e9645cf8bc3a35ec7672e2e_performance_review_cycle.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-se27542a4479746c8968fb1b168ea5fb2_phishing_simulation_procedure.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-se6e7bc3f23d049a8b8a7be036aee30ba_password_and_account_policy.docx",
+      "data/simulated/onedrive_4446DE05E285242C-sea5e00566b004c048f182eec0ca0e4d5_customer_sla_reference.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-sed8e40831c10463088950f2952f9f2dd_data_pipeline_runbook.docx",
+      "data/simulated/onedrive_4446DE05E285242C-sf26ee7dae9ce4efb81cf4c7a83b6c15f_benefits_faq.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-sfdba7c7a799a4704bbcb211ee3995d0f_data_classification_standard.docx",
+      "data/simulated/onedrive_4446DE05E285242C-sff2134a080cc4254a8e453b110ef6c03_employee_onboarding_handbook.pdf",
+      "data/simulated/onenote_0-11cba73b87294fd289cbcc812fec193f-102-4446DE05E285242C-s96ba1904f03e43ca9982557c2c053263_Untitled_Page.txt",
+      "data/simulated/onenote_0-11cba73b87294fd289cbcc812fec193f-23-4446DE05E285242C-s96ba1904f03e43ca9982557c2c053263_Password_Reset_Quick_Notes.txt",
+      "data/simulated/onenote_0-47c960eb25e64ebe972e0506fa28bba0-136-4446DE05E285242C-sf7af0c1846104a2a92f3f893c0b5f4ee_Data_Classification_Examples.txt",
+      "data/simulated/onenote_0-47c960eb25e64ebe972e0506fa28bba0-18-4446DE05E285242C-sf7af0c1846104a2a92f3f893c0b5f4ee_Phishing_Drill_Notes.txt",
+      "data/simulated/onenote_0-47c960eb25e64ebe972e0506fa28bba0-249-4446DE05E285242C-sf7af0c1846104a2a92f3f893c0b5f4ee_Incident_Severity_Notes.txt",
+      "data/simulated/onenote_0-47c960eb25e64ebe972e0506fa28bba0-99-4446DE05E285242C-sf7af0c1846104a2a92f3f893c0b5f4ee_Secret_Handling_Notes.txt",
+      "data/simulated/onenote_0-514243ece80f4d858461062f45f93b88-188-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_Onboarding_Day_1_Notes.txt",
+      "data/simulated/onenote_0-514243ece80f4d858461062f45f93b88-97-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_Misconduct_Review_Notes.txt",
+      "data/simulated/onenote_0-5b268b0c6c164a93a467959fb79ccefc-152-4446DE05E285242C-sb0dcd902c91842c297fde0c539cf5e4f_API_Error_Handling_Notes.txt",
+      "data/simulated/onenote_0-5b268b0c6c164a93a467959fb79ccefc-229-4446DE05E285242C-sb0dcd902c91842c297fde0c539cf5e4f_Pull_Request_Review_Notes.txt",
+      "data/simulated/onenote_0-5b268b0c6c164a93a467959fb79ccefc-75-4446DE05E285242C-sb0dcd902c91842c297fde0c539cf5e4f_RAG_Evaluation_Notes.txt",
+      "data/simulated/onenote_0-684f7b49f4e8491487a057d3e464bc9b-133-4446DE05E285242C-sced89709c3b04dc6aaf627090a04272a_Continuity_Exercise_Notes.txt",
+      "data/simulated/onenote_0-684f7b49f4e8491487a057d3e464bc9b-213-4446DE05E285242C-sced89709c3b04dc6aaf627090a04272a_SLA_Escalation_Examples.txt",
+      "data/simulated/onenote_0-684f7b49f4e8491487a057d3e464bc9b-54-4446DE05E285242C-sb0dcd902c91842c297fde0c539cf5e4f_Release_Checklist_Notes.txt",
+      "data/simulated/onenote_0-6ed3f34b94f44a8dbee6daf4b8db1305-162-4446DE05E285242C-s96ba1904f03e43ca9982557c2c053263_Graph_Connector_Setup_Notes.txt",
+      "data/simulated/onenote_0-6ed3f34b94f44a8dbee6daf4b8db1305-81-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_Leave_Approval_Examples.txt",
+      "data/simulated/onenote_0-e6e0c53594da4e8a9caf83ecc7484980-101-4446DE05E285242C-sced89709c3b04dc6aaf627090a04272a_Shift_Handover_Notes.txt"
+    ],
+    "cleanup_sources": [
+      "data/simulated/onedrive_4446DE05E285242C-s05474346b49c4ed5b4f5291cc79dc297_physical_security_guide.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s07c30765f8324866950b2e340ede8ccf_frontend_ui_quality_standard.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s07cd36cc9dd142ecac29a63401c7e27c_azure_cost_safety_notes.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s0e951a22e0c946518725b531a265dda6_release_management_sop.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-s14e9a982e8b14b4589bbf1c9a6d83f93_r2_text.txt",
+      "data/simulated/onedrive_4446DE05E285242C-s25fb0b8aa62b446c93c2b0ae99180c6c_knowledge_base_admin_sop.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-s298826c77f0843baa81b191ad69bfeb4_key_management_notes.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-s3a49e8cb168e4c15ad2734e36992026f_api_design_guide.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s3bfea450576a425fa258a087afc32ee8_vpn_access_runbook.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-s3c2eba02699c49cea7f200414d11437f_facilities_request_guide.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-s3dd2e5682f534676bea50e652ac21cdd_change_advisory_board_notes.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s48689cff33b9474c807e6bd2b0850632_coding_standards.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s4b34ae68f24b4bbd89afd766b2500ae2_expense_claim_guide.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s53283d7dff0d4961b99e3290243047d0_operational_risk_register.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s55590c1529b6436ca12d18995c0e5146_business_continuity_plan.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-s6bcbac05ef034ee09129e8017896481f_test.txt",
+      "data/simulated/onedrive_4446DE05E285242C-s6d1598ff7b93464b898b0468e0729905_software_request_standard.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-s6ea5a2a398e24bb6b752f2c554b2476a_disciplinary_process_guide.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s6ff6f2c2ffc74a8e8c8d11e9dbccf10b_access_control_policy.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s78659e385f994a7e918854a9f4639586_model_evaluation_notes.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-s7a98b3c2455e4d5081325a2f64a9beae_shift_handover_checklist.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s842c5538dd08422092af5fcc1242b2c2_vendor_security_review.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s8a9a6e6b72d742dd87d0dd94a87e22ee_rag_architecture_decision_record.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-s8bab7739d6524d67abe38104d4a91132_r3_Document.docx",
+      "data/simulated/onedrive_4446DE05E285242C-s8be82ff538e24c849c30622dcddcee3a_training_reimbursement_sop.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-sa1b03321f53c4b2a83b6ddef5ffe4fef_leave_policy_2026.docx",
+      "data/simulated/onedrive_4446DE05E285242C-sa829757f282f4c28a07925de7ef67d64_device_setup_checklist.docx",
+      "data/simulated/onedrive_4446DE05E285242C-sada0243e2d7b4786847eb0b95cd57875_service_escalation_sop.docx",
+      "data/simulated/onedrive_4446DE05E285242C-sb64a0039b32f4f0490e82c96fad5c044_security_awareness_faq.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-scb53cccca9204b1c933850c7a177c490_incident_response_playbook.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-scba3929e4b43446ea85b455ed6f9d3cc_remote_work_arrangement.docx",
+      "data/simulated/onedrive_4446DE05E285242C-sd129f086fcd44cfdac255a4965eb5a41_incident_ticket_triage.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-sdbc227fb2e7d49c2bc5c80057263ec3d_email_security_guide.docx",
+      "data/simulated/onedrive_4446DE05E285242C-sdc254cb592d8460e912d8d3748a32458_knowledge_article_quality_guide.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-se207521b976545f783ba5121809a0492_secure_code_review_checklist.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-se26098939e9645cf8bc3a35ec7672e2e_performance_review_cycle.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-se27542a4479746c8968fb1b168ea5fb2_phishing_simulation_procedure.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-se6e7bc3f23d049a8b8a7be036aee30ba_password_and_account_policy.docx",
+      "data/simulated/onedrive_4446DE05E285242C-sea5e00566b004c048f182eec0ca0e4d5_customer_sla_reference.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-sed8e40831c10463088950f2952f9f2dd_data_pipeline_runbook.docx",
+      "data/simulated/onedrive_4446DE05E285242C-sf26ee7dae9ce4efb81cf4c7a83b6c15f_benefits_faq.pdf",
+      "data/simulated/onedrive_4446DE05E285242C-sfdba7c7a799a4704bbcb211ee3995d0f_data_classification_standard.docx",
+      "data/simulated/onedrive_4446DE05E285242C-sff2134a080cc4254a8e453b110ef6c03_employee_onboarding_handbook.pdf",
+      "data/simulated/onenote_0-11cba73b87294fd289cbcc812fec193f-102-4446DE05E285242C-s96ba1904f03e43ca9982557c2c053263_Untitled_Page.txt",
+      "data/simulated/onenote_0-11cba73b87294fd289cbcc812fec193f-23-4446DE05E285242C-s96ba1904f03e43ca9982557c2c053263_Password_Reset_Quick_Notes.txt",
+      "data/simulated/onenote_0-47c960eb25e64ebe972e0506fa28bba0-136-4446DE05E285242C-sf7af0c1846104a2a92f3f893c0b5f4ee_Data_Classification_Examples.txt",
+      "data/simulated/onenote_0-47c960eb25e64ebe972e0506fa28bba0-18-4446DE05E285242C-sf7af0c1846104a2a92f3f893c0b5f4ee_Phishing_Drill_Notes.txt",
+      "data/simulated/onenote_0-47c960eb25e64ebe972e0506fa28bba0-249-4446DE05E285242C-sf7af0c1846104a2a92f3f893c0b5f4ee_Incident_Severity_Notes.txt",
+      "data/simulated/onenote_0-47c960eb25e64ebe972e0506fa28bba0-99-4446DE05E285242C-sf7af0c1846104a2a92f3f893c0b5f4ee_Secret_Handling_Notes.txt",
+      "data/simulated/onenote_0-514243ece80f4d858461062f45f93b88-188-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_Onboarding_Day_1_Notes.txt",
+      "data/simulated/onenote_0-514243ece80f4d858461062f45f93b88-97-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_Misconduct_Review_Notes.txt",
+      "data/simulated/onenote_0-5b268b0c6c164a93a467959fb79ccefc-152-4446DE05E285242C-sb0dcd902c91842c297fde0c539cf5e4f_API_Error_Handling_Notes.txt",
+      "data/simulated/onenote_0-5b268b0c6c164a93a467959fb79ccefc-229-4446DE05E285242C-sb0dcd902c91842c297fde0c539cf5e4f_Pull_Request_Review_Notes.txt",
+      "data/simulated/onenote_0-5b268b0c6c164a93a467959fb79ccefc-75-4446DE05E285242C-sb0dcd902c91842c297fde0c539cf5e4f_RAG_Evaluation_Notes.txt",
+      "data/simulated/onenote_0-684f7b49f4e8491487a057d3e464bc9b-133-4446DE05E285242C-sced89709c3b04dc6aaf627090a04272a_Continuity_Exercise_Notes.txt",
+      "data/simulated/onenote_0-684f7b49f4e8491487a057d3e464bc9b-213-4446DE05E285242C-sced89709c3b04dc6aaf627090a04272a_SLA_Escalation_Examples.txt",
+      "data/simulated/onenote_0-684f7b49f4e8491487a057d3e464bc9b-54-4446DE05E285242C-sb0dcd902c91842c297fde0c539cf5e4f_Release_Checklist_Notes.txt",
+      "data/simulated/onenote_0-6ed3f34b94f44a8dbee6daf4b8db1305-162-4446DE05E285242C-s96ba1904f03e43ca9982557c2c053263_Graph_Connector_Setup_Notes.txt",
+      "data/simulated/onenote_0-6ed3f34b94f44a8dbee6daf4b8db1305-81-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_Leave_Approval_Examples.txt",
+      "data/simulated/onenote_0-e6e0c53594da4e8a9caf83ecc7484980-101-4446DE05E285242C-sced89709c3b04dc6aaf627090a04272a_Shift_Handover_Notes.txt"
+    ],
+    "elapsed_seconds": 480.425,
+    "before": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 81,
+      "simulated_source_files": 106,
+      "indexed_chunk_count": 104,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "update_results": [
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s05474346b49c4ed5b4f5291cc79dc297_physical_security_guide.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s07c30765f8324866950b2e340ede8ccf_frontend_ui_quality_standard.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s07cd36cc9dd142ecac29a63401c7e27c_azure_cost_safety_notes.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s0e951a22e0c946518725b531a265dda6_release_management_sop.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s14e9a982e8b14b4589bbf1c9a6d83f93_r2_text.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s25fb0b8aa62b446c93c2b0ae99180c6c_knowledge_base_admin_sop.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s298826c77f0843baa81b191ad69bfeb4_key_management_notes.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s3a49e8cb168e4c15ad2734e36992026f_api_design_guide.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s3bfea450576a425fa258a087afc32ee8_vpn_access_runbook.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s3c2eba02699c49cea7f200414d11437f_facilities_request_guide.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s3dd2e5682f534676bea50e652ac21cdd_change_advisory_board_notes.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s48689cff33b9474c807e6bd2b0850632_coding_standards.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s4b34ae68f24b4bbd89afd766b2500ae2_expense_claim_guide.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s53283d7dff0d4961b99e3290243047d0_operational_risk_register.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s55590c1529b6436ca12d18995c0e5146_business_continuity_plan.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s6bcbac05ef034ee09129e8017896481f_test.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s6d1598ff7b93464b898b0468e0729905_software_request_standard.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s6ea5a2a398e24bb6b752f2c554b2476a_disciplinary_process_guide.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s6ff6f2c2ffc74a8e8c8d11e9dbccf10b_access_control_policy.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s78659e385f994a7e918854a9f4639586_model_evaluation_notes.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s7a98b3c2455e4d5081325a2f64a9beae_shift_handover_checklist.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s842c5538dd08422092af5fcc1242b2c2_vendor_security_review.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s8a9a6e6b72d742dd87d0dd94a87e22ee_rag_architecture_decision_record.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s8bab7739d6524d67abe38104d4a91132_r3_Document.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 0,
+        "chunks_indexed": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s8be82ff538e24c849c30622dcddcee3a_training_reimbursement_sop.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sa1b03321f53c4b2a83b6ddef5ffe4fef_leave_policy_2026.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sa829757f282f4c28a07925de7ef67d64_device_setup_checklist.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sada0243e2d7b4786847eb0b95cd57875_service_escalation_sop.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sb64a0039b32f4f0490e82c96fad5c044_security_awareness_faq.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-scb53cccca9204b1c933850c7a177c490_incident_response_playbook.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-scba3929e4b43446ea85b455ed6f9d3cc_remote_work_arrangement.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sd129f086fcd44cfdac255a4965eb5a41_incident_ticket_triage.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sdbc227fb2e7d49c2bc5c80057263ec3d_email_security_guide.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sdc254cb592d8460e912d8d3748a32458_knowledge_article_quality_guide.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-se207521b976545f783ba5121809a0492_secure_code_review_checklist.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-se26098939e9645cf8bc3a35ec7672e2e_performance_review_cycle.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-se27542a4479746c8968fb1b168ea5fb2_phishing_simulation_procedure.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-se6e7bc3f23d049a8b8a7be036aee30ba_password_and_account_policy.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sea5e00566b004c048f182eec0ca0e4d5_customer_sla_reference.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sed8e40831c10463088950f2952f9f2dd_data_pipeline_runbook.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sf26ee7dae9ce4efb81cf4c7a83b6c15f_benefits_faq.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sfdba7c7a799a4704bbcb211ee3995d0f_data_classification_standard.docx",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sff2134a080cc4254a8e453b110ef6c03_employee_onboarding_handbook.pdf",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 2
+      },
+      {
+        "source": "data/simulated/onenote_0-11cba73b87294fd289cbcc812fec193f-102-4446DE05E285242C-s96ba1904f03e43ca9982557c2c053263_Untitled_Page.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      },
+      {
+        "source": "data/simulated/onenote_0-11cba73b87294fd289cbcc812fec193f-23-4446DE05E285242C-s96ba1904f03e43ca9982557c2c053263_Password_Reset_Quick_Notes.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      },
+      {
+        "source": "data/simulated/onenote_0-47c960eb25e64ebe972e0506fa28bba0-136-4446DE05E285242C-sf7af0c1846104a2a92f3f893c0b5f4ee_Data_Classification_Examples.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      },
+      {
+        "source": "data/simulated/onenote_0-47c960eb25e64ebe972e0506fa28bba0-18-4446DE05E285242C-sf7af0c1846104a2a92f3f893c0b5f4ee_Phishing_Drill_Notes.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      },
+      {
+        "source": "data/simulated/onenote_0-47c960eb25e64ebe972e0506fa28bba0-249-4446DE05E285242C-sf7af0c1846104a2a92f3f893c0b5f4ee_Incident_Severity_Notes.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      },
+      {
+        "source": "data/simulated/onenote_0-47c960eb25e64ebe972e0506fa28bba0-99-4446DE05E285242C-sf7af0c1846104a2a92f3f893c0b5f4ee_Secret_Handling_Notes.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      },
+      {
+        "source": "data/simulated/onenote_0-514243ece80f4d858461062f45f93b88-188-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_Onboarding_Day_1_Notes.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      },
+      {
+        "source": "data/simulated/onenote_0-514243ece80f4d858461062f45f93b88-97-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_Misconduct_Review_Notes.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      },
+      {
+        "source": "data/simulated/onenote_0-5b268b0c6c164a93a467959fb79ccefc-152-4446DE05E285242C-sb0dcd902c91842c297fde0c539cf5e4f_API_Error_Handling_Notes.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      },
+      {
+        "source": "data/simulated/onenote_0-5b268b0c6c164a93a467959fb79ccefc-229-4446DE05E285242C-sb0dcd902c91842c297fde0c539cf5e4f_Pull_Request_Review_Notes.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      },
+      {
+        "source": "data/simulated/onenote_0-5b268b0c6c164a93a467959fb79ccefc-75-4446DE05E285242C-sb0dcd902c91842c297fde0c539cf5e4f_RAG_Evaluation_Notes.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      },
+      {
+        "source": "data/simulated/onenote_0-684f7b49f4e8491487a057d3e464bc9b-133-4446DE05E285242C-sced89709c3b04dc6aaf627090a04272a_Continuity_Exercise_Notes.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      },
+      {
+        "source": "data/simulated/onenote_0-684f7b49f4e8491487a057d3e464bc9b-213-4446DE05E285242C-sced89709c3b04dc6aaf627090a04272a_SLA_Escalation_Examples.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      },
+      {
+        "source": "data/simulated/onenote_0-684f7b49f4e8491487a057d3e464bc9b-54-4446DE05E285242C-sb0dcd902c91842c297fde0c539cf5e4f_Release_Checklist_Notes.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      },
+      {
+        "source": "data/simulated/onenote_0-6ed3f34b94f44a8dbee6daf4b8db1305-162-4446DE05E285242C-s96ba1904f03e43ca9982557c2c053263_Graph_Connector_Setup_Notes.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      },
+      {
+        "source": "data/simulated/onenote_0-6ed3f34b94f44a8dbee6daf4b8db1305-81-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_Leave_Approval_Examples.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      },
+      {
+        "source": "data/simulated/onenote_0-e6e0c53594da4e8a9caf83ecc7484980-101-4446DE05E285242C-sced89709c3b04dc6aaf627090a04272a_Shift_Handover_Notes.txt",
+        "deleted_vector_count": 0,
+        "document_objects_loaded": 1,
+        "chunks_indexed": 1
+      }
+    ],
+    "cleanup_results": [
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s05474346b49c4ed5b4f5291cc79dc297_physical_security_guide.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s07c30765f8324866950b2e340ede8ccf_frontend_ui_quality_standard.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s07cd36cc9dd142ecac29a63401c7e27c_azure_cost_safety_notes.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s0e951a22e0c946518725b531a265dda6_release_management_sop.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s14e9a982e8b14b4589bbf1c9a6d83f93_r2_text.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s25fb0b8aa62b446c93c2b0ae99180c6c_knowledge_base_admin_sop.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s298826c77f0843baa81b191ad69bfeb4_key_management_notes.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s3a49e8cb168e4c15ad2734e36992026f_api_design_guide.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s3bfea450576a425fa258a087afc32ee8_vpn_access_runbook.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s3c2eba02699c49cea7f200414d11437f_facilities_request_guide.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s3dd2e5682f534676bea50e652ac21cdd_change_advisory_board_notes.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s48689cff33b9474c807e6bd2b0850632_coding_standards.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s4b34ae68f24b4bbd89afd766b2500ae2_expense_claim_guide.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s53283d7dff0d4961b99e3290243047d0_operational_risk_register.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s55590c1529b6436ca12d18995c0e5146_business_continuity_plan.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s6bcbac05ef034ee09129e8017896481f_test.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s6d1598ff7b93464b898b0468e0729905_software_request_standard.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s6ea5a2a398e24bb6b752f2c554b2476a_disciplinary_process_guide.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s6ff6f2c2ffc74a8e8c8d11e9dbccf10b_access_control_policy.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s78659e385f994a7e918854a9f4639586_model_evaluation_notes.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s7a98b3c2455e4d5081325a2f64a9beae_shift_handover_checklist.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s842c5538dd08422092af5fcc1242b2c2_vendor_security_review.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s8a9a6e6b72d742dd87d0dd94a87e22ee_rag_architecture_decision_record.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s8bab7739d6524d67abe38104d4a91132_r3_Document.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-s8be82ff538e24c849c30622dcddcee3a_training_reimbursement_sop.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sa1b03321f53c4b2a83b6ddef5ffe4fef_leave_policy_2026.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sa829757f282f4c28a07925de7ef67d64_device_setup_checklist.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sada0243e2d7b4786847eb0b95cd57875_service_escalation_sop.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sb64a0039b32f4f0490e82c96fad5c044_security_awareness_faq.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-scb53cccca9204b1c933850c7a177c490_incident_response_playbook.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-scba3929e4b43446ea85b455ed6f9d3cc_remote_work_arrangement.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sd129f086fcd44cfdac255a4965eb5a41_incident_ticket_triage.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sdbc227fb2e7d49c2bc5c80057263ec3d_email_security_guide.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sdc254cb592d8460e912d8d3748a32458_knowledge_article_quality_guide.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-se207521b976545f783ba5121809a0492_secure_code_review_checklist.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-se26098939e9645cf8bc3a35ec7672e2e_performance_review_cycle.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-se27542a4479746c8968fb1b168ea5fb2_phishing_simulation_procedure.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-se6e7bc3f23d049a8b8a7be036aee30ba_password_and_account_policy.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sea5e00566b004c048f182eec0ca0e4d5_customer_sla_reference.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sed8e40831c10463088950f2952f9f2dd_data_pipeline_runbook.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sf26ee7dae9ce4efb81cf4c7a83b6c15f_benefits_faq.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sfdba7c7a799a4704bbcb211ee3995d0f_data_classification_standard.docx",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onedrive_4446DE05E285242C-sff2134a080cc4254a8e453b110ef6c03_employee_onboarding_handbook.pdf",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onenote_0-11cba73b87294fd289cbcc812fec193f-102-4446DE05E285242C-s96ba1904f03e43ca9982557c2c053263_Untitled_Page.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onenote_0-11cba73b87294fd289cbcc812fec193f-23-4446DE05E285242C-s96ba1904f03e43ca9982557c2c053263_Password_Reset_Quick_Notes.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onenote_0-47c960eb25e64ebe972e0506fa28bba0-136-4446DE05E285242C-sf7af0c1846104a2a92f3f893c0b5f4ee_Data_Classification_Examples.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onenote_0-47c960eb25e64ebe972e0506fa28bba0-18-4446DE05E285242C-sf7af0c1846104a2a92f3f893c0b5f4ee_Phishing_Drill_Notes.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onenote_0-47c960eb25e64ebe972e0506fa28bba0-249-4446DE05E285242C-sf7af0c1846104a2a92f3f893c0b5f4ee_Incident_Severity_Notes.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onenote_0-47c960eb25e64ebe972e0506fa28bba0-99-4446DE05E285242C-sf7af0c1846104a2a92f3f893c0b5f4ee_Secret_Handling_Notes.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onenote_0-514243ece80f4d858461062f45f93b88-188-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_Onboarding_Day_1_Notes.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onenote_0-514243ece80f4d858461062f45f93b88-97-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_Misconduct_Review_Notes.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onenote_0-5b268b0c6c164a93a467959fb79ccefc-152-4446DE05E285242C-sb0dcd902c91842c297fde0c539cf5e4f_API_Error_Handling_Notes.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onenote_0-5b268b0c6c164a93a467959fb79ccefc-229-4446DE05E285242C-sb0dcd902c91842c297fde0c539cf5e4f_Pull_Request_Review_Notes.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onenote_0-5b268b0c6c164a93a467959fb79ccefc-75-4446DE05E285242C-sb0dcd902c91842c297fde0c539cf5e4f_RAG_Evaluation_Notes.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onenote_0-684f7b49f4e8491487a057d3e464bc9b-133-4446DE05E285242C-sced89709c3b04dc6aaf627090a04272a_Continuity_Exercise_Notes.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onenote_0-684f7b49f4e8491487a057d3e464bc9b-213-4446DE05E285242C-sced89709c3b04dc6aaf627090a04272a_SLA_Escalation_Examples.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onenote_0-684f7b49f4e8491487a057d3e464bc9b-54-4446DE05E285242C-sb0dcd902c91842c297fde0c539cf5e4f_Release_Checklist_Notes.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onenote_0-6ed3f34b94f44a8dbee6daf4b8db1305-162-4446DE05E285242C-s96ba1904f03e43ca9982557c2c053263_Graph_Connector_Setup_Notes.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onenote_0-6ed3f34b94f44a8dbee6daf4b8db1305-81-4446DE05E285242C-s0d717f7ea8894a79a58a6ae257106c55_Leave_Approval_Examples.txt",
+        "deleted_vector_count": 0
+      },
+      {
+        "source": "data/simulated/onenote_0-e6e0c53594da4e8a9caf83ecc7484980-101-4446DE05E285242C-sced89709c3b04dc6aaf627090a04272a_Shift_Handover_Notes.txt",
+        "deleted_vector_count": 0
+      }
+    ],
+    "total_deleted_vectors": 0,
+    "total_document_objects_loaded": 59,
+    "total_chunks_indexed": 99,
+    "estimated_unchanged_chunks_avoided": 5,
+    "after": {
+      "vector_backend": "azure_search",
+      "active_metadata_records": 81,
+      "simulated_source_files": 106,
+      "indexed_chunk_count": 203,
+      "index_size_bytes": null,
+      "index_size_mb": null,
+      "index_size_available": false,
+      "chroma_vector_count": null,
+      "chroma_db_size_bytes": null,
+      "chroma_db_size_mb": null
+    },
+    "delta": {
+      "indexed_chunk_count": 99,
+      "index_size_bytes": null,
+      "index_size_mb": null
+    },
+    "updated_by": "admin_jc"
   }
 ]
