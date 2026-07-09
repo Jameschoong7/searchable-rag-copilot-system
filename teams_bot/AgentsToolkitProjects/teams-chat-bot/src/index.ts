@@ -134,65 +134,72 @@ app.on("message", async ({ send, activity }) => {
 
   const apiBaseUrl = process.env.RAG_API_BASE_URL || "http://127.0.0.1:8000";
 
-  const submitResponse = await fetch(`${apiBaseUrl}/chat/jobs`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      question,
-      role: profile.role,
-      department: profile.department,
-      user: profile.user,
-      session_id: undefined,
-      use_memory: true,
-    }),
-  });
+  try {
+    const submitResponse = await fetch(`${apiBaseUrl}/chat/jobs`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        question,
+        role: profile.role,
+        department: profile.department,
+        user: profile.user,
+        session_id: undefined,
+        use_memory: true,
+      }),
+    });
 
-  if (!submitResponse.ok) {
-    const errorText = await submitResponse.text();
-    await send(`Could not submit question to RAG backend: ${errorText}`);
-    return;
+    if (!submitResponse.ok) {
+      const errorText = await submitResponse.text();
+      await send(`Could not submit question to RAG backend: ${errorText}`);
+      return;
+    }
+
+    const submittedJob = await submitResponse.json();
+    const jobId = submittedJob.job_id;
+
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      const jobResponse = await fetch(`${apiBaseUrl}/admin/jobs/${jobId}`);
+
+      if (!jobResponse.ok) {
+        const errorText = await jobResponse.text();
+        await send(`Could not check RAG job status: ${errorText}`);
+        return;
+      }
+
+      const job = await jobResponse.json();
+
+      if (job.status === "succeeded") {
+        const result = job.result;
+        const sources = result.sources || [];
+
+        const answerText = result.answer || "No answer returned.";
+        const sourceText =
+          sources.length > 0
+            ? `\n\nSources:\n${sources.map((source: string) => `- ${source}`).join("\n")}`
+            : "";
+
+        await send(`${answerText}${sourceText}`);
+
+        return;
+      }
+
+      if (job.status === "failed") {
+        await send(job.message || "The RAG backend failed to answer.");
+        return;
+      }
+    }
+
+    await send("The RAG backend is still processing. Please try again shortly.");
+  } catch (error) {
+    console.error("RAG backend request failed", error);
+    await send(
+      "The knowledge backend is not reachable. Please make sure the FastAPI service is running."
+    );
   }
-
-  const submittedJob = await submitResponse.json();
-  const jobId = submittedJob.job_id;
-
-  for (let attempt = 0; attempt < 30; attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    const jobResponse = await fetch(`${apiBaseUrl}/admin/jobs/${jobId}`);
-
-    if (!jobResponse.ok) {
-      const errorText = await jobResponse.text();
-      await send(`Could not check RAG job status: ${errorText}`);
-      return;
-    }
-
-    const job = await jobResponse.json();
-
-    if (job.status === "succeeded") {
-      const result = job.result;
-      const sources = result.sources || [];
-
-      const answerText = result.answer || "No answer returned.";
-      const sourceText =
-        sources.length > 0
-          ? `\n\nSources:\n${sources.map((source: string) => `- ${source}`).join("\n")}`
-          : "";
-
-      await send(`${answerText}${sourceText}`);
-
-      return;
-    }
-
-    if (job.status === "failed") {
-      await send(job.message || "The RAG backend failed to answer.");
-      return;
-    }
-  }
-
-  await send("The RAG backend is still processing. Please try again shortly.");
 });
 
 // :snippet-start: message-ext-query-link
