@@ -1874,6 +1874,60 @@ def render_advisor_card(row: dict) -> None:
     )
 
 
+def filter_advisor_rows(rows: list[dict], selected_filter: str) -> list[dict]:
+    """Return advisor rows that match the selected admin review filter."""
+    if selected_filter == "All":
+        return rows
+
+    if selected_filter == "High Priority":
+        return [row for row in rows if row["Priority"] == "High"]
+
+    if selected_filter == "Missing Knowledge":
+        return [
+            row for row in rows
+            if row["Issue Type"] in ["Missing Knowledge", "Vague Query"]
+        ]
+
+    if selected_filter == "Permission / ACL":
+        return [
+            row for row in rows
+            if row["Issue Type"] == "Permission Block"
+        ]
+
+    if selected_filter == "OCR Quality":
+        return [
+            row for row in rows
+            if row["Issue Type"] == "OCR Quality"
+        ]
+
+    if selected_filter == "Retrieval Miss":
+        return [
+            row for row in rows
+            if row["Issue Type"] in [
+                "Candidate Retrieval Gap",
+                "Possible Retrieval Miss",
+            ]
+        ]
+
+    return rows
+
+
+def render_advisor_filter_summary(rows: list[dict], selected_filter: str) -> None:
+    """Show a compact explanation for the selected advisor filter."""
+    filter_descriptions = {
+        "All": "All advisor recommendations from recent chat outcomes.",
+        "High Priority": "Items that likely need the fastest admin or KB-owner review.",
+        "Missing Knowledge": "Questions where the system could not find enough useful knowledge.",
+        "Permission / ACL": "Requests blocked by role or department permissions.",
+        "OCR Quality": "Image-heavy or scanned sources that may need better extraction.",
+        "Retrieval Miss": "Cases where sources existed but ranking, chunking, or matching may need review.",
+    }
+
+    st.caption(
+        f"{len(rows)} item(s). {filter_descriptions.get(selected_filter, '')}"
+    )
+
+
 def render_ai_advisor_page() -> None:
     """Render admin recommendations derived from weak chat/retrieval outcomes."""
     st.header("AI Advisor")
@@ -1937,14 +1991,41 @@ def render_ai_advisor_page() -> None:
         st.subheader("Recommended Actions")
 
         if advisor_rows:
-            visible_advisor_rows = advisor_rows[:8]
+            filter_options = [
+                "All",
+                "High Priority",
+                "Missing Knowledge",
+                "Permission / ACL",
+                "OCR Quality",
+                "Retrieval Miss",
+            ]
+            selected_filter = st.segmented_control(
+                "Advisor filter",
+                filter_options,
+                default="All",
+                key="ai_advisor_filter",
+                label_visibility="collapsed",
+            )
+            filtered_advisor_rows = filter_advisor_rows(
+                advisor_rows,
+                selected_filter or "All",
+            )
+
+            render_advisor_filter_summary(
+                filtered_advisor_rows,
+                selected_filter or "All",
+            )
+
+            visible_advisor_rows = filtered_advisor_rows[:8]
 
             for row in visible_advisor_rows:
                 render_advisor_card(row)
 
-            if len(advisor_rows) > len(visible_advisor_rows):
+            if not filtered_advisor_rows:
+                st.info("No recommendations match this filter.")
+            elif len(filtered_advisor_rows) > len(visible_advisor_rows):
                 st.caption(
-                    f"Showing {len(visible_advisor_rows)} of {len(advisor_rows)} recommendations. "
+                    f"Showing {len(visible_advisor_rows)} of {len(filtered_advisor_rows)} recommendations. "
                     "Open raw records for the full list."
                 )
         else:
@@ -2685,9 +2766,6 @@ radio_index = (
     if selected_page in page_options
     else None
 )
-
-if selected_page not in page_options:
-    st.session_state.pop("selected_navigation_radio", None)
 
 selected_radio_page = st.sidebar.radio(
     "Navigation",
