@@ -1874,6 +1874,97 @@ def render_advisor_card(row: dict) -> None:
     )
 
 
+def render_ai_advisor_page() -> None:
+    """Render admin recommendations derived from weak chat/retrieval outcomes."""
+    st.header("AI Advisor")
+
+    all_documents = load_document_metadata(include_inactive=True)
+    query_log_summary = read_query_log_summary()
+    advisor_rows = build_knowledge_advisor_rows(
+        query_log_summary["recent_outcome_rows"],
+        all_documents,
+    )
+    high_priority_count = sum(
+        1 for row in advisor_rows if row["Priority"] == "High"
+    )
+    missing_or_retrieval_count = sum(
+        1
+        for row in advisor_rows
+        if row["Issue Type"] in [
+            "Missing Knowledge",
+            "Candidate Retrieval Gap",
+            "Possible Retrieval Miss",
+        ]
+    )
+    access_or_ocr_count = sum(
+        1
+        for row in advisor_rows
+        if row["Issue Type"] in ["Permission Block", "OCR Quality"]
+    )
+
+    with st.container(border=True):
+        metric_columns = st.columns(4)
+
+        with metric_columns[0]:
+            render_status_card(
+                "Recommendations",
+                len(advisor_rows),
+                "attention" if advisor_rows else "success",
+            )
+
+        with metric_columns[1]:
+            render_status_card(
+                "High Priority",
+                high_priority_count,
+                "danger" if high_priority_count else "neutral",
+            )
+
+        with metric_columns[2]:
+            render_status_card(
+                "Knowledge Gaps",
+                missing_or_retrieval_count,
+                "attention" if missing_or_retrieval_count else "neutral",
+            )
+
+        with metric_columns[3]:
+            render_status_card(
+                "Access / OCR",
+                access_or_ocr_count,
+                "info" if access_or_ocr_count else "neutral",
+            )
+
+    with st.container(border=True):
+        st.subheader("Recommended Actions")
+
+        if advisor_rows:
+            visible_advisor_rows = advisor_rows[:8]
+
+            for row in visible_advisor_rows:
+                render_advisor_card(row)
+
+            if len(advisor_rows) > len(visible_advisor_rows):
+                st.caption(
+                    f"Showing {len(visible_advisor_rows)} of {len(advisor_rows)} recommendations. "
+                    "Open raw records for the full list."
+                )
+        else:
+            st.success(
+                "No recent weak outcomes need review. New not-found, permission, "
+                "reported-issue, OCR, or backend-error signals will appear here."
+            )
+
+    with st.expander("Raw Advisor Records", expanded=False):
+        if advisor_rows:
+            st.dataframe(
+                advisor_rows,
+                use_container_width=True,
+                hide_index=True,
+                height=min(420, 38 * (len(advisor_rows) + 1)),
+            )
+        else:
+            st.info("No advisor records available yet.")
+
+
 def render_workflow_header(title: str, subtitle: str) -> None:
     """Render the standard header used by KB Management workflow tabs."""
     st.markdown(
@@ -2011,6 +2102,68 @@ st.markdown(
 
     [data-testid="stSidebar"] [role="radiogroup"] > label > div:first-child {{
         display: none;
+    }}
+
+    .advisor-feature-marker {{
+        height: 0;
+        overflow: hidden;
+    }}
+
+    .element-container:has(.advisor-feature-marker) + .element-container .stButton > button {{
+        position: relative;
+        min-height: 2.7rem;
+        justify-content: flex-start;
+        padding: 0.62rem 0.85rem;
+        border: 1px solid #f2b8b5;
+        border-left: 4px solid {brand_red};
+        border-radius: 8px;
+        background:
+            linear-gradient(135deg, rgba(180, 35, 24, 0.09), rgba(255, 255, 255, 0.96) 56%),
+            #ffffff;
+        color: #7a271a;
+        font-weight: 850;
+        letter-spacing: 0;
+        box-shadow: 0 5px 16px rgba(180, 35, 24, 0.08);
+    }}
+
+    .element-container:has(.advisor-feature-marker) + .element-container .stButton > button:hover {{
+        border-color: {brand_red};
+        color: {brand_red_hover};
+        background:
+            linear-gradient(135deg, rgba(180, 35, 24, 0.14), rgba(255, 255, 255, 0.98) 58%),
+            #ffffff;
+        box-shadow: 0 8px 20px rgba(180, 35, 24, 0.12);
+    }}
+
+    .element-container:has(.advisor-feature-marker-active) + .element-container .stButton > button {{
+        background:
+            linear-gradient(135deg, {brand_red}, #d92d20 52%, #f97066),
+            {brand_red};
+        border-color: {brand_red};
+        color: #ffffff;
+        box-shadow: 0 8px 22px rgba(180, 35, 24, 0.24);
+    }}
+
+    .element-container:has(.advisor-feature-marker-active) + .element-container .stButton > button:hover {{
+        background:
+            linear-gradient(135deg, {brand_red_hover}, {brand_red} 52%, #f04438),
+            {brand_red_hover};
+        color: #ffffff;
+    }}
+
+    @media (prefers-reduced-motion: no-preference) {{
+        .element-container:has(.advisor-feature-marker-active) + .element-container .stButton > button {{
+            animation: advisorFeatureGlow 2.8s ease-in-out infinite;
+        }}
+    }}
+
+    @keyframes advisorFeatureGlow {{
+        0%, 100% {{
+            box-shadow: 0 8px 22px rgba(180, 35, 24, 0.20);
+        }}
+        50% {{
+            box-shadow: 0 10px 28px rgba(180, 35, 24, 0.34);
+        }}
     }}
 
     [data-testid="stForm"] [data-testid="InputInstructions"] {{
@@ -2477,25 +2630,78 @@ page_options = [
     kb_page_label,
     "Chat",
 ]
+can_access_ai_advisor = st.session_state["role"] in [
+    SYSTEM_ADMIN_ROLE,
+    PROJECT_MANAGER_ROLE,
+]
 
-if st.session_state["role"] in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
+if can_access_ai_advisor:
     page_options.insert(0, "Performance")
 
 if can_access_settings():
     page_options.append("Settings")
 
+valid_page_options = page_options.copy()
+
+if can_access_ai_advisor:
+    valid_page_options.append("AI Advisor")
+
 if "selected_navigation_page" not in st.session_state:
     st.session_state["selected_navigation_page"] = kb_page_label
 
-if st.session_state["selected_navigation_page"] not in page_options:
+if st.session_state["selected_navigation_page"] not in valid_page_options:
     st.session_state["selected_navigation_page"] = kb_page_label
 
-selected_page = st.sidebar.radio(
-    "Navigation",
-    page_options,
-    key="selected_navigation_page",
+selected_page = st.session_state["selected_navigation_page"]
+
+if can_access_ai_advisor:
+    advisor_marker_class = (
+        "advisor-feature-marker advisor-feature-marker-active"
+        if selected_page == "AI Advisor"
+        else "advisor-feature-marker"
+    )
+    st.sidebar.markdown(
+        f'<div class="{advisor_marker_class}"></div>',
+        unsafe_allow_html=True,
+    )
+
+    if st.sidebar.button(
+        "★ AI Advisor",
+        use_container_width=True,
+        key="featured_ai_advisor_button",
+        help="Review weak answer patterns and recommended knowledge-base improvements.",
+    ):
+        st.session_state["selected_navigation_page"] = "AI Advisor"
+        st.session_state.pop("selected_navigation_radio", None)
+        st.rerun()
+
+st.sidebar.markdown(
+    '<div class="sidebar-section-label">Navigation</div>',
+    unsafe_allow_html=True,
 )
 
+radio_index = (
+    page_options.index(selected_page)
+    if selected_page in page_options
+    else None
+)
+
+if selected_page not in page_options:
+    st.session_state.pop("selected_navigation_radio", None)
+
+selected_radio_page = st.sidebar.radio(
+    "Navigation",
+    page_options,
+    index=radio_index,
+    key="selected_navigation_radio",
+    label_visibility="collapsed",
+)
+
+if selected_radio_page and selected_radio_page != selected_page:
+    st.session_state["selected_navigation_page"] = selected_radio_page
+    st.rerun()
+
+selected_page = st.session_state["selected_navigation_page"]
 previous_selected_page = st.session_state.get("previous_selected_navigation_page")
 
 if previous_selected_page != selected_page:
@@ -2692,94 +2898,6 @@ if selected_page == "Performance":
                 )
             else:
                 st.info("No logged chat outcomes yet. Submit a Chat query to populate this table.")
-
-    with st.container(border=True):
-        st.subheader("AI Knowledge Quality Advisor")
-
-        advisor_rows = build_knowledge_advisor_rows(
-            query_log_summary["recent_outcome_rows"],
-            all_documents,
-        )
-        high_priority_count = sum(
-            1 for row in advisor_rows if row["Priority"] == "High"
-        )
-        missing_or_retrieval_count = sum(
-            1
-            for row in advisor_rows
-            if row["Issue Type"] in [
-                "Missing Knowledge",
-                "Candidate Retrieval Gap",
-                "Possible Retrieval Miss",
-            ]
-        )
-        access_or_ocr_count = sum(
-            1
-            for row in advisor_rows
-            if row["Issue Type"] in ["Permission Block", "OCR Quality"]
-        )
-
-        advisor_metric_columns = st.columns(4)
-
-        with advisor_metric_columns[0]:
-            render_status_card(
-                "Recommendations",
-                len(advisor_rows),
-                "attention" if advisor_rows else "success",
-            )
-
-        with advisor_metric_columns[1]:
-            render_status_card(
-                "High Priority",
-                high_priority_count,
-                "danger" if high_priority_count else "neutral",
-            )
-
-        with advisor_metric_columns[2]:
-            render_status_card(
-                "Knowledge Gaps",
-                missing_or_retrieval_count,
-                "attention" if missing_or_retrieval_count else "neutral",
-            )
-
-        with advisor_metric_columns[3]:
-            render_status_card(
-                "Access / OCR",
-                access_or_ocr_count,
-                "info" if access_or_ocr_count else "neutral",
-            )
-
-        if advisor_rows:
-            st.markdown('<div class="compact-section-title">Recommended Actions</div>', unsafe_allow_html=True)
-
-            visible_advisor_rows = advisor_rows[:4]
-
-            for row in visible_advisor_rows:
-                render_advisor_card(row)
-
-            if len(advisor_rows) > len(visible_advisor_rows):
-                st.caption(
-                    f"Showing {len(visible_advisor_rows)} of {len(advisor_rows)} recommendations. "
-                    "Open raw records for the full list."
-                )
-
-            st.caption(
-                "Advisor v1 uses transparent rules over recent chat outcomes, "
-                "user feedback, source lists, and document metadata. It does not "
-                "change retrieval or permissions."
-            )
-
-            with st.expander("Raw Advisor Records", expanded=False):
-                st.dataframe(
-                    advisor_rows,
-                    use_container_width=True,
-                    hide_index=True,
-                    height=min(360, 38 * (len(advisor_rows) + 1)),
-                )
-        else:
-            st.success(
-                "No recent weak outcomes need review. New not-found, permission, "
-                "reported-issue, OCR, or backend-error signals will appear here."
-            )
 
     with st.container(border=True):
         st.subheader("Source Refresh")
@@ -3309,6 +3427,11 @@ if selected_page == "Performance":
             st.info("No logged chat queries yet. Submit a Chat query to create a log.")
 
 
+    st.stop()
+
+
+if selected_page == "AI Advisor":
+    render_ai_advisor_page()
     st.stop()
 
 
