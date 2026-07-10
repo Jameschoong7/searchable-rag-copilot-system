@@ -3,6 +3,7 @@
 
 from html import escape
 from datetime import datetime
+import hashlib
 import json
 from pathlib import Path
 import sqlite3
@@ -87,6 +88,7 @@ SETTINGS_URL = f"{API_BASE_URL}/admin/settings"
 LLM_CONFIG_HEALTH_URL = f"{API_BASE_URL}/admin/llm/config-health"
 LLM_LIVE_TEST_URL = f"{API_BASE_URL}/admin/llm/live-test"
 LLM_USAGE_URL = f"{API_BASE_URL}/admin/llm/usage"
+ADVISOR_ACTION_PLAN_URL = f"{API_BASE_URL}/admin/advisor/action-plan"
 UPLOAD_DOCUMENT_URL = f"{API_BASE_URL}/admin/upload-document"
 UPLOAD_DOCUMENT_VERSION_URL = f"{API_BASE_URL}/admin/upload-document-version"
 UPLOAD_ZIP_STAGING_URL = f"{API_BASE_URL}/admin/upload-zip-staging"
@@ -446,6 +448,23 @@ def request_llm_usage_records() -> dict:
         LLM_USAGE_URL,
         params={"limit": 25},
         timeout=15,
+    )
+
+    response.raise_for_status()
+    return response.json()
+
+
+def request_advisor_action_plan(recommendation: dict) -> dict:
+    """Ask FastAPI to generate one admin action plan for an advisor row."""
+    response = requests.post(
+        ADVISOR_ACTION_PLAN_URL,
+        json={
+            "role": st.session_state["role"],
+            "user": st.session_state["user"],
+            "user_department": st.session_state["department"],
+            "recommendation": recommendation,
+        },
+        timeout=90,
     )
 
     response.raise_for_status()
@@ -1874,6 +1893,51 @@ def render_advisor_card(row: dict) -> None:
     )
 
 
+def get_advisor_row_key(row: dict) -> str:
+    """Return a stable key for one advisor recommendation row."""
+    row_fingerprint = json.dumps(row, sort_keys=True, default=str)
+    return hashlib.sha1(row_fingerprint.encode("utf-8")).hexdigest()[:16]
+
+
+def render_advisor_action_plan_controls(row: dict) -> None:
+    """Render the on-demand LLM action-plan button for one advisor row."""
+    row_key = get_advisor_row_key(row)
+    state_key = f"advisor_action_plan_{row_key}"
+    error_key = f"advisor_action_plan_error_{row_key}"
+
+    action_columns = st.columns([1, 3])
+
+    with action_columns[0]:
+        if st.button(
+            "Generate Action Plan",
+            key=f"generate_advisor_action_plan_{row_key}",
+            use_container_width=True,
+            help="Uses the configured LLM once to rewrite this recommendation into admin action steps.",
+        ):
+            st.session_state.pop(error_key, None)
+
+            try:
+                with st.spinner("Generating action plan..."):
+                    result = request_advisor_action_plan(row)
+            except requests.exceptions.HTTPError as error:
+                st.session_state[error_key] = (
+                    f"Action plan rejected by backend: {error.response.text}"
+                )
+            except requests.exceptions.RequestException as error:
+                st.session_state[error_key] = (
+                    f"Could not generate action plan: {error}"
+                )
+            else:
+                st.session_state[state_key] = result["action_plan"]
+
+    if st.session_state.get(error_key):
+        st.warning(st.session_state[error_key])
+
+    if st.session_state.get(state_key):
+        with st.expander("Generated Action Plan", expanded=True):
+            st.markdown(st.session_state[state_key])
+
+
 def filter_advisor_rows(rows: list[dict], selected_filter: str) -> list[dict]:
     """Return advisor rows that match the selected admin review filter."""
     if selected_filter == "All":
@@ -2020,6 +2084,7 @@ def render_ai_advisor_page() -> None:
 
             for row in visible_advisor_rows:
                 render_advisor_card(row)
+                render_advisor_action_plan_controls(row)
 
             if not filtered_advisor_rows:
                 st.info("No recommendations match this filter.")

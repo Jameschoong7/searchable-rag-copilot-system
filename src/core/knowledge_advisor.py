@@ -93,6 +93,7 @@ def build_advisor_recommendation(row, metadata_lookup: dict[str, dict]) -> dict 
             "Suggested Action": "Check FastAPI, model backend, vector backend, and recent job logs before retrying.",
             "Owner": "System Admin",
             "Feedback": feedback,
+            "Sources Checked": sources,
         }
 
     if status == "permission_block":
@@ -106,6 +107,7 @@ def build_advisor_recommendation(row, metadata_lookup: dict[str, dict]) -> dict 
             "Suggested Action": "No content fix is required unless the document owner decides this information should be shared.",
             "Owner": "Document Owner",
             "Feedback": feedback,
+            "Sources Checked": sources,
         }
 
     if feedback == "reported_issue" and sources:
@@ -119,6 +121,7 @@ def build_advisor_recommendation(row, metadata_lookup: dict[str, dict]) -> dict 
             "Suggested Action": "Review retrieved sources, expected answer, metadata tags, and labelled evaluation coverage.",
             "Owner": "System Admin",
             "Feedback": feedback,
+            "Sources Checked": sources,
         }
 
     if status == "not_found":
@@ -133,6 +136,7 @@ def build_advisor_recommendation(row, metadata_lookup: dict[str, dict]) -> dict 
                 "Suggested Action": "Add guided prompt examples or ask the user to include a policy, process, department, or task.",
                 "Owner": "Knowledge Admin",
                 "Feedback": feedback,
+                "Sources Checked": sources,
             }
 
         if sources_have_ocr_risk(sources, metadata_lookup):
@@ -146,6 +150,7 @@ def build_advisor_recommendation(row, metadata_lookup: dict[str, dict]) -> dict 
                 "Suggested Action": "Review OCR output, replace with a text-based PDF, or add a corrected text version.",
                 "Owner": "Knowledge Admin",
                 "Feedback": feedback,
+                "Sources Checked": sources,
             }
 
         if not sources:
@@ -159,6 +164,7 @@ def build_advisor_recommendation(row, metadata_lookup: dict[str, dict]) -> dict 
                 "Suggested Action": "Add or sync the missing policy/process document, then create a labelled evaluation case.",
                 "Owner": "Knowledge Admin",
                 "Feedback": feedback,
+                "Sources Checked": sources,
             }
 
         return {
@@ -171,6 +177,7 @@ def build_advisor_recommendation(row, metadata_lookup: dict[str, dict]) -> dict 
             "Suggested Action": "Review chunking, metadata tags, threshold, and whether the expected source is indexed.",
             "Owner": "System Admin",
             "Feedback": feedback,
+            "Sources Checked": sources,
         }
 
     return None

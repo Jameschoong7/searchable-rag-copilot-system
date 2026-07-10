@@ -637,6 +637,22 @@ class ChatJobRequest(QueryRequest):
     use_memory: bool = True
 
 
+class AdvisorActionPlanRequest(BaseModel):
+    """Represent one admin request to rewrite an advisor row into an action plan."""
+
+    role: str
+    user: str
+    user_department: str
+    recommendation: dict
+
+
+class AdvisorActionPlanResponse(BaseModel):
+    """Represent an LLM-written admin action plan for one advisor recommendation."""
+
+    status: str
+    action_plan: str
+
+
 class JobResponse(BaseModel):
     """Represent one backend job record."""
 
@@ -703,6 +719,53 @@ class RejectStagedDocumentRequest(BaseModel):
     role: str
     user_department: str
     document_id: str
+
+
+@app.post("/admin/advisor/action-plan", response_model=AdvisorActionPlanResponse)
+def generate_admin_advisor_action_plan(
+    request: AdvisorActionPlanRequest,
+) -> AdvisorActionPlanResponse:
+    """Generate one admin-facing action plan from a structured advisor row."""
+    if request.role not in [SYSTEM_ADMIN_ROLE, PROJECT_MANAGER_ROLE]:
+        raise HTTPException(
+            status_code=403,
+            detail="Only System Admin or Project Manager can generate advisor action plans.",
+        )
+
+    recommendation = request.recommendation or {}
+    required_fields = [
+        "Query",
+        "Issue Type",
+        "Priority",
+        "Reason",
+        "Suggested Action",
+        "Owner",
+    ]
+    missing_fields = [
+        field for field in required_fields
+        if not str(recommendation.get(field, "")).strip()
+    ]
+
+    if missing_fields:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Advisor recommendation is missing: {', '.join(missing_fields)}.",
+        )
+
+    try:
+        from src.core.advisor_action_plan import generate_advisor_action_plan
+
+        action_plan = generate_advisor_action_plan(recommendation)
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Advisor action plan generation failed: {error}",
+        ) from error
+
+    return AdvisorActionPlanResponse(
+        status="success",
+        action_plan=action_plan,
+    )
 
 
 def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
