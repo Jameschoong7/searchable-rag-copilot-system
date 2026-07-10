@@ -6,7 +6,6 @@ from datetime import datetime
 import hashlib
 import json
 from pathlib import Path
-import sqlite3
 import time
 import requests
 import streamlit as st
@@ -40,6 +39,11 @@ from src.core.constants import (
 
 from src.core.answer_status import classify_answer_status_detail
 from src.core.knowledge_advisor import build_knowledge_advisor_rows
+from src.core.query_log_repository import (
+    QUERY_HISTORY_LIMIT,
+    read_query_log_summary,
+    update_query_feedback,
+)
 from src.core.user_repository import authenticate_user
 
 
@@ -94,7 +98,6 @@ UPLOAD_DOCUMENT_VERSION_URL = f"{API_BASE_URL}/admin/upload-document-version"
 UPLOAD_ZIP_STAGING_URL = f"{API_BASE_URL}/admin/upload-zip-staging"
 APPROVE_DOCUMENT_URL = f"{API_BASE_URL}/admin/approve-document"
 REJECT_STAGED_DOCUMENT_URL = f"{API_BASE_URL}/admin/reject-staged-document"
-QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
 ONEDRIVE_FILES_URL = f"{API_BASE_URL}/admin/graph/onedrive/files"
 ONEDRIVE_STAGE_FILE_URL = f"{API_BASE_URL}/admin/graph/onedrive/stage-file"
 ONEDRIVE_STAGE_FILES_JOB_URL = f"{API_BASE_URL}/admin/graph/onedrive/stage-files-job"
@@ -107,7 +110,6 @@ ONENOTE_REFRESH_PAGES_JOB_URL = f"{API_BASE_URL}/admin/graph/onenote/refresh-pag
 EVALUATION_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/retrieval_eval_results.json"
 INDEX_BENCHMARK_RESULTS_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_results.json"
 INDEX_BENCHMARK_HISTORY_PATH = PROJECT_ROOT / "data/evaluation/index_benchmark_history.json"
-QUERY_HISTORY_LIMIT = 50
 
 
 def request_document_approval(
@@ -675,6 +677,7 @@ def submit_chat_job(
             "file_type_filter": file_type_filter,
             "session_id": st.session_state.get("chat_session_id"),
             "use_memory": st.session_state.get("chat_memory_enabled", True),
+            "client": "streamlit",
         },
         timeout=10,
     )
@@ -776,22 +779,16 @@ def poll_active_chat_job() -> None:
         if result.get("session_id"):
             st.session_state["chat_session_id"] = result["session_id"]
 
-        answer_status_detail = classify_answer_status_detail(
-            result["answer"],
-            result["sources"],
-        )
-        answer_status = answer_status_detail["status"]
+        answer_status = result.get("answer_status")
 
-        query_log_id = write_query_log(
-            question=result["question"],
-            department_filter=result.get("department_filter"),
-            file_type_filter=result.get("file_type_filter"),
-            status=answer_status,
-            status_reason=answer_status_detail["reason"],
-            answer_text=result["answer"],
-            sources=result["sources"],
-            latency_seconds=result.get("latency_seconds", 0),
-        )
+        if not answer_status:
+            answer_status_detail = classify_answer_status_detail(
+                result["answer"],
+                result["sources"],
+            )
+            answer_status = answer_status_detail["status"]
+
+        query_log_id = result.get("query_log_id")
 
         context_text = (
             f"Access context: {result['role']} / {result['department']} | "
@@ -826,16 +823,7 @@ def poll_active_chat_job() -> None:
         if result.get("session_id"):
             st.session_state["chat_session_id"] = result["session_id"]
 
-        query_log_id = write_query_log(
-            question=result.get("question", "Unknown question"),
-            department_filter=result.get("department_filter"),
-            file_type_filter=result.get("file_type_filter"),
-            status="api_error",
-            status_reason="Backend chat job failed",
-            answer_text=job["message"],
-            sources=[],
-            latency_seconds=result.get("latency_seconds", 0),
-        )
+        query_log_id = result.get("query_log_id")
 
         st.session_state["chat_messages"].append(
             {
@@ -1469,49 +1457,6 @@ def render_pending_index_notice(
         )
 
 
-def initialise_query_log_database() -> None:
-    """Create the local SQLite query log table if it does not exist."""
-    QUERY_LOG_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-    with sqlite3.connect(QUERY_LOG_DB_PATH) as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS query_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT NOT NULL,
-                user TEXT NOT NULL,
-                role TEXT NOT NULL,
-                department TEXT NOT NULL,
-                question TEXT NOT NULL,
-                department_filter TEXT,
-                file_type_filter TEXT,
-                status TEXT NOT NULL,
-                sources_json TEXT NOT NULL,
-                latency_seconds REAL NOT NULL
-            )
-            """
-        )
-
-        existing_columns = {
-            row[1]
-            for row in connection.execute("PRAGMA table_info(query_logs)")
-        }
-
-        feedback_columns = {
-            "feedback": "TEXT DEFAULT 'none'",
-            "feedback_note": "TEXT",
-            "feedback_at": "TEXT",
-            "answer_text": "TEXT",
-            "status_reason": "TEXT",
-        }
-
-        for column_name, column_type in feedback_columns.items():
-            if column_name not in existing_columns:
-                connection.execute(
-                    f"ALTER TABLE query_logs ADD COLUMN {column_name} {column_type}"
-                )
-
-
 def get_status_label(status: str) -> str:
     """Return a user-facing label for one chat answer status"""
     labels = {
@@ -1578,173 +1523,6 @@ def show_escalation_guidance(status: str) -> None:
         st.caption(
             "Next step: retry later or contact the system admin if the issue continues."
         )
-
-
-def write_query_log(
-        question: str,
-        department_filter: str | None,
-        file_type_filter: str | None,
-        status: str,
-        status_reason: str,
-        answer_text: str,
-        sources: list[str],
-        latency_seconds: float,
-) -> int:
-    """Insert one structured chat query event into the local SQLite log."""
-    initialise_query_log_database()
-
-    with sqlite3.connect(QUERY_LOG_DB_PATH) as connection:
-        cursor = connection.execute(
-            """
-            INSERT INTO query_logs (
-                timestamp,
-                user,
-                role,
-                department,
-                question,
-                department_filter,
-                file_type_filter,
-                status,
-                status_reason,
-                answer_text,
-                sources_json,
-                latency_seconds
-            )
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                datetime.now().isoformat(timespec="seconds"),
-                st.session_state["user"],
-                st.session_state["role"],
-                st.session_state["department"],
-                question,
-                department_filter,
-                file_type_filter,
-                status,
-                status_reason,
-                answer_text,
-                json.dumps(sources),
-                round(latency_seconds, 3),
-            )
-        )
-
-        return cursor.lastrowid
-
-
-def update_query_feedback(query_log_id: int, feedback: str, feedback_note: str | None = None) -> None:
-    """Update user feedback for one logged query."""
-    initialise_query_log_database()
-
-    with sqlite3.connect(QUERY_LOG_DB_PATH) as connection:
-        connection.execute(
-            """
-            UPDATE query_logs
-            SET
-                feedback = ?,
-                feedback_note = ?,
-                feedback_at = ?
-            WHERE id = ?
-            """,
-            (
-                feedback,
-                feedback_note,
-                datetime.now().isoformat(timespec="seconds"),
-                query_log_id,
-            ),
-        )
-
-
-def read_query_log_summary() -> dict:
-    """Read real local query-log signals for the Performance dashboard."""
-    initialise_query_log_database()
-
-    with sqlite3.connect(QUERY_LOG_DB_PATH) as connection:
-        summary_row = connection.execute(
-            """
-            SELECT
-                COUNT(*) AS total_queries,
-                COALESCE(AVG(latency_seconds), 0) AS average_latency,
-                SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END)
-                    AS grounded_answers,
-                SUM(CASE WHEN status = 'not_found' THEN 1 ELSE 0 END)
-                    AS not_found_queries,
-                SUM(CASE WHEN status = 'permission_block' THEN 1 ELSE 0 END)
-                    AS permission_blocks,
-                SUM(CASE WHEN status IN ('api_error', 'connection_error', 'error') THEN 1 ELSE 0 END)
-                    AS error_queries
-            FROM query_logs
-            """
-        ).fetchone()
-
-        recent_outcome_rows = connection.execute(
-             """
-            SELECT
-                timestamp,
-                user,
-                role,
-                department,
-                question,
-                department_filter,
-                file_type_filter,
-                status,
-                status_reason,
-                answer_text,
-                sources_json,
-                latency_seconds,
-                feedback,
-                feedback_note
-            FROM query_logs
-            ORDER BY id DESC
-            LIMIT ?
-            """,
-            (QUERY_HISTORY_LIMIT,),
-        ).fetchall()
-
-        recent_rows = connection.execute(
-             """
-            SELECT
-                timestamp,
-                user,
-                role,
-                department,
-                question,
-                department_filter,
-                file_type_filter,
-                status,
-                latency_seconds
-            FROM query_logs
-            ORDER BY id DESC
-            LIMIT ?
-            """,
-            (QUERY_HISTORY_LIMIT,),
-        ).fetchall()
-
-        daily_latency_rows = connection.execute(
-            """
-            SELECT
-                DATE(timestamp) AS query_date,
-                COUNT(*) AS query_count,
-                AVG(latency_seconds) AS average_latency
-            FROM query_logs
-            WHERE DATE(timestamp) >= DATE('now', '-6 days')
-            GROUP BY DATE(timestamp)
-            ORDER BY DATE(timestamp)
-            """
-        ).fetchall()
-
-        return {
-            "total_queries": summary_row[0],
-            "average_latency": summary_row[1],
-            "grounded_answers": summary_row[2] or 0,
-            "not_found_queries": summary_row[3] or 0,
-            "permission_blocks": summary_row[4] or 0,
-            "error_queries": summary_row[5] or 0,
-            "unresolved_queries": (summary_row[3] or 0) + (summary_row[5] or 0),
-            "recent_outcome_rows": recent_outcome_rows,
-            "recent_queries": recent_rows,
-            "daily_latency_rows": daily_latency_rows,
-            "query_history_limit": QUERY_HISTORY_LIMIT,
-        }
 
 
 def can_view_document(document: dict) -> bool:
@@ -3483,32 +3261,6 @@ if selected_page == "Performance":
             st.altair_chart(latency_chart, use_container_width=True)
         else:
             st.info("No query latency data yet. Submit a Chat query to populate this chart.")
-
-    with st.expander("Evaluation Method"):
-        st.markdown(
-            "**Eval Top-K Accuracy checks whether the expected source document appears "
-            "within the top 5 retrieved chunks in the labelled evaluation run.**"
-        )
-        st.caption(
-            "Top-K Accuracy and Miss Rate are calculated from the latest labelled "
-            "retrieval evaluation result. Each labelled query defines an expected source "
-            "or expected miss/block outcome."
-        )
-        if evaluation_results and evaluation_results.get("threshold_interpretation"):
-            threshold_interpretation = evaluation_results["threshold_interpretation"]
-
-            st.markdown("**Threshold Comparison**")
-
-            st.dataframe(
-                threshold_interpretation["comparison_rows"],
-                use_container_width=True,
-                hide_index=True,
-            )
-
-            if threshold_interpretation["has_clear_winner"]:
-                st.success(threshold_interpretation["recommendation"])
-            else:
-                st.info(threshold_interpretation["recommendation"])
 
     if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
         with st.expander("Benchmark Misses", expanded=False):

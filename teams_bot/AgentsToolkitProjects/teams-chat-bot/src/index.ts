@@ -147,6 +147,7 @@ app.on("message", async ({ send, activity }) => {
         user: profile.user,
         session_id: undefined,
         use_memory: true,
+        client: "teams",
       }),
     });
 

@@ -76,6 +76,7 @@ from src.core.chat_memory_repository import (
     list_recent_chat_messages_for_session,
     list_chat_sessions_for_user,
 )
+from src.core.query_log_repository import write_query_log
 from src.rag.chat_rewrite import (
     MAX_REWRITE_HISTORY_MESSAGES,
     rewrite_follow_up_question_with_configured_llm,
@@ -635,6 +636,7 @@ class ChatJobRequest(QueryRequest):
     user: str
     session_id: str | None = None
     use_memory: bool = True
+    client: str = "unknown"
 
 
 class AdvisorActionPlanRequest(BaseModel):
@@ -721,6 +723,36 @@ class RejectStagedDocumentRequest(BaseModel):
     document_id: str
 
 
+def safely_write_chat_query_log(
+    *,
+    request: ChatJobRequest,
+    question: str,
+    status: str,
+    status_reason: str,
+    answer_text: str,
+    sources: list[str],
+    latency_seconds: float,
+) -> int | None:
+    """Write backend-owned chat evidence without failing the chat job."""
+    try:
+        return write_query_log(
+            user=request.user,
+            role=request.role,
+            department=request.department,
+            question=question,
+            department_filter=request.department_filter,
+            file_type_filter=request.file_type_filter,
+            status=status,
+            status_reason=status_reason,
+            answer_text=answer_text,
+            sources=sources,
+            latency_seconds=latency_seconds,
+            client=request.client,
+        )
+    except Exception:
+        return None
+
+
 @app.post("/admin/advisor/action-plan", response_model=AdvisorActionPlanResponse)
 def generate_admin_advisor_action_plan(
     request: AdvisorActionPlanRequest,
@@ -784,17 +816,6 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
     session_id = chat_session["session_id"]
     retrieval_question = question
 
-    if request.use_memory:
-        recent_messages = list_recent_chat_messages_for_session(
-            session_id=session_id,
-            user=request.user,
-            limit=MAX_REWRITE_HISTORY_MESSAGES,
-        )
-        retrieval_question = rewrite_follow_up_question_with_configured_llm(
-            question,
-            recent_messages,
-        )
-
     append_chat_message(
         session_id=session_id,
         message_role=MESSAGE_ROLE_USER,
@@ -812,6 +833,17 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
     start_time = time.perf_counter()
 
     try:
+        if request.use_memory:
+            recent_messages = list_recent_chat_messages_for_session(
+                session_id=session_id,
+                user=request.user,
+                limit=MAX_REWRITE_HISTORY_MESSAGES,
+            )
+            retrieval_question = rewrite_follow_up_question_with_configured_llm(
+                question,
+                recent_messages,
+            )
+
         from src.rag.engine import generate_answer
 
         result = generate_answer(
@@ -826,6 +858,16 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
             result["sources"],
         )
         answer_status = answer_status_detail["status"]
+        latency_seconds = round(time.perf_counter() - start_time, 3)
+        query_log_id = safely_write_chat_query_log(
+            request=request,
+            question=question,
+            status=answer_status,
+            status_reason=answer_status_detail["reason"],
+            answer_text=result["answer"],
+            sources=result["sources"],
+            latency_seconds=latency_seconds,
+        )
 
         append_chat_message(
             session_id=session_id,
@@ -848,20 +890,33 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
                 "sources": result["sources"],
                 "answer_status": answer_status,
                 "status_reason": answer_status_detail["reason"],
+                "query_log_id": query_log_id,
                 "role": request.role,
                 "department": request.department,
                 "department_filter": request.department_filter,
                 "file_type_filter": request.file_type_filter,
                 "llm_backend": llm_runtime_info["llm_backend"],
                 "llm_deployment": llm_runtime_info["llm_deployment"],
-                "latency_seconds": round(time.perf_counter() - start_time, 3),
+                "latency_seconds": latency_seconds,
             },
         )
     except Exception as error:
+        latency_seconds = round(time.perf_counter() - start_time, 3)
+        failed_answer_text = f"Chat query failed: {error}"
+        query_log_id = safely_write_chat_query_log(
+            request=request,
+            question=question,
+            status="api_error",
+            status_reason="Backend chat job failed",
+            answer_text=failed_answer_text,
+            sources=[],
+            latency_seconds=latency_seconds,
+        )
+
         append_chat_message(
             session_id=session_id,
             message_role=MESSAGE_ROLE_ASSISTANT,
-            content=f"Chat query failed: {error}",
+            content=failed_answer_text,
             sources=[],
             status="api_error",
         )
@@ -879,13 +934,14 @@ def run_chat_query_job(job_id: str, request: ChatJobRequest) -> None:
                 "sources": [],
                 "answer_status": "api_error",
                 "status_reason": "Backend chat job failed",
+                "query_log_id": query_log_id,
                 "role": request.role,
                 "department": request.department,
                 "department_filter": request.department_filter,
                 "file_type_filter": request.file_type_filter,
                 "llm_backend": llm_runtime_info["llm_backend"],
                 "llm_deployment": llm_runtime_info["llm_deployment"],
-                "latency_seconds": round(time.perf_counter() - start_time, 3),
+                "latency_seconds": latency_seconds,
             },
         )
 
