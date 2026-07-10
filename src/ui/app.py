@@ -1839,6 +1839,41 @@ def render_status_card(label: str, value: int | str, tone: str = "neutral") -> N
     )
 
 
+def render_advisor_card(row: dict) -> None:
+    """Render one AI Knowledge Quality Advisor recommendation card."""
+    priority = row["Priority"]
+    priority_class = priority.lower()
+    query_preview = row["Query"]
+
+    if len(query_preview) > 95:
+        query_preview = f"{query_preview[:92]}..."
+
+    st.markdown(
+        f"""
+        <div class="advisor-card advisor-card-{priority_class}">
+            <div class="advisor-card-header">
+                <span class="advisor-priority advisor-priority-{priority_class}">
+                    {escape(priority)}
+                </span>
+                <span>{escape(row["Issue Type"])}</span>
+            </div>
+            <div class="advisor-card-row">
+                <strong>Query:</strong> {escape(query_preview)}
+            </div>
+            <div class="advisor-card-row">
+                <strong>Action:</strong> {escape(row["Suggested Action"])}
+            </div>
+            <div class="advisor-card-row">
+                <strong>Owner:</strong> {escape(row["Owner"])}
+                &nbsp;|&nbsp;
+                <strong>Issue:</strong> {escape(row["Reason"])}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_workflow_header(title: str, subtitle: str) -> None:
     """Render the standard header used by KB Management workflow tabs."""
     st.markdown(
@@ -2123,6 +2158,82 @@ st.markdown(
         background: #eef2f7 !important;
         border-color: #c7d0dd !important;
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75) !important;
+    }}
+
+    .advisor-card {{
+        border: 1px solid #d0d5dd;
+        border-left: 4px solid #98a2b3;
+        border-radius: 8px;
+        padding: 0.5rem 0.65rem;
+        margin: 0.35rem 0;
+        background: #ffffff;
+        box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+    }}
+
+    .advisor-card-high {{
+        border-left-color: {brand_red};
+        background: #fffbfb;
+    }}
+
+    .advisor-card-medium {{
+        border-left-color: #d89614;
+        background: #fffdf5;
+    }}
+
+    .advisor-card-low {{
+        border-left-color: #3b82f6;
+        background: #f8fbff;
+    }}
+
+    .advisor-card-header {{
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.2rem;
+        color: #101828;
+        font-weight: 850;
+        font-size: 0.86rem;
+    }}
+
+    .advisor-priority {{
+        display: inline-flex;
+        align-items: center;
+        padding: 0.12rem 0.45rem;
+        border-radius: 999px;
+        border: 1px solid #d0d5dd;
+        background: #f9fafb;
+        color: #344054;
+        font-size: 0.72rem;
+        font-weight: 800;
+    }}
+
+    .advisor-priority-high {{
+        background: {brand_red_soft};
+        border-color: {brand_red_border};
+        color: {brand_red};
+    }}
+
+    .advisor-priority-medium {{
+        background: #fff7e6;
+        border-color: #f7c56b;
+        color: #8a5a00;
+    }}
+
+    .advisor-priority-low {{
+        background: #eff6ff;
+        border-color: #bfdbfe;
+        color: #1d4ed8;
+    }}
+
+    .advisor-card-row {{
+        color: #475467;
+        font-size: 0.78rem;
+        line-height: 1.25;
+        margin-top: 0.12rem;
+    }}
+
+    .advisor-card-row strong {{
+        color: #344054;
     }}
 
     .compact-section-title {{
@@ -2637,24 +2748,38 @@ if selected_page == "Performance":
                 "info" if access_or_ocr_count else "neutral",
             )
 
-        with st.expander("Recommended Admin Actions", expanded=False):
-            if advisor_rows:
+        if advisor_rows:
+            st.markdown('<div class="compact-section-title">Recommended Actions</div>', unsafe_allow_html=True)
+
+            visible_advisor_rows = advisor_rows[:4]
+
+            for row in visible_advisor_rows:
+                render_advisor_card(row)
+
+            if len(advisor_rows) > len(visible_advisor_rows):
+                st.caption(
+                    f"Showing {len(visible_advisor_rows)} of {len(advisor_rows)} recommendations. "
+                    "Open raw records for the full list."
+                )
+
+            st.caption(
+                "Advisor v1 uses transparent rules over recent chat outcomes, "
+                "user feedback, source lists, and document metadata. It does not "
+                "change retrieval or permissions."
+            )
+
+            with st.expander("Raw Advisor Records", expanded=False):
                 st.dataframe(
                     advisor_rows,
                     use_container_width=True,
                     hide_index=True,
                     height=min(360, 38 * (len(advisor_rows) + 1)),
                 )
-                st.caption(
-                    "Advisor v1 uses transparent rules over recent chat outcomes, "
-                    "user feedback, source lists, and document metadata. It does not "
-                    "change retrieval or permissions."
-                )
-            else:
-                st.success(
-                    "No recent weak outcomes need review. New not-found, permission, "
-                    "reported-issue, OCR, or backend-error signals will appear here."
-                )
+        else:
+            st.success(
+                "No recent weak outcomes need review. New not-found, permission, "
+                "reported-issue, OCR, or backend-error signals will appear here."
+            )
 
     with st.container(border=True):
         st.subheader("Source Refresh")
