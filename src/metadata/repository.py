@@ -359,44 +359,58 @@ def create_new_document_version(
     new_document: dict,
     archived_at: str,
 ) -> None:
-    """Archive the previous version and insert a new active version for the same source document."""
+    """Atomically archive one version and insert its active replacement."""
     initialise_metadata_database()
 
-    all_documents = load_document_metadata(include_inactive=True)
+    with sqlite3.connect(METADATA_DB_PATH) as connection:
+        connection.row_factory = sqlite3.Row
+        previous_row = connection.execute(
+            "SELECT * FROM document_metadata WHERE document_id = ?",
+            (previous_document_id,),
+        ).fetchone()
 
-    previous_document = next(
-        (
-            document
-            for document in all_documents
-            if document["document_id"] == previous_document_id
-        ),
-        None,
-    )
+        if previous_row is None:
+            raise ValueError(f"Document not found: {previous_document_id}")
 
-    if previous_document is None:
-        raise ValueError(f"Document not found: {previous_document_id}")
+        previous_document = decode_document_from_sqlite(previous_row)
+        source_document_id = previous_document.get(
+            "source_document_id",
+            previous_document["document_id"],
+        )
+        previous_version_number = previous_document.get("version_number") or 1
 
-    source_document_id = previous_document.get(
-        "source_document_id",
-        previous_document["document_id"],
-    )
+        versioned_document = new_document.copy()
+        versioned_document["source_document_id"] = source_document_id
+        versioned_document["version_number"] = previous_version_number + 1
+        versioned_document["is_active"] = 1
+        versioned_document["archived_at"] = None
+        versioned_document["replaced_by_document_id"] = None
+        encoded_document = encode_document_for_sqlite(versioned_document)
 
-    previous_version_number = previous_document.get("version_number") or 1
+        placeholders = ", ".join("?" for _ in DOCUMENT_COLUMNS)
+        column_names = ", ".join(DOCUMENT_COLUMNS)
+        values = [encoded_document.get(column) for column in DOCUMENT_COLUMNS]
 
-    versioned_document = new_document.copy()
-    versioned_document["source_document_id"] = source_document_id
-    versioned_document["version_number"] = previous_version_number + 1
-    versioned_document["is_active"] = 1
-    versioned_document["archived_at"] = None
-    versioned_document["replaced_by_document_id"] = None
-
-    archive_document_version(
-        document_id=previous_document_id,
-        replaced_by_document_id=versioned_document["document_id"],
-        archived_at=archived_at,
-    )
-
-    append_document_metadata(versioned_document)
+        # One transaction prevents an insert failure from leaving the old version archived.
+        connection.execute(
+            f"INSERT INTO document_metadata ({column_names}) VALUES ({placeholders})",
+            values,
+        )
+        connection.execute(
+            """
+            UPDATE document_metadata
+            SET is_active = 0,
+                chunk_id = 'archived',
+                archived_at = ?,
+                replaced_by_document_id = ?
+            WHERE document_id = ?
+            """,
+            (
+                archived_at,
+                versioned_document["document_id"],
+                previous_document_id,
+            ),
+        )
 
 
 def approve_document_for_indexing(
@@ -528,9 +542,18 @@ def mark_documents_pending_index(document_ids: list[str]) -> None:
 
 def generate_document_id(documents: list[dict]) -> str:
     """Generate the next local upload document ID."""
-    upload_count = sum(
-        1 for document in documents
-        if document["document_id"].startswith("DOC-UPLOAD-")
-    )
+    existing_numbers = []
 
-    return f"DOC-UPLOAD-{upload_count + 1:03d}"
+    for document in documents:
+        document_id = document.get("document_id", "")
+
+        if not document_id.startswith("DOC-UPLOAD-"):
+            continue
+
+        suffix = document_id.removeprefix("DOC-UPLOAD-")
+
+        if suffix.isdigit():
+            existing_numbers.append(int(suffix))
+
+    next_number = max(existing_numbers, default=0) + 1
+    return f"DOC-UPLOAD-{next_number:03d}"

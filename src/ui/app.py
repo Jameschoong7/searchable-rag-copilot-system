@@ -1233,9 +1233,15 @@ def submit_chat_question() -> None:
     """Stage the submitted draft and clear the visible input before rerun."""
     draft_question = st.session_state.get("chat_question", "")
 
+    if not draft_question.strip():
+        st.session_state["chat_submit_warning"] = "Enter a question before sending."
+        st.session_state["chat_is_processing"] = False
+        return
+
     st.session_state["pending_chat_question"] = draft_question
     st.session_state["chat_question"] = ""
-    st.session_state["chat_is_processing"] = bool(draft_question.strip())
+    st.session_state["chat_is_processing"] = True
+    st.session_state.pop("chat_submit_warning", None)
 
 
 def is_logged_in() -> bool:
@@ -3484,6 +3490,7 @@ if selected_page in ["KB Management", "KB Status"]:
                             type=["txt", "pdf", "docx"],
                             key=f"upload_file{upload_form_version}",
                         )
+                        st.caption("Maximum 20 MB per document.")
 
                         title_key = prepare_upload_title_state(uploaded_file, upload_form_version)
 
@@ -3647,6 +3654,7 @@ if selected_page in ["KB Management", "KB Status"]:
                                 type=["txt", "pdf", "docx"],
                                 key=f"version_upload_file_{upload_form_version}",
                             )
+                            st.caption("Maximum 20 MB per replacement document.")
 
                             with st.form(f"version_upload_form_{upload_form_version}"):
                                 submitted_version_upload = st.form_submit_button(
@@ -3688,6 +3696,10 @@ if selected_page in ["KB Management", "KB Status"]:
                             "Upload ZIP",
                             type=["zip"],
                             key=f"zip_upload_file_{upload_form_version}",
+                        )
+                        st.caption(
+                            "Maximum 25 MB compressed, 100 files, 100 MB expanded, "
+                            "and 20 MB per document inside the ZIP."
                         )
 
                         submitted_zip_upload = st.button(
@@ -5282,6 +5294,9 @@ if selected_page == "Chat":
                             unsafe_allow_html=True,
                         )
 
+            if st.session_state.get("chat_submit_warning"):
+                st.warning(st.session_state["chat_submit_warning"])
+
             with st.form("chat_question_form", border=False):
                 question_columns = st.columns([6, 1])
 
@@ -5368,11 +5383,14 @@ if selected_page == "Chat":
                     }
                 )
                 st.session_state["chat_is_processing"] = False
-            except requests.exceptions.RequestException as error:
+            except requests.exceptions.RequestException:
                 st.session_state["chat_messages"].append(
                     {
                         "role": "assistant",
-                        "content": f"Could not submit chat job: {error}",
+                        "content": (
+                            "The knowledge service is temporarily unavailable. "
+                            "Confirm the backend is running, then try again."
+                        ),
                         "sources": [],
                         "context": "",
                         "status": "connection_error",

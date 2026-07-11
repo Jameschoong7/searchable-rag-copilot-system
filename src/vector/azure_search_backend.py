@@ -155,6 +155,15 @@ def normalize_bool(value) -> bool:
     return bool(value)
 
 
+def azure_search_score_to_cosine_similarity(search_score: float) -> float:
+    """Convert Azure's transformed cosine score into standard cosine similarity."""
+    if search_score <= 0:
+        return 0.0
+
+    cosine_distance = (1 - search_score) / search_score
+    return max(-1.0, min(1.0, 1 - cosine_distance))
+
+
 def build_search_document(chunk, chunk_index: int, metadata_by_filename: dict[str, dict]) -> dict:
     """Convert one LangChain chunk into an Azure AI Search document."""
     source_path = chunk.metadata.get("source", "")
@@ -233,7 +242,9 @@ def similarity_search_with_scores(question: str, allowed_sources: list[str], top
             metadata=metadata,
         )
 
-        score = float(result.get("@search.score", 0))
+        score = azure_search_score_to_cosine_similarity(
+            float(result.get("@search.score", 0))
+        )
         scored_documents.append((document, score))
 
     return scored_documents

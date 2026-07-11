@@ -1,4 +1,5 @@
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,7 +25,9 @@ class StoredDocument:
 
 def normalise_storage_filename(filename: str) -> str:
     """Return a safe local/blob filename for uploaded documents."""
-    return filename.replace(" ", "_")
+    basename = Path(filename.replace("\\", "/")).name
+    normalised = re.sub(r"[^A-Za-z0-9._-]+", "_", basename).strip("._")
+    return normalised or "uploaded_document"
 
 
 def save_local_document_bytes(filename: str, content: bytes) -> StoredDocument:

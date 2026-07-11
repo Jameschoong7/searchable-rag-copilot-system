@@ -58,10 +58,17 @@ def document_matches_filters(
 def query_matches_document(question: str, document: dict) -> bool:
     """Check whether a user question appears to target a document's metadata."""
     ignored_words = {
+        "and",
+        "are",
+        "for",
+        "how",
+        "the",
         "what",
         "when",
         "where",
         "which",
+        "who",
+        "why",
         "with",
         "from",
         "that",
@@ -79,12 +86,13 @@ def query_matches_document(question: str, document: dict) -> bool:
     query_keywords = {
         word
         for word in re.findall(r"[a-z0-9]+", question.lower())
-        if len(word) >= 4 and word not in ignored_words
+        if len(word) >= 3 and word not in ignored_words
     }
 
     searchable_metadata = " ".join(
         [
             document["title"],
+            document.get("filename", ""),
             document["category"],
             " ".join(document["tags"]),
         ]

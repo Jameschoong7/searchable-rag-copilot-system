@@ -14,6 +14,71 @@ import io
 from pathlib import Path
 
 
+MAX_DOCUMENT_UPLOAD_BYTES = 20 * 1024 * 1024
+MAX_ZIP_UPLOAD_BYTES = 25 * 1024 * 1024
+MAX_ZIP_ENTRY_COUNT = 100
+MAX_ZIP_EXPANDED_BYTES = 100 * 1024 * 1024
+
+
+async def read_upload_with_limit(
+    file: UploadFile,
+    maximum_bytes: int,
+    label: str,
+) -> bytes:
+    """Read one upload incrementally and reject it before memory use grows unbounded."""
+    chunks = []
+    total_bytes = 0
+
+    while chunk := await file.read(1024 * 1024):
+        total_bytes += len(chunk)
+
+        if total_bytes > maximum_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"{label} exceeds the {maximum_bytes // (1024 * 1024)} MB limit.",
+            )
+
+        chunks.append(chunk)
+
+    return b"".join(chunks)
+
+
+def validate_zip_archive_limits(zip_file: zipfile.ZipFile) -> None:
+    """Reject ZIP archives whose entry count or expanded size exceeds demo limits."""
+    file_entries = [entry for entry in zip_file.infolist() if not entry.is_dir()]
+
+    if len(file_entries) > MAX_ZIP_ENTRY_COUNT:
+        raise HTTPException(
+            status_code=413,
+            detail=f"ZIP archive contains more than {MAX_ZIP_ENTRY_COUNT} files.",
+        )
+
+    expanded_bytes = sum(entry.file_size for entry in file_entries)
+
+    if expanded_bytes > MAX_ZIP_EXPANDED_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                "ZIP archive expands beyond the "
+                f"{MAX_ZIP_EXPANDED_BYTES // (1024 * 1024)} MB limit."
+            ),
+        )
+
+    oversized_entry = next(
+        (entry for entry in file_entries if entry.file_size > MAX_DOCUMENT_UPLOAD_BYTES),
+        None,
+    )
+
+    if oversized_entry:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"ZIP entry {oversized_entry.filename} exceeds the "
+                f"{MAX_DOCUMENT_UPLOAD_BYTES // (1024 * 1024)} MB document limit."
+            ),
+        )
+
+
 # Create the shared FastAPI application used by both frontend platforms.
 app = FastAPI(
     title="Searchable RAG Copilot API",
@@ -1577,7 +1642,11 @@ async def upload_document(
             detail="Metadata already exists for this filename.",
         )
 
-    file_bytes = await file.read()
+    file_bytes = await read_upload_with_limit(
+        file,
+        MAX_DOCUMENT_UPLOAD_BYTES,
+        "Uploaded document",
+    )
 
     if not file_bytes:
         raise HTTPException(
@@ -1675,7 +1744,11 @@ async def upload_zip_for_staging(
             detail="Only ZIP files are supported for batch staging.",
         )
 
-    zip_bytes = await file.read()
+    zip_bytes = await read_upload_with_limit(
+        file,
+        MAX_ZIP_UPLOAD_BYTES,
+        "Uploaded ZIP",
+    )
 
     if not zip_bytes:
         raise HTTPException(
@@ -1698,6 +1771,8 @@ async def upload_zip_for_staging(
             status_code=400,
             detail="Uploaded file is not a valid ZIP archive.",
         ) from error
+
+    validate_zip_archive_limits(zip_file)
 
     for zip_info in zip_file.infolist():
         if zip_info.is_dir():
@@ -1862,7 +1937,11 @@ async def upload_document_version(
             detail="Metadata already exists for this replacement filename.",
         )
 
-    file_bytes = await file.read()
+    file_bytes = await read_upload_with_limit(
+        file,
+        MAX_DOCUMENT_UPLOAD_BYTES,
+        "Uploaded document version",
+    )
 
     if not file_bytes:
         raise HTTPException(

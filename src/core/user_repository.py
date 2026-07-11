@@ -70,7 +70,9 @@ def verify_password(password: str, stored_password_hash: str) -> bool:
     try:
         algorithm, iterations_text, salt_hex, expected_hash_hex = stored_password_hash.split("$", 3)
         iterations = int(iterations_text)
-    except ValueError:
+        salt = bytes.fromhex(salt_hex)
+        bytes.fromhex(expected_hash_hex)
+    except (TypeError, ValueError):
         return False
 
     if algorithm != "pbkdf2_sha256":
@@ -79,7 +81,7 @@ def verify_password(password: str, stored_password_hash: str) -> bool:
     actual_hash = hashlib.pbkdf2_hmac(
         "sha256",
         password.encode("utf-8"),
-        bytes.fromhex(salt_hex),
+        salt,
         iterations,
     )
 
