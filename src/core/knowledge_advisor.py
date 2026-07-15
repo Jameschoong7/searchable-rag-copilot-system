@@ -28,6 +28,12 @@ def get_meaningful_query_terms(question: str) -> list[str]:
     ]
 
 
+def normalize_question_for_repeat_detection(question: str) -> str:
+    """Normalize a user question enough to spot recurring weak patterns."""
+    terms = get_meaningful_query_terms(question)
+    return " ".join(terms)
+
+
 def build_source_metadata_lookup(documents: list[dict]) -> dict[str, dict]:
     """Map source filenames to metadata rows for advisor diagnosis."""
     lookup = {}
@@ -190,12 +196,55 @@ def build_knowledge_advisor_rows(
     """Build admin recommendations from recent query outcomes."""
     metadata_lookup = build_source_metadata_lookup(documents)
     advisor_rows = []
+    repeated_question_groups = {}
 
     for row in recent_outcome_rows:
         recommendation = build_advisor_recommendation(row, metadata_lookup)
 
         if recommendation:
             advisor_rows.append(recommendation)
+
+        normalized_question = normalize_question_for_repeat_detection(row[4])
+        if not normalized_question:
+            continue
+
+        repeated_question_groups.setdefault(normalized_question, []).append(row)
+
+    for question_rows in repeated_question_groups.values():
+        if len(question_rows) < 2:
+            continue
+
+        latest_row = question_rows[0]
+        status_set = {row[7] for row in question_rows}
+        feedback_set = {(row[12] or "none") for row in question_rows}
+        needs_review = (
+            any(status != "success" for status in status_set)
+            or "reported_issue" in feedback_set
+        )
+
+        if not needs_review:
+            continue
+
+        advisor_rows.append(
+            {
+                "Time": latest_row[0],
+                "Query": latest_row[4],
+                "User Scope": f"{latest_row[2]} / {latest_row[3]}",
+                "Issue Type": "Recurring Issue Pattern",
+                "Priority": "Medium",
+                "Reason": (
+                    f"A similar question pattern appeared {len(question_rows)} times "
+                    "recently and still produced weak or reported outcomes."
+                ),
+                "Suggested Action": (
+                    "Add a clearer FAQ entry, improve metadata tags, or create a labelled "
+                    "evaluation case for this recurring need."
+                ),
+                "Owner": "Knowledge Admin",
+                "Feedback": ", ".join(sorted(feedback_set)),
+                "Sources Checked": [],
+            }
+        )
 
     priority_order = {
         "High": 0,

@@ -138,13 +138,23 @@ def update_query_feedback(
         )
 
 
-def read_query_log_summary(limit: int = QUERY_HISTORY_LIMIT) -> dict:
+def read_query_log_summary(
+    limit: int = QUERY_HISTORY_LIMIT,
+    department: str | None = None,
+) -> dict:
     """Read shared query-log signals for dashboards and advisor recommendations."""
     initialise_query_log_database()
 
+    where_clause = ""
+    where_params: tuple[str, ...] = ()
+
+    if department:
+        where_clause = "WHERE department = ?"
+        where_params = (department,)
+
     with sqlite3.connect(QUERY_LOG_DB_PATH) as connection:
         summary_row = connection.execute(
-            """
+            f"""
             SELECT
                 COUNT(*) AS total_queries,
                 COALESCE(AVG(latency_seconds), 0) AS average_latency,
@@ -157,11 +167,13 @@ def read_query_log_summary(limit: int = QUERY_HISTORY_LIMIT) -> dict:
                 SUM(CASE WHEN status IN ('api_error', 'connection_error', 'error') THEN 1 ELSE 0 END)
                     AS error_queries
             FROM query_logs
-            """
+            {where_clause}
+            """,
+            where_params,
         ).fetchone()
 
         recent_outcome_rows = connection.execute(
-            """
+            f"""
             SELECT
                 timestamp,
                 user,
@@ -178,14 +190,15 @@ def read_query_log_summary(limit: int = QUERY_HISTORY_LIMIT) -> dict:
                 feedback,
                 feedback_note
             FROM query_logs
+            {where_clause}
             ORDER BY id DESC
             LIMIT ?
             """,
-            (limit,),
+            (*where_params, limit),
         ).fetchall()
 
         recent_rows = connection.execute(
-            """
+            f"""
             SELECT
                 timestamp,
                 user,
@@ -197,23 +210,32 @@ def read_query_log_summary(limit: int = QUERY_HISTORY_LIMIT) -> dict:
                 status,
                 latency_seconds
             FROM query_logs
+            {where_clause}
             ORDER BY id DESC
             LIMIT ?
             """,
-            (limit,),
+            (*where_params, limit),
         ).fetchall()
 
+        daily_where_clause = "WHERE DATE(timestamp) >= DATE('now', '-6 days')"
+        daily_params = ()
+
+        if department:
+            daily_where_clause += " AND department = ?"
+            daily_params = (department,)
+
         daily_latency_rows = connection.execute(
-            """
+            f"""
             SELECT
                 DATE(timestamp) AS query_date,
                 COUNT(*) AS query_count,
                 AVG(latency_seconds) AS average_latency
             FROM query_logs
-            WHERE DATE(timestamp) >= DATE('now', '-6 days')
+            {daily_where_clause}
             GROUP BY DATE(timestamp)
             ORDER BY DATE(timestamp)
-            """
+            """,
+            daily_params,
         ).fetchall()
 
         return {

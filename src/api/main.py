@@ -849,6 +849,15 @@ def generate_admin_advisor_action_plan(
             detail=f"Advisor recommendation is missing: {', '.join(missing_fields)}.",
         )
 
+    if request.role == PROJECT_MANAGER_ROLE:
+        user_scope = str(recommendation.get("User Scope", ""))
+
+        if not user_scope.endswith(f" / {request.user_department}"):
+            raise HTTPException(
+                status_code=403,
+                detail="Project Manager can only generate action plans for own-department advisor records.",
+            )
+
     try:
         from src.core.advisor_action_plan import generate_advisor_action_plan
 
