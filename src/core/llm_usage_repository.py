@@ -44,8 +44,7 @@ def estimate_openai_cost_usd(
     if input_tokens is None or output_tokens is None:
         return None
 
-    # Prices are USD per 1M tokens for current demo planning. Keep this estimate
-    # visible as approximate admin telemetry, not billing-grade accounting.
+    # Prices are USD per 1M tokens for current demo planning. (Estimation only)
     price_table = {
         "nano": {
             "input": 0.20,

@@ -54,17 +54,44 @@ ROLE_AWARE_CHAT_PROMPTS = {
         "Annual Leave": "What is the annual leave approval process?",
         "VPN Setup": "How do I set up the company VPN?",
     },
-    PROJECT_MANAGER_ROLE: {
-        "Development Workflow": "What is the software development workflow?",
-        "Coding Standards": "What are the Python coding standards?",
-        "VPN Setup": "How do I set up the company VPN?",
-        "Security Incident": "What is the security incident reporting procedure?",
-    },
     GENERAL_EMPLOYEE_ROLE: {
         "Annual Leave": "What is the annual leave approval process?",
         "Expense Claims": "How do I submit an expense claim?",
         "Security Incident": "What is the security incident reporting procedure?",
         "Onboarding": "What is the employee onboarding process?",
+    },
+}
+
+PROJECT_MANAGER_CHAT_PROMPTS_BY_DEPARTMENT = {
+    "Engineering": {
+        "Development Workflow": "What is the software development workflow?",
+        "Coding Standards": "What are the Python coding standards?",
+        "Release Checklist": "What should engineering check before releasing a service?",
+        "Incident Handoff": "How should engineering hand off an incident?",
+    },
+    "HR": {
+        "Leave Approval": "What is the annual leave approval process?",
+        "Onboarding": "What is the employee onboarding process?",
+        "Misconduct Handling": "What is the employee misconduct handling process?",
+        "Attendance": "What is the attendance and late arrival policy?",
+    },
+    "IT": {
+        "VPN Setup": "How do I set up the company VPN?",
+        "Password Policy": "What are the password policy requirements?",
+        "Access Request": "How should IT access requests be handled?",
+        "Device Support": "What is the process for device support?",
+    },
+    "Security": {
+        "Incident Report": "What is the security incident reporting procedure?",
+        "Key Rotation": "When is key rotation required?",
+        "Security Review": "What security checks are required before launch?",
+        "Data Handling": "How should restricted data be handled?",
+    },
+    "Operations": {
+        "Expense Claims": "How do I submit an expense claim?",
+        "Vendor Request": "What is the vendor onboarding process?",
+        "Procurement": "What is the procurement approval workflow?",
+        "Canteen": "What is the canteen or office service process?",
     },
 }
 
@@ -1245,8 +1272,13 @@ def submit_chat_question() -> None:
 
 
 def is_logged_in() -> bool:
-    """Check whether the current Streamlit session has an authenticated user."""
-    return "user" in st.session_state
+    """Require a complete authenticated identity before rendering protected pages."""
+    required_identity_keys = ["user", "role", "department"]
+
+    return all(
+        st.session_state.get(key)
+        for key in required_identity_keys
+    )
 
 
 def login_user(username: str, password: str) -> bool:
@@ -1256,9 +1288,13 @@ def login_user(username: str, password: str) -> bool:
     if account is None:
         return False
 
-    st.session_state["user"] = account["username"]
-    st.session_state["role"] = account["role"]
-    st.session_state["department"] = account["department"]
+    st.session_state.update(
+        {
+            "user": account["username"],
+            "role": account["role"],
+            "department": account["department"],
+        }
+    )
     return True
 
 
@@ -1273,6 +1309,14 @@ def get_kb_page_label() -> str:
         return "KB Management"
 
     return "KB Status"
+
+
+def sync_navigation_page_from_radio() -> None:
+    """Keep the rendered page aligned with the sidebar radio before rerendering."""
+    selected_radio_page = st.session_state.get("selected_navigation_radio")
+
+    if selected_radio_page:
+        st.session_state["selected_navigation_page"] = selected_radio_page
 
 
 def can_access_settings() -> bool:
@@ -1495,6 +1539,30 @@ def format_logged_sources(status: str, sources_json: str) -> str:
         return f"Checked: {source_text}"
 
     return f"Sources: {source_text}"
+
+
+def get_chat_suggested_prompts(role: str, department: str) -> dict[str, str]:
+    """Return role and department-aware chat prompt chips."""
+    if role == PROJECT_MANAGER_ROLE:
+        return PROJECT_MANAGER_CHAT_PROMPTS_BY_DEPARTMENT.get(
+            department,
+            {
+                "Department Policy": "What policies apply to my department?",
+                "Open Issues": "What process should my team follow for unresolved issues?",
+                "Escalation": "When should my team escalate a request?",
+                "Onboarding": "What should new team members complete first?",
+            },
+        )
+
+    return ROLE_AWARE_CHAT_PROMPTS[role]
+
+
+def summarize_chat_sources(sources: list[str], visible_limit: int = 5) -> tuple[list[str], int]:
+    """Return a short unique source list and the number of hidden sources."""
+    unique_sources = list(dict.fromkeys(sources))
+    visible_sources = unique_sources[:visible_limit]
+
+    return visible_sources, max(len(unique_sources) - len(visible_sources), 0)
 
 
 def read_scoped_query_log_summary(department: str | None = None) -> dict:
@@ -2658,11 +2726,13 @@ valid_page_options = page_options.copy()
 if can_access_ai_advisor:
     valid_page_options.append("AI Advisor")
 
+default_navigation_page = "Performance" if can_access_ai_advisor else kb_page_label
+
 if "selected_navigation_page" not in st.session_state:
-    st.session_state["selected_navigation_page"] = kb_page_label
+    st.session_state["selected_navigation_page"] = default_navigation_page
 
 if st.session_state["selected_navigation_page"] not in valid_page_options:
-    st.session_state["selected_navigation_page"] = kb_page_label
+    st.session_state["selected_navigation_page"] = default_navigation_page
 
 selected_page = st.session_state["selected_navigation_page"]
 
@@ -2704,11 +2774,8 @@ selected_radio_page = st.sidebar.radio(
     index=radio_index,
     key="selected_navigation_radio",
     label_visibility="collapsed",
+    on_change=sync_navigation_page_from_radio,
 )
-
-if selected_radio_page and selected_radio_page != selected_page:
-    st.session_state["selected_navigation_page"] = selected_radio_page
-    st.rerun()
 
 selected_page = st.session_state["selected_navigation_page"]
 previous_selected_page = st.session_state.get("previous_selected_navigation_page")
@@ -2763,9 +2830,11 @@ with st.sidebar:
 
 st.sidebar.divider()
 
-if st.sidebar.button("Logout", use_container_width=True):
-    logout_user()
-    st.rerun()
+st.sidebar.button(
+    "Logout",
+    use_container_width=True,
+    on_click=logout_user,
+)
 
 
 if selected_page == "Performance":
@@ -3383,7 +3452,6 @@ if selected_page == "Performance":
                         "Expected Source": row["expected_source"],
                         "Retrieved Sources": ", ".join(row["retrieved_sources"]),
                         "Issue": row["issue"],
-                        "Next Enhancement": "Review metadata, chunking, filters, or Top-K ranking",
                     }
                     for row in evaluation_results["miss_rows"]
                 ]
@@ -3836,34 +3904,34 @@ if selected_page in ["KB Management", "KB Status"]:
                         "OneDrive",
                         "Scan the configured OneDrive knowledge folder, stage files for review, and refresh indexed source versions.",
                     )
-                    connector_action_columns = st.columns([1, 2])
+                    if st.button(
+                        "Scan OneDrive",
+                        use_container_width=True,
+                        key="scan_onedrive_root_button",
+                    ):
+                        try:
+                            scan_result = request_onedrive_file_scan()
+                        except requests.exceptions.HTTPError as error:
+                            st.error(f"OneDrive scan rejected by backend: {error.response.text}")
+                        except requests.exceptions.RequestException as error:
+                            st.error(f"Could not scan OneDrive connector: {error}")
+                        else:
+                            st.session_state["onedrive_files"] = scan_result["files"]
+                            st.session_state["selected_onedrive_files_to_stage"] = []
+                            st.session_state["selected_onedrive_files_to_refresh"] = []
+                            st.session_state.pop("reopen_onedrive_stage_expander", None)
+                            st.session_state.pop("reopen_onedrive_refresh_expander", None)
+                            st.success(f"Found {len(scan_result['files'])} file(s).")
 
-                    with connector_action_columns[0]:
-                        if st.button(
-                            "Scan OneDrive",
-                            use_container_width=True,
-                            key="scan_onedrive_root_button",
-                        ):
-                            try:
-                                scan_result = request_onedrive_file_scan()
-                            except requests.exceptions.HTTPError as error:
-                                st.error(f"OneDrive scan rejected by backend: {error.response.text}")
-                            except requests.exceptions.RequestException as error:
-                                st.error(f"Could not scan OneDrive connector: {error}")
-                            else:
-                                st.session_state["onedrive_files"] = scan_result["files"]
-                                st.success(f"Found {len(scan_result['files'])} file(s).")
+                    if st.session_state.get("onedrive_stage_message"):
+                        stage_status = st.session_state.get("onedrive_stage_status", "info")
 
-                    with connector_action_columns[1]:
-                        if st.session_state.get("onedrive_stage_message"):
-                            stage_status = st.session_state.get("onedrive_stage_status", "info")
-
-                            if stage_status == "success":
-                                st.success(st.session_state["onedrive_stage_message"])
-                            elif stage_status == "error":
-                                st.error(st.session_state["onedrive_stage_message"])
-                            else:
-                                st.info(st.session_state["onedrive_stage_message"])
+                        if stage_status == "success":
+                            st.success(st.session_state["onedrive_stage_message"])
+                        elif stage_status == "error":
+                            st.error(st.session_state["onedrive_stage_message"])
+                        else:
+                            st.info(st.session_state["onedrive_stage_message"])
 
                     onedrive_files = st.session_state.get("onedrive_files", [])
                     file_options = {
@@ -3914,7 +3982,14 @@ if selected_page in ["KB Management", "KB Status"]:
                                 hide_index=True,
                                 height=260,
                             )
-                        with st.expander("Stage Files for Review", expanded=False):
+                        keep_onedrive_stage_open = bool(
+                            st.session_state.get("selected_onedrive_files_to_stage")
+                        ) or st.session_state.pop("reopen_onedrive_stage_expander", False)
+
+                        with st.expander(
+                            "Stage Files for Review",
+                            expanded=keep_onedrive_stage_open,
+                        ):
                             selection_columns = st.columns(3)
 
                             with selection_columns[0]:
@@ -3924,6 +3999,7 @@ if selected_page in ["KB Management", "KB Status"]:
                                     key="select_all_onedrive_files_button",
                                 ):
                                     st.session_state["selected_onedrive_files_to_stage"] = list(file_options.keys())
+                                    st.session_state["reopen_onedrive_stage_expander"] = True
                                     st.rerun()
 
                             with selection_columns[1]:
@@ -3937,6 +4013,7 @@ if selected_page in ["KB Management", "KB Status"]:
                                         for label, file_item in file_options.items()
                                         if file_item.get("connector_state", "New") in ["New", "Rejected"]
                                     ]
+                                    st.session_state["reopen_onedrive_stage_expander"] = True
                                     st.rerun()
 
                             with selection_columns[2]:
@@ -3946,6 +4023,7 @@ if selected_page in ["KB Management", "KB Status"]:
                                     key="clear_onedrive_selection_button",
                                 ):
                                     st.session_state["selected_onedrive_files_to_stage"] = []
+                                    st.session_state["reopen_onedrive_stage_expander"] = True
                                     st.rerun()
 
                             selected_file_labels = st.multiselect(
@@ -3995,7 +4073,14 @@ if selected_page in ["KB Management", "KB Status"]:
                     }
 
                     if refreshable_file_options:
-                        with st.expander("Refresh OneDrive Sources", expanded=False):
+                        keep_onedrive_refresh_open = bool(
+                            st.session_state.get("selected_onedrive_files_to_refresh")
+                        ) or st.session_state.pop("reopen_onedrive_refresh_expander", False)
+
+                        with st.expander(
+                            "Refresh OneDrive Sources",
+                            expanded=keep_onedrive_refresh_open,
+                        ):
                             if st.session_state.get("onedrive_refresh_message"):
                                 refresh_status = st.session_state.get("onedrive_refresh_status", "info")
 
@@ -4017,6 +4102,7 @@ if selected_page in ["KB Management", "KB Status"]:
                                     st.session_state["selected_onedrive_files_to_refresh"] = list(
                                         refreshable_file_options.keys()
                                     )
+                                    st.session_state["reopen_onedrive_refresh_expander"] = True
                                     st.rerun()
 
                             with refresh_columns[1]:
@@ -4026,6 +4112,7 @@ if selected_page in ["KB Management", "KB Status"]:
                                     key="clear_onedrive_refresh_selection_button",
                                 ):
                                     st.session_state["selected_onedrive_files_to_refresh"] = []
+                                    st.session_state["reopen_onedrive_refresh_expander"] = True
                                     st.rerun()
 
                             with refresh_columns[2]:
@@ -4081,34 +4168,6 @@ if selected_page in ["KB Management", "KB Status"]:
                                     use_expander=False,
                                 )
 
-                            selected_refresh_label = st.selectbox(
-                                "Select one OneDrive file to refresh",
-                                list(refreshable_file_options.keys()),
-                                key="selected_onedrive_file_to_refresh",
-                            )
-
-                            if st.button(
-                                "Refresh One File",
-                                use_container_width=True,
-                                key="refresh_selected_onedrive_file_button",
-                            ):
-                                try:
-                                    with st.spinner("Checking OneDrive content and version history..."):
-                                        refresh_result = request_onedrive_file_refresh(
-                                            refreshable_file_options[selected_refresh_label]
-                                        )
-                                except requests.exceptions.HTTPError as error:
-                                    st.error(f"OneDrive refresh rejected by backend: {error.response.text}")
-                                except requests.exceptions.RequestException as error:
-                                    st.error(f"Could not refresh OneDrive file: {error}")
-                                else:
-                                    if refresh_result["status"] == "updated":
-                                        st.success(refresh_result["message"])
-                                    elif refresh_result["status"] == "no_change":
-                                        st.info(refresh_result["message"])
-                                    else:
-                                        st.warning(refresh_result["message"])
-
             with onenote_tab:
                 with st.container(border=True):
                     render_workflow_header(
@@ -4128,6 +4187,10 @@ if selected_page in ["KB Management", "KB Status"]:
                             st.error(f"Could not scan OneNote connector: {error}")
                         else:
                             st.session_state["onenote_pages"] = scan_result["pages"]
+                            st.session_state["selected_onenote_pages_to_stage"] = []
+                            st.session_state["selected_onenote_pages_to_refresh"] = []
+                            st.session_state.pop("reopen_onenote_stage_expander", None)
+                            st.session_state.pop("reopen_onenote_refresh_expander", None)
                             st.success(f"Found {len(scan_result['pages'])} page(s).")
 
                     onenote_pages = st.session_state.get("onenote_pages", [])
@@ -4181,7 +4244,14 @@ if selected_page in ["KB Management", "KB Status"]:
                                 height=260,
                             )
 
-                        with st.expander("Stage Pages for Review", expanded=False):
+                        keep_onenote_stage_open = bool(
+                            st.session_state.get("selected_onenote_pages_to_stage")
+                        ) or st.session_state.pop("reopen_onenote_stage_expander", False)
+
+                        with st.expander(
+                            "Stage Pages for Review",
+                            expanded=keep_onenote_stage_open,
+                        ):
                             selection_columns = st.columns(3)
 
                             with selection_columns[0]:
@@ -4191,6 +4261,7 @@ if selected_page in ["KB Management", "KB Status"]:
                                     key="select_all_onenote_pages_button",
                                 ):
                                     st.session_state["selected_onenote_pages_to_stage"] = list(page_options.keys())
+                                    st.session_state["reopen_onenote_stage_expander"] = True
                                     st.rerun()
 
                             with selection_columns[1]:
@@ -4204,6 +4275,7 @@ if selected_page in ["KB Management", "KB Status"]:
                                         for label, page in page_options.items()
                                         if page.get("connector_state", "New") in ["New", "Rejected"]
                                     ]
+                                    st.session_state["reopen_onenote_stage_expander"] = True
                                     st.rerun()
 
                             with selection_columns[2]:
@@ -4213,6 +4285,7 @@ if selected_page in ["KB Management", "KB Status"]:
                                     key="clear_onenote_selection_button",
                                 ):
                                     st.session_state["selected_onenote_pages_to_stage"] = []
+                                    st.session_state["reopen_onenote_stage_expander"] = True
                                     st.rerun()
 
                             selected_page_labels = st.multiselect(
@@ -4272,7 +4345,14 @@ if selected_page in ["KB Management", "KB Status"]:
                         }
 
                         if refreshable_page_options:
-                            with st.expander("Refresh OneNote Pages", expanded=False):
+                            keep_onenote_refresh_open = bool(
+                                st.session_state.get("selected_onenote_pages_to_refresh")
+                            ) or st.session_state.pop("reopen_onenote_refresh_expander", False)
+
+                            with st.expander(
+                                "Refresh OneNote Pages",
+                                expanded=keep_onenote_refresh_open,
+                            ):
                                 if st.session_state.get("onenote_refresh_message"):
                                     refresh_status = st.session_state.get("onenote_refresh_status", "info")
 
@@ -4294,6 +4374,7 @@ if selected_page in ["KB Management", "KB Status"]:
                                         st.session_state["selected_onenote_pages_to_refresh"] = list(
                                             refreshable_page_options.keys()
                                         )
+                                        st.session_state["reopen_onenote_refresh_expander"] = True
                                         st.rerun()
 
                                 with refresh_columns[1]:
@@ -4303,6 +4384,7 @@ if selected_page in ["KB Management", "KB Status"]:
                                         key="clear_onenote_refresh_selection_button",
                                     ):
                                         st.session_state["selected_onenote_pages_to_refresh"] = []
+                                        st.session_state["reopen_onenote_refresh_expander"] = True
                                         st.rerun()
 
                                 with refresh_columns[2]:
@@ -4357,34 +4439,6 @@ if selected_page in ["KB Management", "KB Status"]:
                                         expander_label="Pending OneNote Versions",
                                         use_expander=False,
                                     )
-
-                                selected_refresh_label = st.selectbox(
-                                    "Select one OneNote page to refresh",
-                                    list(refreshable_page_options.keys()),
-                                    key="selected_onenote_page_to_refresh",
-                                )
-
-                                if st.button(
-                                    "Refresh One Page",
-                                    use_container_width=True,
-                                    key="refresh_selected_onenote_page_button",
-                                ):
-                                    try:
-                                        with st.spinner("Checking OneNote content and version history..."):
-                                            refresh_result = request_onenote_page_refresh(
-                                                refreshable_page_options[selected_refresh_label]
-                                            )
-                                    except requests.exceptions.HTTPError as error:
-                                        st.error(f"OneNote refresh rejected by backend: {error.response.text}")
-                                    except requests.exceptions.RequestException as error:
-                                        st.error(f"Could not refresh OneNote page: {error}")
-                                    else:
-                                        if refresh_result["status"] == "updated":
-                                            st.success(refresh_result["message"])
-                                        elif refresh_result["status"] == "no_change":
-                                            st.info(refresh_result["message"])
-                                        else:
-                                            st.warning(refresh_result["message"])
 
                     else:
                         st.caption("No OneNote pages loaded from the configured notebook scope.")
@@ -5345,8 +5399,26 @@ if selected_page == "Chat":
 
                                 with meta_col1:
                                     with st.expander(source_label):
-                                        for source in message["sources"]:
+                                        visible_sources, hidden_source_count = summarize_chat_sources(
+                                            message["sources"]
+                                        )
+
+                                        for source in visible_sources:
                                             st.code(source, language=None)
+
+                                        if hidden_source_count:
+                                            st.caption(
+                                                f"{hidden_source_count} additional source(s) hidden. "
+                                                "Full unique source list:"
+                                            )
+                                            unique_sources = list(dict.fromkeys(message["sources"]))
+                                            st.text_area(
+                                                "Full unique source list",
+                                                value="\n".join(unique_sources),
+                                                height=160,
+                                                label_visibility="collapsed",
+                                                disabled=True,
+                                            )
 
                             if message.get("context"):
                                 with meta_col2:
@@ -5423,11 +5495,13 @@ if selected_page == "Chat":
                         disabled=chat_is_processing,
                     )
 
-            example_prompts = ROLE_AWARE_CHAT_PROMPTS[st.session_state["role"]]
+            example_prompts = get_chat_suggested_prompts(
+                st.session_state["role"],
+                st.session_state["department"],
+            )
 
             with st.expander("Suggested Questions", expanded=False):
-                total_cols = len(example_prompts) + (1 if st.session_state["role"] == GENERAL_EMPLOYEE_ROLE else 0)
-                example_columns = st.columns(total_cols)
+                example_columns = st.columns(len(example_prompts))
 
                 for i, (label, prompt) in enumerate(example_prompts.items()):
                     with example_columns[i]:
@@ -5436,17 +5510,6 @@ if selected_page == "Chat":
                             key=f"example_prompt_{label}",
                             on_click=select_example_chat_prompt,
                             args=(prompt,),
-                            use_container_width=True,
-                            disabled=chat_is_processing,
-                        )
-
-                if st.session_state["role"] == GENERAL_EMPLOYEE_ROLE:
-                    with example_columns[-1]:
-                        st.button(
-                            "Restricted IT Policy",
-                            key="acl_demo_prompt",
-                            on_click=select_example_chat_prompt,
-                            args=("What are the password policy requirements?",),
                             use_container_width=True,
                             disabled=chat_is_processing,
                         )
@@ -5793,14 +5856,3 @@ if selected_page == "Settings":
                     st.session_state["settings_message"] = "Search index rebuild queued."
                     st.session_state["settings_rebuild_required"] = True
                     st.rerun()
-
-
-    with st.expander("Backend Mode Rules"):
-        st.markdown("""
-        * **SQLite** remains the source of truth for metadata, ACL/RBAC, versioning, logs, and audit.
-        * **Azure AI Search** stores searchable chunks only; governance remains controlled by the backend.
-        * **Azure Blob Storage** stores uploaded source documents when configured.
-        * **Local MiniLM embeddings** are acceptable for the current proposal because the system architecture, ACL flow, evaluation, and retrieval governance are the assessed core.
-        * **LLM backend selection** remains available because local Ollama and the implemented Azure OpenAI/Foundry-compatible path can both use the same governed retrieval context.
-        * **SharePoint** is not included in this build because the current account does not have enterprise Microsoft 365 SharePoint site access. The future path requires a company tenant, test site/library, and Graph permissions.
-        """)
