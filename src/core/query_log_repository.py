@@ -3,6 +3,8 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+from src.core.constants import SYSTEM_ADMIN_ROLE
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 QUERY_LOG_DB_PATH = PROJECT_ROOT / "data/logs/query_logs.db"
@@ -141,16 +143,31 @@ def update_query_feedback(
 def read_query_log_summary(
     limit: int = QUERY_HISTORY_LIMIT,
     department: str | None = None,
+    exclude_system_admin: bool = False,
+    advisor_only: bool = False,
 ) -> dict:
     """Read shared query-log signals for dashboards and advisor recommendations."""
     initialise_query_log_database()
 
-    where_clause = ""
-    where_params: tuple[str, ...] = ()
+    filters = []
+    where_params = []
 
     if department:
-        where_clause = "WHERE department = ?"
-        where_params = (department,)
+        filters.append("department = ?")
+        where_params.append(department)
+
+    if exclude_system_admin:
+        filters.append("role != ?")
+        where_params.append(SYSTEM_ADMIN_ROLE)
+
+    if advisor_only:
+        filters.append(
+            "(status IN ('not_found', 'permission_block', 'api_error', "
+            "'connection_error', 'error') OR feedback = 'reported_issue')"
+        )
+
+    where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
+    where_params_tuple = tuple(where_params)
 
     with sqlite3.connect(QUERY_LOG_DB_PATH) as connection:
         summary_row = connection.execute(
@@ -169,7 +186,7 @@ def read_query_log_summary(
             FROM query_logs
             {where_clause}
             """,
-            where_params,
+            where_params_tuple,
         ).fetchone()
 
         recent_outcome_rows = connection.execute(
@@ -194,7 +211,7 @@ def read_query_log_summary(
             ORDER BY id DESC
             LIMIT ?
             """,
-            (*where_params, limit),
+            (*where_params_tuple, limit),
         ).fetchall()
 
         recent_rows = connection.execute(
@@ -214,15 +231,25 @@ def read_query_log_summary(
             ORDER BY id DESC
             LIMIT ?
             """,
-            (*where_params, limit),
+            (*where_params_tuple, limit),
         ).fetchall()
 
         daily_where_clause = "WHERE DATE(timestamp) >= DATE('now', '-6 days')"
-        daily_params = ()
+        daily_params = []
 
         if department:
             daily_where_clause += " AND department = ?"
-            daily_params = (department,)
+            daily_params.append(department)
+
+        if exclude_system_admin:
+            daily_where_clause += " AND role != ?"
+            daily_params.append(SYSTEM_ADMIN_ROLE)
+
+        if advisor_only:
+            daily_where_clause += (
+                " AND (status IN ('not_found', 'permission_block', 'api_error', "
+                "'connection_error', 'error') OR feedback = 'reported_issue')"
+            )
 
         daily_latency_rows = connection.execute(
             f"""
@@ -235,7 +262,7 @@ def read_query_log_summary(
             GROUP BY DATE(timestamp)
             ORDER BY DATE(timestamp)
             """,
-            daily_params,
+            tuple(daily_params),
         ).fetchall()
 
         return {

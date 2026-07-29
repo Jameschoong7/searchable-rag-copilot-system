@@ -67,6 +67,7 @@ MarkupSafe
 marshmallow
 mdurl
 mmh3
+msal
 mpmath
 multidict
 mypy_extensions

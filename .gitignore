@@ -12,8 +12,5 @@ __pycache__/
 *.pyc
 *.pyo
 .DS_Store
-.codex
-PROJECT_MEMORY.md
 ui_prototype
-PLANS.md
 documents

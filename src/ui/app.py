@@ -1565,24 +1565,50 @@ def summarize_chat_sources(sources: list[str], visible_limit: int = 5) -> tuple[
     return visible_sources, max(len(unique_sources) - len(visible_sources), 0)
 
 
-def read_scoped_query_log_summary(department: str | None = None) -> dict:
+def read_scoped_query_log_summary(
+    department: str | None = None,
+    exclude_system_admin: bool = False,
+    advisor_only: bool = False,
+) -> dict:
     """Read query logs with a stale-import fallback for running Streamlit sessions."""
     try:
-        return read_query_log_summary(department=department)
+        return read_query_log_summary(
+            department=department,
+            exclude_system_admin=exclude_system_admin,
+            advisor_only=advisor_only,
+        )
     except TypeError:
         # Streamlit can keep an older imported helper alive until the app process restarts.
         summary = read_query_log_summary()
 
-        if not department:
+        if not department and not exclude_system_admin and not advisor_only:
             return summary
 
         recent_outcome_rows = [
             row for row in summary["recent_outcome_rows"]
-            if row[3] == department
+            if (
+                (not department or row[3] == department)
+                and not (exclude_system_admin and row[2] == SYSTEM_ADMIN_ROLE)
+                and not (
+                    advisor_only
+                    and row[7] not in [
+                        "not_found",
+                        "permission_block",
+                        "api_error",
+                        "connection_error",
+                        "error",
+                    ]
+                    and row[12] != "reported_issue"
+                )
+            )
         ]
         recent_queries = [
             row for row in summary["recent_queries"]
-            if row[3] == department
+            if (
+                (not department or row[3] == department)
+                and not (exclude_system_admin and row[2] == SYSTEM_ADMIN_ROLE)
+                and not (advisor_only and row[7] == "success")
+            )
         ]
         daily_latency_rows = []
         latency_values = [float(row[11] or 0) for row in recent_outcome_rows]
@@ -1920,16 +1946,34 @@ def render_ai_advisor_page() -> None:
     st.header("AI Advisor")
 
     all_documents = load_document_metadata(include_inactive=True)
-    query_log_department = (
-        None
-        if st.session_state["role"] == SYSTEM_ADMIN_ROLE
-        else st.session_state["department"]
-    )
+
+    if st.session_state["role"] == SYSTEM_ADMIN_ROLE:
+        scope_columns = st.columns([1, 3])
+
+        with scope_columns[0]:
+            selected_advisor_department = st.selectbox(
+                "Department scope",
+                [FILTER_ALL, *DEPARTMENT_OPTIONS],
+                key="ai_advisor_department_scope",
+            )
+
+        query_log_department = (
+            None
+            if selected_advisor_department == FILTER_ALL
+            else selected_advisor_department
+        )
+    else:
+        query_log_department = st.session_state["department"]
+
     visible_advisor_documents = [
         document for document in all_documents
         if can_view_document(document)
     ]
-    query_log_summary = read_scoped_query_log_summary(department=query_log_department)
+    query_log_summary = read_scoped_query_log_summary(
+        department=query_log_department,
+        exclude_system_admin=st.session_state["role"] == PROJECT_MANAGER_ROLE,
+        advisor_only=True,
+    )
     advisor_rows = build_knowledge_advisor_rows(
         query_log_summary["recent_outcome_rows"],
         visible_advisor_documents,
@@ -2860,7 +2904,10 @@ if selected_page == "Performance":
         if st.session_state["role"] == SYSTEM_ADMIN_ROLE
         else st.session_state["department"]
     )
-    query_log_summary = read_scoped_query_log_summary(department=query_log_department)
+    query_log_summary = read_scoped_query_log_summary(
+        department=query_log_department,
+        exclude_system_admin=st.session_state["role"] == PROJECT_MANAGER_ROLE,
+    )
     evaluation_results = load_retrieval_evaluation_results()
     index_benchmark_results = None
     latest_full_rebuild_result = None
