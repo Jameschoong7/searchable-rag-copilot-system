@@ -43,7 +43,12 @@ source .venv/bin/activate
 uvicorn src.api.main:app --host 127.0.0.1 --port 8000
 ```
 
-Then:
+The simplest option is VS Code **Run and Debug** -> **Debug in Microsoft 365
+Agents Playground**. That launch target prepares the Playground environment,
+starts the bot, starts the Playground, and attaches the debugger.
+
+For the equivalent command-line flow, use two terminals after installing and
+building the project:
 
 ```bash
 cd teams_bot/AgentsToolkitProjects/teams-chat-bot
@@ -51,6 +56,19 @@ npm ci
 npm run build
 npm run dev:teamsfx:playground
 ```
+
+In a second terminal:
+
+```bash
+cd teams_bot/AgentsToolkitProjects/teams-chat-bot
+npm run dev:teamsfx:launch-playground
+```
+
+Open the Microsoft 365 Agents Playground URL printed by the second command. Do
+not use the Node DevTools URL on port `9239` as the chat interface; that port is
+only for debugging the bot process. The welcome message is sent on the
+`install.add` activity raised by Playground or Teams, so it is not expected in
+Node DevTools or on the bot's raw HTTP endpoint.
 
 ## Demo Profiles
 

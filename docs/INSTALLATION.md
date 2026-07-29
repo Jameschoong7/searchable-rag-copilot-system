@@ -221,11 +221,23 @@ npm run build
 
 Configure `RAG_API_BASE_URL=http://127.0.0.1:8000` in
 `env/.env.playground` for Agents Playground or `env/.env.local` for the local
-Toolkit environment, then start Microsoft 365 Agents Playground:
+Toolkit environment. Start the bot process:
 
 ```bash
 npm run dev:teamsfx:playground
 ```
+
+In a second terminal, start the Playground client:
+
+```bash
+cd teams_bot/AgentsToolkitProjects/teams-chat-bot
+npm run dev:teamsfx:launch-playground
+```
+
+Open the Playground URL printed by the second command. The URL on port `9239`
+is Node DevTools for debugging and is not the chatbot interface. VS Code **Run
+and Debug** -> **Debug in Microsoft 365 Agents Playground** performs these steps
+automatically.
 
 The Teams client is another frontend for the same FastAPI chat-job API. It does
 not replace or host the backend.
