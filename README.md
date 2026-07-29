@@ -13,6 +13,101 @@ The system supports a fully local profile and a cost-conscious hybrid Azure
 profile. SQLite remains the governance source of truth for metadata, ACLs,
 versions, jobs, chat history and usage logs in both profiles.
 
+## Start Here: Choose a Setup Path
+
+You do not need Azure, Microsoft Graph or Teams to run the core system. Choose
+one path before installing:
+
+### Path A: Fully Local
+
+Choose this when Azure resources are unavailable or when evaluating the system
+without cloud cost.
+
+1. Complete [Installation](docs/INSTALLATION.md).
+2. Copy `.env.example` to `.env` and keep its default local provider values.
+3. Install/start Ollama and pull Mistral.
+4. Start FastAPI and Streamlit using the commands in this README.
+5. Build the initial Chroma index from the portal.
+
+Detailed environment values: [Configuration - Complete Local Profile](docs/CONFIGURATION.md#complete-local-profile).
+
+On a fresh installation, leaving the copied `.env.example` provider values
+unchanged selects:
+
+```dotenv
+STORAGE_BACKEND=local
+VECTOR_BACKEND=chroma
+EMBEDDING_BACKEND=local
+LLM_BACKEND=ollama
+GRAPH_CONNECTOR_ENABLED=false
+```
+
+This means documents stay on the local machine, ChromaDB performs retrieval,
+Mistral answers through Ollama, and OneDrive/OneNote controls remain disabled.
+No Azure account or Microsoft sign-in is required.
+
+### Path B: Hybrid Azure
+
+Choose this to reproduce the current cloud-connected setup while keeping
+FastAPI, Streamlit, SQLite and embeddings on the company test machine.
+
+1. Complete [Installation](docs/INSTALLATION.md).
+2. Follow [Azure Setup](docs/AZURE_SETUP.md) to create/configure:
+   - Azure Blob Storage;
+   - Azure AI Search Free;
+   - a Foundry `gpt-5.4-nano` deployment.
+3. Copy `.env.example` to `.env`, add the company-owned Azure values and select
+   the hybrid providers.
+4. Start FastAPI and Streamlit.
+5. Open **Settings** and verify the active providers before rebuilding the
+   Azure Search index.
+
+Detailed environment values: [Configuration - Complete Hybrid Azure Profile](docs/CONFIGURATION.md#complete-hybrid-azure-profile).
+
+Microsoft Graph is optional. The hybrid Azure profile works without OneDrive or
+OneNote when `GRAPH_CONNECTOR_ENABLED=false`; documents can still enter through
+manual upload and Batch ZIP.
+
+### Optional: OneDrive and OneNote
+
+After either application profile is running, follow
+[Graph Connector Setup](docs/GRAPH_CONNECTOR_SETUP.md) to:
+
+1. validate the Microsoft account with Graph Explorer;
+2. create the project's Entra app registration;
+3. consent `User.Read`, `Files.Read` and `Notes.Read`;
+4. configure the OneDrive root and OneNote notebook;
+5. run device-code login and verify silent token refresh;
+6. scan, stage, review, approve and index connector content.
+
+Graph Explorer consent and the project's Entra app consent are separate. The
+guide explains both processes.
+
+### Optional: Teams Client
+
+The Streamlit portal already includes chat. Add the Teams-style client only when
+the company wants to test a second frontend. Follow the
+[Teams client guide](teams_bot/AgentsToolkitProjects/teams-chat-bot/README.md).
+The Teams client needs only the FastAPI URL; Azure and Graph credentials remain
+in the backend `.env`.
+
+## Guide Map
+
+| Goal | Read this |
+|---|---|
+| Install WSL, Python, OCR, Ollama and start the application | [Installation](docs/INSTALLATION.md) |
+| Understand every `.env` variable and provider switch | [Configuration](docs/CONFIGURATION.md) |
+| Obtain Blob, Search and Foundry endpoints/keys | [Azure Setup](docs/AZURE_SETUP.md) |
+| Configure Graph Explorer, Entra, OneDrive and OneNote | [Graph Connector Setup](docs/GRAPH_CONNECTOR_SETUP.md) |
+| Learn every role-visible portal workflow | [User Manual](docs/USER_MANUAL.md) |
+| Operate upload, review, indexing, versions and connectors | [Administrator Operations](docs/ADMIN_OPERATIONS.md) |
+| Add labelled queries and measure accuracy/miss rate | [Evaluation Guide](docs/EVALUATION_GUIDE.md) |
+| Run a controlled company test | [Company UAT Guide](docs/COMPANY_UAT_GUIDE.md) |
+| Diagnose errors | [Troubleshooting](docs/TROUBLESHOOTING.md) |
+| Review restrictions before sharing access | [Security and Limitations](docs/SECURITY_AND_LIMITATIONS.md) |
+| Back up or restore system state | [Backup and Recovery](docs/BACKUP_AND_RECOVERY.md) |
+| Understand the complete data flow | [Architecture](docs/ARCHITECTURE.md) |
+
 ## Supported Runtime Profiles
 
 | Component | Local profile | Hybrid Azure profile |
@@ -103,10 +198,16 @@ cp .env.example .env
 Open `.env` in an editor and choose one of these paths:
 
 - **Local:** retain `STORAGE_BACKEND=local`, `VECTOR_BACKEND=chroma` and
-  `LLM_BACKEND=ollama`.
+  `LLM_BACKEND=ollama`. Continue with
+  [Configuration - Complete Local Profile](docs/CONFIGURATION.md#complete-local-profile).
 - **Hybrid Azure:** set `STORAGE_BACKEND=azure_blob`,
   `VECTOR_BACKEND=azure_search`, and `LLM_BACKEND=azure_openai`, then provide
-  company-owned Azure values.
+  company-owned Azure values obtained through
+  [Azure Setup](docs/AZURE_SETUP.md). Continue with
+  [Configuration - Complete Hybrid Azure Profile](docs/CONFIGURATION.md#complete-hybrid-azure-profile).
+
+OneDrive and OneNote are not required for either initial path. Enable them later
+through [Graph Connector Setup](docs/GRAPH_CONNECTOR_SETUP.md).
 
 Never commit `.env`, Azure keys, connection strings or Graph token caches.
 See [Configuration](docs/CONFIGURATION.md) for every variable and

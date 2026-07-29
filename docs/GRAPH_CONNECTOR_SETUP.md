@@ -292,15 +292,16 @@ place where possible and verify the discovered item before refreshing.
 
 ## Troubleshooting Authentication
 
-| Symptom | Likely cause | Action |
-|---|---|---|
-| `401 Unauthorized` | Expired/manual token or wrong audience | Remove `GRAPH_ACCESS_TOKEN`, run device login, restart FastAPI. |
-| `No cached Microsoft account` | Token cache missing | Run `scripts/graph_device_login.py`. |
-| `invalid_client` requiring a secret | Public client flow disabled or wrong app type | Enable **Allow public client flows**; do not add a secret as a workaround. |
-| OneDrive says tenant lacks SPO license | Signed into an Entra tenant without OneDrive/SharePoint license | Use the intended licensed company account or current personal consumer authority. |
-| Graph Explorer works but app fails | Explorer and app tokens represent different accounts/tenants/apps | Compare `/me`, authority, client ID and scopes. |
-| OneNote empty | Notebook filter mismatch | Match the notebook name exactly or temporarily verify without a filter. |
-| Portal connector gets 401 while Python test works | FastAPI started before token/config refresh | Restart FastAPI. |
+
+| Symptom                                           | Likely cause                                                      | Action                                                                            |
+| ------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `401 Unauthorized`                                | Expired/manual token or wrong audience                            | Remove`GRAPH_ACCESS_TOKEN`, run device login, restart FastAPI.                    |
+| `No cached Microsoft account`                     | Token cache missing                                               | Run`scripts/graph_device_login.py`.                                               |
+| `invalid_client` requiring a secret               | Public client flow disabled or wrong app type                     | Enable**Allow public client flows**; do not add a secret as a workaround.         |
+| OneDrive says tenant lacks SPO license            | Signed into an Entra tenant without OneDrive/SharePoint license   | Use the intended licensed company account or current personal consumer authority. |
+| Graph Explorer works but app fails                | Explorer and app tokens represent different accounts/tenants/apps | Compare`/me`, authority, client ID and scopes.                                    |
+| OneNote empty                                     | Notebook filter mismatch                                          | Match the notebook name exactly or temporarily verify without a filter.           |
+| Portal connector gets 401 while Python test works | FastAPI started before token/config refresh                       | Restart FastAPI.                                                                  |
 
 ## Privacy and Handover
 
