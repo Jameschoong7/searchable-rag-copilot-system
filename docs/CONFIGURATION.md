@@ -78,6 +78,41 @@ The editable Admin Guardrail Prompt is appended to the fixed grounded-answer
 instructions. It does not replace the ACL checks, retrieval rules, citation
 logic, memory-rewrite prompt or AI Advisor prompt.
 
+### Edit the fixed grounded-answer prompt in code
+
+For a permanent release-level change, open `src/rag/engine.py` and find
+`generate_answer()`. The fixed prompt starts at the `prompt = f"""` block with:
+
+```text
+You are an internal knowledge assistant for Centific Malaysia.
+```
+
+Edit only the fixed instructions in that block. Preserve these dynamic fields:
+
+- `{app_config.guardrail_prompt}`: the System Admin runtime guardrail;
+- `{context_text}`: authorized retrieved source excerpts;
+- `{question}`: the current retrieval question.
+
+Removing or relocating those fields can break grounding, runtime governance or
+question handling. After a code-level prompt change:
+
+1. restart FastAPI so the updated Python module is loaded;
+2. run a known grounded-answer query;
+3. run not-found and cross-department permission-block queries;
+4. verify citations and exact numeric facts;
+5. run `python -m src.evaluation.retrieval_eval`;
+6. commit the prompt change as a reviewed source-code change.
+
+The fallback text in `DEFAULT_GUARDRAIL_PROMPT` is separately defined in
+`src/core/config.py`. Its effective precedence is:
+
+```text
+SQLite Settings value -> GUARDRAIL_PROMPT in .env -> code fallback constant
+```
+
+Therefore, editing `DEFAULT_GUARDRAIL_PROMPT` will not affect an installation
+that already has a SQLite guardrail override or `.env` value.
+
 To change the operational guardrail:
 
 1. Sign in as `admin_jc` or another System Admin account.
