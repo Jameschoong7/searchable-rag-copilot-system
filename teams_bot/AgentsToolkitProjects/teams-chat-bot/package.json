@@ -15,7 +15,7 @@
   "scripts": {
     "dev:teamsfx": "env-cmd --silent -f .localConfigs npm run dev",
     "dev:teamsfx:playground": "env-cmd --silent -f .localConfigs.playground npm run dev",
-    "dev:teamsfx:launch-playground": "env-cmd --silent -f env/.env.playground node ./devTools/playground/node_modules/@microsoft/m365agentsplayground/cli.js start",
+    "dev:teamsfx:launch-playground": "env-cmd --silent -f env/.env.playground agentsplayground start",
     "clean": "rimraf ./dist",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
@@ -34,12 +34,13 @@
     "@microsoft/teams.graph": "^2.0.0"
   },
   "devDependencies": {
+    "@microsoft/m365agentsplayground": "^0.2.28",
     "@types/node": "^22.5.4",
     "dotenv": "^16.4.5",
+    "env-cmd": "^11.0.0",
     "nodemon": "^3.1.4",
     "rimraf": "^6.0.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.4.5",
-    "env-cmd": "^11.0.0"
+    "typescript": "^5.4.5"
   }
 }

@@ -1,0 +1,86 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 1230 >>
+stream
+BT
+/F1 11 Tf
+50 780 Td
+14 TL
+(Secure Code Review Checklist) Tj
+T*
+(Department: ENGINEERING) Tj
+T*
+(Category: Checklist) Tj
+T*
+(Source: Synthetic Enterprise Knowledge Base) Tj
+T*
+(Audience: Internal staff with approved department access) Tj
+T*
+() Tj
+T*
+(Purpose) Tj
+T*
+(This document provides department-specific guidance for ENGINEERING staff and approved) Tj
+T*
+(collaborators.) Tj
+T*
+() Tj
+T*
+(Key Requirements) Tj
+T*
+(- Check authentication, authorization, input validation, and secret handling.) Tj
+T*
+(- Review logging for sensitive data exposure.) Tj
+T*
+(- Confirm dependency changes are necessary and maintained.) Tj
+T*
+(- Security findings must include impact, evidence, and recommended fix.) Tj
+T*
+() Tj
+T*
+(Review And Ownership) Tj
+T*
+(The ENGINEERING document owner reviews this content every 90 days or after a material) Tj
+T*
+(process change.) Tj
+T*
+(Outdated versions should be archived before the replacement version is indexed.) Tj
+T*
+() Tj
+T*
+(RAG Test Notes) Tj
+T*
+(Queries about 'secure code review checklist' should cite this source when the user has) Tj
+T*
+(access to ENGINEERING.) Tj
+T*
+(If a user from another department lacks permission, the system should not use this content) Tj
+T*
+(in the answer.) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
+trailer << /Size 6 /Root 1 0 R >>
+startxref
+1593
+%%EOF

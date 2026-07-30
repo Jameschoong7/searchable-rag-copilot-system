@@ -1,0 +1,26 @@
+Critical Client Handover Checklist 2026
+
+Synthetic demonstration page - no confidential company data
+
+Document ID: OPS-HO-31
+Department: Operations
+Owner: Service Operations
+Effective date: 1 August 2026
+
+Use this checklist for P1 service incidents or any client handover after 6:00 PM MYT.
+
+Required handover fields
+- Incident owner
+- Client impact
+- Current status
+- Next action and deadline
+- Evidence or incident-record link
+
+Timing
+- Outgoing coordinator posts the handover in the Operations channel before 6:30 PM MYT.
+- Incoming coordinator acknowledges the handover within 15 minutes.
+- No acknowledgement after 15 minutes: escalate to the Operations Duty Manager.
+
+Closure control
+- Do not close the handover until the incident record contains the final action, owner, and timestamp.
+- Verbal handover alone is not sufficient evidence.

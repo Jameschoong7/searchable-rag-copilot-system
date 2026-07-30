@@ -118,7 +118,7 @@ in the backend `.env`.
 | Answer model | Ollama/Mistral | Azure OpenAI `gpt-5.4-nano` deployment |
 | Metadata and governance | SQLite | SQLite |
 | OneDrive/OneNote | Disabled or optional | Microsoft Graph delegated read access |
-| SharePoint | Simulated/exported | Simulated/exported |
+| SharePoint | Not implemented | Future enterprise integration |
 
 Provider selection is configuration-driven. It is not automatic failover: if
 an active Azure provider fails, the administrator must intentionally switch to
@@ -159,7 +159,7 @@ Run these commands inside Ubuntu/WSL:
 
 ```bash
 sudo apt update
-sudo apt install -y python3 python3-venv python3-pip git tesseract-ocr
+sudo apt install -y python3 python3-venv python3-pip git curl tesseract-ocr
 ```
 
 Additional optional prerequisites:
@@ -186,8 +186,10 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-Initial model downloads can take time. The local embedding model is used by
-both ChromaDB and Azure AI Search.
+Initial model downloads can take time. The dependency file selects CPU-only
+PyTorch so a normal company test installation does not download the CUDA/NVIDIA
+toolchain. The local embedding model is used by both ChromaDB and Azure AI
+Search.
 
 ## 4. Configure the Environment
 
@@ -219,16 +221,28 @@ the runtime profile differs from the file.
 
 ## 5. Prepare the Local LLM Profile
 
-Install Ollama using its supported installer, then run:
+Install Ollama using its supported installer. First check whether its background
+service is already running:
 
 ```bash
-ollama pull mistral
+curl http://127.0.0.1:11434/api/tags
+```
+
+If that request fails, start Ollama in its own terminal:
+
+```bash
 ollama serve
 ```
 
-Keep `ollama serve` running in its own terminal. This step is not required when
-`LLM_BACKEND=azure_openai` is active, but keeping Ollama available provides an
-intentional local fallback.
+Then, in another terminal, download the configured Mistral 7B model:
+
+```bash
+ollama pull mistral
+```
+
+Do not start a second `ollama serve` process when the installer already started
+the service. Ollama is not required when `LLM_BACKEND=azure_openai` is active,
+but keeping it available provides an intentional local fallback.
 
 ## 6. Start the Shared Backend
 
@@ -281,9 +295,16 @@ Sign in as `admin_jc`, then:
 1. Open **Settings** and verify the active storage, vector and LLM providers.
 2. Open **KB Management**.
 3. Open **Index Sync**.
-4. Use **Update Pending Documents** for routine indexing.
-5. Use a full rebuild only for the initial index or a deliberate vector-backend
-   change.
+4. On a fresh clone, select **Confirm full rebuild** and click **Full Rebuild**.
+5. Wait for the job to report success before asking the first question.
+6. After the initial index exists, use **Run Update for Pending Documents** for
+   routine uploads and refreshed versions.
+7. Run another full rebuild only for a deliberate vector-backend change or
+   recovery operation.
+
+The repository seeds document metadata, but it does not distribute a generated
+Chroma database. Therefore, the first full rebuild is required even when no
+documents are shown as pending.
 
 An Azure AI Search rebuild deletes and recreates the selected index. Do not run
 it casually against a shared environment.
@@ -306,26 +327,33 @@ from the project's Entra application.
 
 ## 10. Optional Teams Client
 
-```bash
-cd teams_bot/AgentsToolkitProjects/teams-chat-bot
-npm ci
-npm run build
-npm run dev:teamsfx:playground
-```
+The primary workflow is:
 
-In a second terminal, launch the client UI:
+1. Install [Visual Studio Code](https://code.visualstudio.com/).
+2. Install [Node.js 20 or 22](https://nodejs.org/en/download) in the environment
+   where the bot will run, then verify `node --version`.
+3. Install the [Microsoft 365 Agents Toolkit](https://learn.microsoft.com/microsoftteams/platform/toolkit/install-agents-toolkit)
+   extension (`TeamsDevApp.ms-teams-vscode-extension`). If VS Code asks, install
+   the extension in the active WSL window as well.
+4. From the repository root, open the bot folder as its own VS Code workspace:
 
-```bash
-cd teams_bot/AgentsToolkitProjects/teams-chat-bot
-npm run dev:teamsfx:launch-playground
-```
+   ```bash
+   code teams_bot/AgentsToolkitProjects/teams-chat-bot
+   ```
 
-Set `RAG_API_BASE_URL=http://127.0.0.1:8000` in
-`teams_bot/AgentsToolkitProjects/teams-chat-bot/env/.env.playground` for Agents
-Playground, or `env/.env.local` for the local Toolkit environment. The backend
-must already be running. Alternatively, use VS Code **Run and Debug** ->
-**Debug in Microsoft 365 Agents Playground**, which orchestrates both processes.
-Port `9239` is Node DevTools, not the chatbot interface.
+   Opening only the repository root with `code .` does not expose the nested
+   bot folder's `.vscode/launch.json` Run configuration.
+5. Set `RAG_API_BASE_URL=http://127.0.0.1:8000` in `env/.env.playground`.
+6. Start FastAPI from the repository root.
+7. Open **Run and Debug**, select **Debug in Microsoft 365 Agents Playground**,
+   and press **Run** (`F5`).
+
+Agents Toolkit checks prerequisites, prepares the local Playground environment,
+starts the bot, opens the Playground and attaches the debugger. A Microsoft 365
+tenant is not required for this local simulation. See the
+[Teams client guide](teams_bot/AgentsToolkitProjects/teams-chat-bot/README.md)
+for the command-line alternative. Port `9239` is Node DevTools, not the chatbot
+interface.
 
 ## 11. Verify Retrieval Quality
 

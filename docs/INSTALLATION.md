@@ -11,6 +11,8 @@ Confirm the tester has:
 - permission to install WSL, Python packages and optional Microsoft tools;
 - at least 16 GB RAM recommended for running Streamlit, FastAPI, local
   embeddings and Ollama together;
+- at least 10 GB free disk space for Python packages, local models, indexes and
+  working documents;
 - Git access to the private repository;
 - company-approved Azure credentials if using the hybrid profile;
 - no real confidential documents until the controlled-UAT data rules are
@@ -47,7 +49,7 @@ Inside Ubuntu/WSL:
 
 ```bash
 sudo apt update
-sudo apt install -y python3 python3-venv python3-pip git tesseract-ocr
+sudo apt install -y python3 python3-venv python3-pip git curl tesseract-ocr
 ```
 
 Verify:
@@ -105,21 +107,28 @@ chmod 600 .env
 
 ### 6. Optional Local Ollama
 
-Install Ollama using the approved installer for the test machine. Then:
-
-```bash
-ollama pull mistral
-ollama serve
-```
-
-In a separate terminal:
+Install Ollama using the approved installer for the test machine. Check whether
+the installer already started its service:
 
 ```bash
 curl http://127.0.0.1:11434/api/tags
 ```
 
+If the request fails, run this in a dedicated terminal:
+
+```bash
+ollama serve
+```
+
+Then download the configured Mistral 7B model from another terminal:
+
+```bash
+ollama pull mistral
+```
+
 If Azure OpenAI is active, Ollama is optional. It remains useful for a deliberate
-offline fallback.
+offline fallback. Do not start a second server if Ollama is already listening on
+port `11434`.
 
 ### 7. Start FastAPI
 
@@ -159,9 +168,12 @@ Open the displayed URL in the Windows browser. WSL normally exposes
 3. Verify the active providers match the intended profile.
 4. Expand **LLM Health** details.
 5. Use the billable **Test** button only when a real model request is acceptable.
-6. Open **KB Management** and check pending/indexed counts.
-7. Run **Update Pending Documents** when documents are waiting.
-8. Ask one known sample question and verify that sources are displayed.
+6. Open **KB Management → Index Sync**.
+7. On a fresh clone, select **Confirm full rebuild** and click **Full Rebuild**.
+8. Wait for the initial rebuild job to succeed. Seed metadata exists on a clean
+   installation, but the generated Chroma index does not.
+9. Use **Run Update for Pending Documents** for later uploads/refreshes.
+10. Ask one known sample question and verify that sources are displayed.
 
 ## Native Windows Alternative
 
@@ -211,7 +223,36 @@ streamlit run src/ui/app.py
 
 ## Teams Client Installation
 
-Use Node.js 20 or 22. Node 24 is outside the repository's declared engine range.
+Use [Node.js 20 or 22](https://nodejs.org/en/download). Node 24 is outside the
+repository's declared engine range. Install Node in the environment where the
+bot will run; for the primary WSL path, `node --version` must work inside WSL.
+The primary path uses the Microsoft 365 Agents Toolkit in Visual Studio Code:
+
+1. Install [Visual Studio Code](https://code.visualstudio.com/).
+2. Install the [Microsoft 365 Agents Toolkit](https://learn.microsoft.com/microsoftteams/platform/toolkit/install-agents-toolkit)
+   extension (`TeamsDevApp.ms-teams-vscode-extension`). If prompted in a WSL
+   window, install it there too.
+3. From the repository root, open the nested bot as its own VS Code workspace:
+
+   ```bash
+   code teams_bot/AgentsToolkitProjects/teams-chat-bot
+   ```
+
+   Do not use only `code .` from the repository root for this step. VS Code does
+   not automatically load a nested folder's `.vscode/launch.json`.
+4. Configure `RAG_API_BASE_URL=http://127.0.0.1:8000` in
+   `env/.env.playground`.
+5. Start the FastAPI backend separately.
+6. Open **Run and Debug** (`Ctrl+Shift+D`).
+7. Select **Debug in Microsoft 365 Agents Playground** and press `F5`.
+
+The Toolkit prepares and opens the Playground automatically. No Microsoft 365
+tenant is required for this local simulation.
+
+### Command-Line Alternative
+
+The project also carries Agents Playground as a development dependency, so a
+clean clone can use:
 
 ```bash
 cd teams_bot/AgentsToolkitProjects/teams-chat-bot
@@ -219,9 +260,7 @@ npm ci
 npm run build
 ```
 
-Configure `RAG_API_BASE_URL=http://127.0.0.1:8000` in
-`env/.env.playground` for Agents Playground or `env/.env.local` for the local
-Toolkit environment. Start the bot process:
+Start the bot process:
 
 ```bash
 npm run dev:teamsfx:playground

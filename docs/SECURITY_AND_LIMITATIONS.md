@@ -46,6 +46,12 @@ Commands such as `/use-it-manager` select a simulated test profile. They are not
 Microsoft Teams identity-to-role mapping and must be disabled/replaced before
 real deployment.
 
+The current Microsoft local-development plugin also inherits four moderate npm
+advisories through its pinned Teams Apps/MSAL/UUID dependency chain. The high
+development-only `brace-expansion` advisory was patched in the lockfile. Do not
+apply an unreviewed forced npm audit fix; monitor the Microsoft Teams SDK and
+upgrade when a compatible plugin release removes the remaining advisories.
+
 ### No rate limiting or abuse protection
 
 The API has no per-user rate limit, request quota, WAF or robust concurrency

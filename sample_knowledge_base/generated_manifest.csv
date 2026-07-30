@@ -1,0 +1,66 @@
+platform,department,title,category,file_type,relative_path
+OneDrive,IT,Password And Account Policy,Policy,DOCX,onedrive/Enterprise Knowledge Base/IT/password_and_account_policy.docx
+OneDrive,IT,VPN Access Runbook,Runbook,PDF,onedrive/Enterprise Knowledge Base/IT/vpn_access_runbook.pdf
+OneDrive,IT,Device Setup Checklist,Checklist,DOCX,onedrive/Enterprise Knowledge Base/IT/device_setup_checklist.docx
+OneDrive,IT,Software Request Standard,Standard,PDF,onedrive/Enterprise Knowledge Base/IT/software_request_standard.pdf
+OneDrive,IT,Email Security Guide,Guide,DOCX,onedrive/Enterprise Knowledge Base/IT/email_security_guide.docx
+OneDrive,IT,Knowledge Base Admin SOP,SOP,PDF,onedrive/Enterprise Knowledge Base/IT/knowledge_base_admin_sop.pdf
+OneDrive,IT,Azure Cost Safety Notes,Notes,DOCX,onedrive/Enterprise Knowledge Base/IT/azure_cost_safety_notes.docx
+OneDrive,IT,Incident Ticket Triage,Procedure,PDF,onedrive/Enterprise Knowledge Base/IT/incident_ticket_triage.pdf
+OneDrive,HR,Leave Policy 2026,Policy,DOCX,onedrive/Enterprise Knowledge Base/HR/leave_policy_2026.docx
+OneDrive,HR,Employee Onboarding Handbook,Handbook,PDF,onedrive/Enterprise Knowledge Base/HR/employee_onboarding_handbook.pdf
+OneDrive,HR,Expense Claim Guide,Guide,DOCX,onedrive/Enterprise Knowledge Base/HR/expense_claim_guide.docx
+OneDrive,HR,Performance Review Cycle,Procedure,PDF,onedrive/Enterprise Knowledge Base/HR/performance_review_cycle.pdf
+OneDrive,HR,Remote Work Arrangement,Policy,DOCX,onedrive/Enterprise Knowledge Base/HR/remote_work_arrangement.docx
+OneDrive,HR,Training Reimbursement SOP,SOP,PDF,onedrive/Enterprise Knowledge Base/HR/training_reimbursement_sop.pdf
+OneDrive,HR,Disciplinary Process Guide,Guide,DOCX,onedrive/Enterprise Knowledge Base/HR/disciplinary_process_guide.docx
+OneDrive,HR,Benefits FAQ,FAQ,PDF,onedrive/Enterprise Knowledge Base/HR/benefits_faq.pdf
+OneDrive,ENGINEERING,Coding Standards,Standard,DOCX,onedrive/Enterprise Knowledge Base/ENGINEERING/coding_standards.docx
+OneDrive,ENGINEERING,Release Management SOP,SOP,PDF,onedrive/Enterprise Knowledge Base/ENGINEERING/release_management_sop.pdf
+OneDrive,ENGINEERING,API Design Guide,Guide,DOCX,onedrive/Enterprise Knowledge Base/ENGINEERING/api_design_guide.docx
+OneDrive,ENGINEERING,Model Evaluation Notes,Notes,PDF,onedrive/Enterprise Knowledge Base/ENGINEERING/model_evaluation_notes.pdf
+OneDrive,ENGINEERING,Data Pipeline Runbook,Runbook,DOCX,onedrive/Enterprise Knowledge Base/ENGINEERING/data_pipeline_runbook.docx
+OneDrive,ENGINEERING,Secure Code Review Checklist,Checklist,PDF,onedrive/Enterprise Knowledge Base/ENGINEERING/secure_code_review_checklist.pdf
+OneDrive,ENGINEERING,Frontend UI Quality Standard,Standard,DOCX,onedrive/Enterprise Knowledge Base/ENGINEERING/frontend_ui_quality_standard.docx
+OneDrive,ENGINEERING,RAG Architecture Decision Record,ADR,PDF,onedrive/Enterprise Knowledge Base/ENGINEERING/rag_architecture_decision_record.pdf
+OneDrive,SECURITY,Access Control Policy,Policy,DOCX,onedrive/Enterprise Knowledge Base/SECURITY/access_control_policy.docx
+OneDrive,SECURITY,Incident Response Playbook,Playbook,PDF,onedrive/Enterprise Knowledge Base/SECURITY/incident_response_playbook.pdf
+OneDrive,SECURITY,Data Classification Standard,Standard,DOCX,onedrive/Enterprise Knowledge Base/SECURITY/data_classification_standard.docx
+OneDrive,SECURITY,Phishing Simulation Procedure,Procedure,PDF,onedrive/Enterprise Knowledge Base/SECURITY/phishing_simulation_procedure.pdf
+OneDrive,SECURITY,Vendor Security Review,Checklist,DOCX,onedrive/Enterprise Knowledge Base/SECURITY/vendor_security_review.docx
+OneDrive,SECURITY,Key Management Notes,Notes,PDF,onedrive/Enterprise Knowledge Base/SECURITY/key_management_notes.pdf
+OneDrive,SECURITY,Physical Security Guide,Guide,DOCX,onedrive/Enterprise Knowledge Base/SECURITY/physical_security_guide.docx
+OneDrive,SECURITY,Security Awareness FAQ,FAQ,PDF,onedrive/Enterprise Knowledge Base/SECURITY/security_awareness_faq.pdf
+OneDrive,OPERATIONS,Service Escalation SOP,SOP,DOCX,onedrive/Enterprise Knowledge Base/OPERATIONS/service_escalation_sop.docx
+OneDrive,OPERATIONS,Business Continuity Plan,Plan,PDF,onedrive/Enterprise Knowledge Base/OPERATIONS/business_continuity_plan.pdf
+OneDrive,OPERATIONS,Shift Handover Checklist,Checklist,DOCX,onedrive/Enterprise Knowledge Base/OPERATIONS/shift_handover_checklist.docx
+OneDrive,OPERATIONS,Customer SLA Reference,Reference,PDF,onedrive/Enterprise Knowledge Base/OPERATIONS/customer_sla_reference.pdf
+OneDrive,OPERATIONS,Change Advisory Board Notes,Notes,DOCX,onedrive/Enterprise Knowledge Base/OPERATIONS/change_advisory_board_notes.docx
+OneDrive,OPERATIONS,Knowledge Article Quality Guide,Guide,PDF,onedrive/Enterprise Knowledge Base/OPERATIONS/knowledge_article_quality_guide.pdf
+OneDrive,OPERATIONS,Operational Risk Register,Register,DOCX,onedrive/Enterprise Knowledge Base/OPERATIONS/operational_risk_register.docx
+OneDrive,OPERATIONS,Facilities Request Guide,Guide,PDF,onedrive/Enterprise Knowledge Base/OPERATIONS/facilities_request_guide.pdf
+OneNote,IT,Password Reset Quick Notes,Quick Notes,MD,onenote/Enterprise Knowledge Base/IT/Quick Notes/password_reset_quick_notes.md
+OneNote,IT,VPN Troubleshooting Cases,Runbook Notes,MD,onenote/Enterprise Knowledge Base/IT/Runbook Notes/vpn_troubleshooting_cases.md
+OneNote,IT,Index Rebuild Demo Notes,RAG Admin,MD,onenote/Enterprise Knowledge Base/IT/RAG Admin/index_rebuild_demo_notes.md
+OneNote,IT,Graph Connector Setup Notes,Connector Notes,MD,onenote/Enterprise Knowledge Base/IT/Connector Notes/graph_connector_setup_notes.md
+OneNote,HR,Leave Approval Examples,Policy Notes,MD,onenote/Enterprise Knowledge Base/HR/Policy Notes/leave_approval_examples.md
+OneNote,HR,Onboarding Day 1 Notes,Onboarding,MD,onenote/Enterprise Knowledge Base/HR/Onboarding/onboarding_day_1_notes.md
+OneNote,HR,Benefits Claim Reminders,Benefits,MD,onenote/Enterprise Knowledge Base/HR/Benefits/benefits_claim_reminders.md
+OneNote,HR,Misconduct Review Notes,Employee Relations,MD,onenote/Enterprise Knowledge Base/HR/Employee Relations/misconduct_review_notes.md
+OneNote,ENGINEERING,Pull Request Review Notes,Development,MD,onenote/Enterprise Knowledge Base/ENGINEERING/Development/pull_request_review_notes.md
+OneNote,ENGINEERING,RAG Evaluation Notes,AI Quality,MD,onenote/Enterprise Knowledge Base/ENGINEERING/AI Quality/rag_evaluation_notes.md
+OneNote,ENGINEERING,Release Checklist Notes,Release,MD,onenote/Enterprise Knowledge Base/ENGINEERING/Release/release_checklist_notes.md
+OneNote,ENGINEERING,API Error Handling Notes,Backend,MD,onenote/Enterprise Knowledge Base/ENGINEERING/Backend/api_error_handling_notes.md
+OneNote,SECURITY,Incident Severity Notes,Incident Response,MD,onenote/Enterprise Knowledge Base/SECURITY/Incident Response/incident_severity_notes.md
+OneNote,SECURITY,Data Classification Examples,Governance,MD,onenote/Enterprise Knowledge Base/SECURITY/Governance/data_classification_examples.md
+OneNote,SECURITY,Phishing Drill Notes,Awareness,MD,onenote/Enterprise Knowledge Base/SECURITY/Awareness/phishing_drill_notes.md
+OneNote,SECURITY,Secret Handling Notes,Engineering Security,MD,onenote/Enterprise Knowledge Base/SECURITY/Engineering Security/secret_handling_notes.md
+OneNote,OPERATIONS,Shift Handover Notes,Service Desk,MD,onenote/Enterprise Knowledge Base/OPERATIONS/Service Desk/shift_handover_notes.md
+OneNote,OPERATIONS,SLA Escalation Examples,Customer Ops,MD,onenote/Enterprise Knowledge Base/OPERATIONS/Customer Ops/sla_escalation_examples.md
+OneNote,OPERATIONS,Continuity Exercise Notes,BCP,MD,onenote/Enterprise Knowledge Base/OPERATIONS/BCP/continuity_exercise_notes.md
+OneNote,OPERATIONS,Knowledge Article Notes,Knowledge Ops,MD,onenote/Enterprise Knowledge Base/OPERATIONS/Knowledge Ops/knowledge_article_notes.md
+Local Upload,HR,Hybrid Work Equipment Allowance 2026,Employee Benefits,DOCX,local_upload/demo_manual_Hybrid_Work_Equipment_Allowance_2026.docx
+Connector Source Copy,IT,Emergency Laptop Replacement Runbook 2026,IT Operations,PDF,local_upload/demo_onedrive_Emergency_Laptop_Replacement_Runbook_2026.pdf
+Connector Source Copy,OPERATIONS,Critical Client Handover Checklist 2026,Service Desk,TXT,local_upload/demo_onenote_Critical_Client_Handover_Checklist_2026.txt
+OneDrive,IT,Emergency Laptop Replacement Runbook 2026,IT Operations,PDF,onedrive/Enterprise Knowledge Base/IT/demo_onedrive_Emergency_Laptop_Replacement_Runbook_2026.pdf
+OneNote,OPERATIONS,Critical Client Handover Checklist 2026,Service Desk,TXT,onenote/Enterprise Knowledge Base/OPERATIONS/Service Desk/demo_onenote_Critical_Client_Handover_Checklist_2026.txt
