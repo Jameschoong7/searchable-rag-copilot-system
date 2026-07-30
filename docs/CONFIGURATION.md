@@ -61,6 +61,97 @@ Top-K is a chunk limit, not a document limit. Five chunks can come from one
 source or several sources. Chunks below the threshold are removed, so the final
 answer can cite fewer than five chunks or sources.
 
+## Prompt Configuration
+
+The application has several prompt layers. They are intentionally not one
+unrestricted prompt field:
+
+| Prompt layer | Configuration location | Intended owner |
+|---|---|---|
+| Admin retrieval guardrail | **Settings → Retrieval & Guardrails → Admin Guardrail Prompt** | System Admin |
+| First-install guardrail default | `GUARDRAIL_PROMPT` in `.env` | Deployment operator |
+| Fixed grounded-answer instructions | `src/rag/engine.py` | Developer/change-controlled release |
+| Conversation follow-up rewrite | `src/rag/chat_rewrite.py` | Developer/change-controlled release |
+| AI Advisor action-plan instructions | `src/core/advisor_action_plan.py` | Developer/change-controlled release |
+
+The editable Admin Guardrail Prompt is appended to the fixed grounded-answer
+instructions. It does not replace the ACL checks, retrieval rules, citation
+logic, memory-rewrite prompt or AI Advisor prompt.
+
+To change the operational guardrail:
+
+1. Sign in as `admin_jc` or another System Admin account.
+2. Open **Settings**.
+3. Find **Retrieval & Guardrails**.
+4. Edit **Admin Guardrail Prompt**.
+5. Select **Save Runtime Settings**.
+6. Run known-answer, not-found and permission-block checks.
+7. Run the labelled retrieval evaluation before accepting the change.
+
+The saved value is stored in SQLite `app_settings` and takes precedence over
+`GUARDRAIL_PROMPT` in `.env`. Changing `.env` later will not override an
+already-saved portal value. Use the Settings workflow to make another change.
+Guardrail-only changes do not require a vector-index rebuild.
+
+Do not place secrets, user-specific instructions or permission exceptions in a
+prompt. ACL/RBAC must remain enforced by backend code before content reaches the
+LLM.
+
+## Controlled-UAT Account Configuration
+
+Portal login accounts are stored in the SQLite `app_users` table inside
+`data/metadata/document_metadata.db`. Missing demonstration accounts are seeded
+from `SEED_USERS` in `src/core/user_repository.py`; passwords are stored as
+PBKDF2 hashes rather than plaintext.
+
+Supported role and department values come from `src/core/constants.py`:
+
+```text
+Roles: System Admin, Project Manager, General Employee
+Departments: IT, Engineering, HR, Security, Operations
+```
+
+There is currently no account-administration screen or account-management API.
+For a controlled source-code UAT build, a developer can add another seed entry
+to `SEED_USERS`, for example:
+
+```python
+{
+    "username": "employee_hr_demo2",
+    "password": DEFAULT_SEED_PASSWORD,
+    "role": GENERAL_EMPLOYEE_ROLE,
+    "department": "HR",
+},
+```
+
+After changing the seed list, restart Streamlit and attempt the new login. The
+seeding function inserts missing usernames with `ON CONFLICT DO NOTHING`.
+Therefore:
+
+- adding a new username creates the missing account;
+- changing the role, department or password for an existing username in
+  `SEED_USERS` does not update its existing SQLite row;
+- changing `DEFAULT_SEED_PASSWORD` affects only accounts inserted afterward;
+- do not delete the shared SQLite database merely to reset users because it also
+  contains document metadata, settings, jobs and other system state.
+
+Use these accounts only for named controlled-UAT testers. Production identity
+requires Entra/OIDC authentication, server-validated claims, provisioning,
+password lifecycle, MFA and account administration.
+
+### Teams test profiles
+
+Teams-style commands such as `/use-hr` are configured separately in
+`teams_bot/AgentsToolkitProjects/teams-chat-bot/src/index.ts` through
+`DEFAULT_PROFILE` and `DEMO_PROFILES`. They do not authenticate against the
+portal `app_users` table. Adding a portal seed account does not automatically
+create a Teams command, and adding a Teams test profile does not create a portal
+login.
+
+The Teams profiles submit simulated user, role and department values to FastAPI
+for local testing. Replace this mechanism with validated Microsoft identity and
+server-side role mapping before any unrestricted deployment.
+
 ## Azure Blob Variables
 
 | Variable | Where to obtain it |

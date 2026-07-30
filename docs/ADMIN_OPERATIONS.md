@@ -223,6 +223,27 @@ underlying query, source and ACL before updating documents or permissions.
 
 ## Settings Change Control
 
+### Retrieval guardrail
+
+The System Admin can change **Settings → Retrieval & Guardrails → Admin
+Guardrail Prompt**. This value is appended to the fixed grounded RAG prompt and
+is stored as a SQLite runtime override. It must not be used to bypass ACL/RBAC,
+embed secrets or add user-specific permission exceptions. Guardrail-only changes
+do not require reindexing, but they require known-answer, not-found,
+permission-block and labelled evaluation checks.
+
+See [Prompt Configuration](CONFIGURATION.md#prompt-configuration) for all prompt
+layers and their ownership.
+
+### Controlled-UAT accounts
+
+There is no account-management UI/API in this delivery. Demonstration portal
+accounts are seeded from `src/core/user_repository.py`, while Teams command
+profiles are separately defined in the Teams client. Follow
+[Controlled-UAT Account Configuration](CONFIGURATION.md#controlled-uat-account-configuration)
+for the supported roles/departments and insertion behavior. Do not manually
+delete the shared SQLite database to reset an account.
+
 Before changing providers:
 
 1. Record current Settings.

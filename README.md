@@ -96,7 +96,7 @@ in the backend `.env`.
 | Goal | Read this |
 |---|---|
 | Install WSL, Python, OCR, Ollama and start the application | [Installation](docs/INSTALLATION.md) |
-| Understand every `.env` variable and provider switch | [Configuration](docs/CONFIGURATION.md) |
+| Configure providers, prompts and controlled-UAT accounts | [Configuration](docs/CONFIGURATION.md) |
 | Obtain Blob, Search and Foundry endpoints/keys | [Azure Setup](docs/AZURE_SETUP.md) |
 | Configure Graph Explorer, Entra, OneDrive and OneNote | [Graph Connector Setup](docs/GRAPH_CONNECTOR_SETUP.md) |
 | Learn every role-visible portal workflow | [User Manual](docs/USER_MANUAL.md) |

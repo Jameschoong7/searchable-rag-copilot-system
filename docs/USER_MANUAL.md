@@ -34,7 +34,9 @@ Expected result:
 - navigation options differ by role.
 
 If login fails, verify spelling and account state. There is no self-service
-password reset or account administration screen.
+password reset or account administration screen. Deployment operators and
+developers should follow [Controlled-UAT Account Configuration](CONFIGURATION.md#controlled-uat-account-configuration)
+rather than editing SQLite manually.
 
 ## Global Navigation
 
@@ -230,7 +232,9 @@ Admin sees the global operational view.
 5. Expand **Usage Records** for recent Azure token and estimated-cost records.
 6. Select storage, vector and LLM providers.
 7. Leave embedding locked to `local`.
-8. Adjust Top-K, relevance threshold or guardrail only with evaluation evidence.
+8. Adjust Top-K, relevance threshold or **Admin Guardrail Prompt** only with
+   evaluation evidence. The guardrail is appended to the fixed grounded-answer
+   instructions; it is not a permission mechanism or replacement system prompt.
 9. Select **Save Runtime Settings**.
 10. If a vector-provider change is pending, run the required full rebuild at a
     controlled time.
@@ -238,6 +242,9 @@ Admin sees the global operational view.
 Vector/embedding changes are risky because indexed vectors must match the query
 embedding model and active schema. The system keeps the previous active setting
 until the required rebuild succeeds.
+
+See [Prompt Configuration](CONFIGURATION.md#prompt-configuration) for prompt
+ownership, SQLite override behavior and the required post-change checks.
 
 ## Sign Out and End a Test
 
