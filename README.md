@@ -103,6 +103,7 @@ in the backend `.env`.
 | Operate upload, review, indexing, versions and connectors | [Administrator Operations](docs/ADMIN_OPERATIONS.md) |
 | Add labelled queries and measure accuracy/miss rate | [Evaluation Guide](docs/EVALUATION_GUIDE.md) |
 | Run a controlled company test | [Company UAT Guide](docs/COMPANY_UAT_GUIDE.md) |
+| Verify the fixed handover release and package contents | [Handover Manifest](HANDOVER_MANIFEST.md) |
 | Diagnose errors | [Troubleshooting](docs/TROUBLESHOOTING.md) |
 | Review restrictions before sharing access | [Security and Limitations](docs/SECURITY_AND_LIMITATIONS.md) |
 | Back up or restore system state | [Backup and Recovery](docs/BACKUP_AND_RECOVERY.md) |
@@ -370,6 +371,7 @@ maintenance signal, not a target that should be forced to 100%. See
 
 ## Documentation
 
+- [Company Handover Manifest](HANDOVER_MANIFEST.md)
 - [Installation](docs/INSTALLATION.md)
 - [Configuration](docs/CONFIGURATION.md)
 - [Azure Setup](docs/AZURE_SETUP.md)

@@ -1,3 +1,4 @@
 *.csv text eol=lf
 *.docx binary
 *.pdf binary
+HANDOVER_MANIFEST.md export-subst
