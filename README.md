@@ -13,7 +13,7 @@ The system supports a fully local profile and a cost-conscious hybrid Azure
 profile. SQLite remains the governance source of truth for metadata, ACLs,
 versions, jobs, chat history and usage logs in both profiles.
 
-> **Company handover:** Use the fixed `v1.0.2-company-handover` tag or its
+> **Company handover:** Use the fixed `v1.0.3-company-handover` tag or its
 > matching source ZIP. See the [Company Handover Manifest](HANDOVER_MANIFEST.md)
 > for the release identity, included files, limitations and integrity checks.
 
@@ -182,8 +182,9 @@ better Python and SQLite filesystem behavior.
 ```bash
 mkdir -p ~/projects
 cd ~/projects
-git clone <COMPANY_REPOSITORY_URL> searchable-rag-copilot-system
+git clone https://github.com/Jameschoong7/searchable-rag-copilot-system.git
 cd searchable-rag-copilot-system
+git checkout v1.0.3-company-handover
 
 python3 -m venv .venv
 source .venv/bin/activate

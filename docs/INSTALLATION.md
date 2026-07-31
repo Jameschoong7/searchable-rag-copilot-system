@@ -73,8 +73,9 @@ behave better under the WSL Linux filesystem.
 ```bash
 mkdir -p ~/projects
 cd ~/projects
-git clone <COMPANY_REPOSITORY_URL> searchable-rag-copilot-system
+git clone https://github.com/Jameschoong7/searchable-rag-copilot-system.git
 cd searchable-rag-copilot-system
+git checkout v1.0.3-company-handover
 ```
 
 ### 4. Create the Python Environment
@@ -193,8 +194,9 @@ Install:
 From PowerShell:
 
 ```powershell
-git clone <COMPANY_REPOSITORY_URL> searchable-rag-copilot-system
+git clone https://github.com/Jameschoong7/searchable-rag-copilot-system.git
 Set-Location searchable-rag-copilot-system
+git checkout v1.0.3-company-handover
 
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
