@@ -8,8 +8,8 @@
 | Academic project | UOW Malaysia industry final-year project with Centific Malaysia |
 | Handover date | 31 July 2026 |
 | Repository | <https://github.com/Jameschoong7/searchable-rag-copilot-system> |
-| Release tag | `v1.0-company-handover` |
-| Tagged ZIP filename | `searchable-rag-copilot-system-v1.0-company-handover.zip` |
+| Release tag | `v1.0.1-company-handover` |
+| Tagged ZIP filename | `searchable-rag-copilot-system-v1.0.1-company-handover.zip` |
 | Application baseline commit | `28b2970f316785524c53a1a283021c2bb5f338fc` |
 | Tagged release commit | `$Format:%H$` |
 | Handover contact | Jun Cheng Choong (James), GitHub `@Jameschoong7` |
@@ -107,31 +107,14 @@ Before distribution, the operator must confirm that any Azure key exposed during
 development has been rotated and that the handover `.env` contains only approved
 company-owned credentials.
 
-## Ownership And Permitted Use
-
-No open-source licence is granted by this repository or handover manifest.
-Third-party dependencies and generated tooling remain subject to their own
-licence terms.
-
-This package is provided only for the academic review and controlled company UAT
-purposes described above. Project ownership, institutional intellectual-property
-rights, commercial use, redistribution, sublicensing and use beyond the agreed
-evaluation scope remain subject to the applicable university rules and any
-written agreement among the student, university and company.
-
-Before any broader internal, production, commercial or redistributed use, the
-recipient must obtain written confirmation from the relevant rights holder(s).
-This section records the handover boundary; it is not a substitute for legal or
-institutional advice.
-
 ## Integrity Verification
 
 Verify the tag and commit after cloning:
 
 ```bash
 git fetch --tags origin
-git show --no-patch --decorate v1.0-company-handover
-git rev-list -n 1 v1.0-company-handover
+git show --no-patch --decorate v1.0.1-company-handover
+git rev-list -n 1 v1.0.1-company-handover
 ```
 
 Verify the separately supplied ZIP against its accompanying
