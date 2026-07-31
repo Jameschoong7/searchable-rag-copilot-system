@@ -75,6 +75,7 @@ mkdir -p ~/projects
 cd ~/projects
 git clone https://github.com/Jameschoong7/searchable-rag-copilot-system.git
 cd searchable-rag-copilot-system
+git checkout v1.0.4-company-handover
 ```
 
 ### 4. Create the Python Environment
@@ -195,6 +196,7 @@ From PowerShell:
 ```powershell
 git clone https://github.com/Jameschoong7/searchable-rag-copilot-system.git
 Set-Location searchable-rag-copilot-system
+git checkout v1.0.4-company-handover
 
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1

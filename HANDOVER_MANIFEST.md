@@ -8,15 +8,15 @@
 | Academic project | UOW Malaysia industry final-year project with Centific Malaysia |
 | Handover date | 31 July 2026 |
 | Repository | <https://github.com/Jameschoong7/searchable-rag-copilot-system> |
-| Release tag | `v1.0.3-company-handover` |
-| Tagged ZIP filename | `searchable-rag-copilot-system-v1.0.3-company-handover.zip` |
+| Release tag | `v1.0.4-company-handover` |
+| Tagged ZIP filename | `searchable-rag-copilot-system-v1.0.4-company-handover.zip` |
 | Application baseline commit | `28b2970f316785524c53a1a283021c2bb5f338fc` |
 | Tagged release commit | `$Format:%H$` |
 | Handover contact | Jun Cheng Choong (James), GitHub `@Jameschoong7` |
 
 The tagged release commit token is expanded to the exact commit SHA when the
 official ZIP is generated with `git archive`. In a normal Git checkout, the
-`v1.0.3-company-handover` tag target shown by Git/GitHub is authoritative.
+`v1.0.4-company-handover` tag target shown by Git/GitHub is authoritative.
 
 ## Delivery Classification
 
@@ -113,8 +113,8 @@ Verify the tag and commit after cloning:
 
 ```bash
 git fetch --tags origin
-git show --no-patch --decorate v1.0.3-company-handover
-git rev-list -n 1 v1.0.3-company-handover
+git show --no-patch --decorate v1.0.4-company-handover
+git rev-list -n 1 v1.0.4-company-handover
 ```
 
 Verify the separately supplied ZIP against its accompanying
