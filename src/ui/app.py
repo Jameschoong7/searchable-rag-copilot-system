@@ -1251,14 +1251,34 @@ def is_api_online() -> bool:
     return True
 
 
+CHAT_QUESTION_WIDGET_VERSION_KEY = "chat_question_widget_version"
+
+
+def get_chat_question_widget_key() -> str:
+    """Return the current draft widget key used by the batched chat form."""
+    widget_version = st.session_state.get(CHAT_QUESTION_WIDGET_VERSION_KEY, 0)
+    return f"chat_question_{widget_version}"
+
+
+def advance_chat_question_widget() -> str:
+    """Replace the draft widget so stale browser-side form state cannot return."""
+    previous_widget_key = get_chat_question_widget_key()
+    st.session_state.pop(previous_widget_key, None)
+    st.session_state[CHAT_QUESTION_WIDGET_VERSION_KEY] = (
+        st.session_state.get(CHAT_QUESTION_WIDGET_VERSION_KEY, 0) + 1
+    )
+    return get_chat_question_widget_key()
+
+
 def select_example_chat_prompt(prompt: str) -> None:
-    """Place an example prompt into the chat box so the user can review it."""
-    st.session_state["chat_question"] = prompt
+    """Place an example prompt into a fresh chat box for user review."""
+    next_widget_key = advance_chat_question_widget()
+    st.session_state[next_widget_key] = prompt
 
 
 def submit_chat_question() -> None:
     """Stage the submitted draft and clear the visible input before rerun."""
-    draft_question = st.session_state.get("chat_question", "")
+    draft_question = st.session_state.get(get_chat_question_widget_key(), "")
 
     if not draft_question.strip():
         st.session_state["chat_submit_warning"] = "Enter a question before sending."
@@ -1266,7 +1286,7 @@ def submit_chat_question() -> None:
         return
 
     st.session_state["pending_chat_question"] = draft_question
-    st.session_state["chat_question"] = ""
+    advance_chat_question_widget()
     st.session_state["chat_is_processing"] = True
     st.session_state.pop("chat_submit_warning", None)
 
@@ -4492,9 +4512,10 @@ if selected_page in ["KB Management", "KB Status"]:
 
         with review_tab:
             with st.container(border=True):
+                is_admin_review = st.session_state["role"] == SYSTEM_ADMIN_ROLE
                 review_subtitle = (
                     "Review connector and batch-staged documents before indexing."
-                    if st.session_state["role"] == SYSTEM_ADMIN_ROLE
+                    if is_admin_review
                     else "Review own-department batch ZIP documents before indexing."
                 )
                 render_workflow_header(
@@ -4535,7 +4556,7 @@ if selected_page in ["KB Management", "KB Status"]:
                     }
 
                     selected_review_label = st.selectbox(
-                        "Select connector document to review",
+                        "Select document to review",
                         list(document_options.keys()),
                         key="selected_connector_review_document",
                     )
@@ -4549,14 +4570,22 @@ if selected_page in ["KB Management", "KB Status"]:
                             key=f"approve_title_{selected_review_document['document_id']}",
                         )
 
-                        edited_department = st.selectbox(
-                            "Department",
-                            DEPARTMENT_OPTIONS,
-                            index=DEPARTMENT_OPTIONS.index(selected_review_document["department"])
-                            if selected_review_document["department"] in DEPARTMENT_OPTIONS
-                            else 0,
-                            key=f"approve_department_{selected_review_document['document_id']}",
-                        )
+                        if is_admin_review:
+                            edited_department = st.selectbox(
+                                "Department",
+                                DEPARTMENT_OPTIONS,
+                                index=DEPARTMENT_OPTIONS.index(selected_review_document["department"])
+                                if selected_review_document["department"] in DEPARTMENT_OPTIONS
+                                else 0,
+                                key=f"approve_department_{selected_review_document['document_id']}",
+                            )
+                        else:
+                            edited_department = st.selectbox(
+                                "Department",
+                                [st.session_state["department"]],
+                                disabled=True,
+                                key=f"approve_department_{selected_review_document['document_id']}",
+                            )
 
                         edited_category = st.text_input(
                             "Category",
@@ -4570,27 +4599,48 @@ if selected_page in ["KB Management", "KB Status"]:
                             key=f"approve_tags_{selected_review_document['document_id']}",
                         )
 
-                        edited_allowed_roles = st.multiselect(
-                            "Allowed roles",
-                            ROLE_OPTIONS,
-                            default=[
+                        if is_admin_review:
+                            edited_allowed_roles = st.multiselect(
+                                "Allowed roles",
+                                ROLE_OPTIONS,
+                                default=[
+                                    role
+                                    for role in selected_review_document["allowed_roles"]
+                                    if role in ROLE_OPTIONS
+                                ],
+                                key=f"approve_roles_{selected_review_document['document_id']}",
+                            )
+
+                            edited_allowed_departments = st.multiselect(
+                                "Allowed departments",
+                                DEPARTMENT_OPTIONS,
+                                default=[
+                                    department
+                                    for department in selected_review_document["allowed_departments"]
+                                    if department in DEPARTMENT_OPTIONS
+                                ],
+                                key=f"approve_departments_{selected_review_document['document_id']}",
+                            )
+                        else:
+                            pm_role_options = [PROJECT_MANAGER_ROLE, GENERAL_EMPLOYEE_ROLE]
+                            pm_default_roles = [
                                 role
                                 for role in selected_review_document["allowed_roles"]
-                                if role in ROLE_OPTIONS
-                            ],
-                            key=f"approve_roles_{selected_review_document['document_id']}",
-                        )
-
-                        edited_allowed_departments = st.multiselect(
-                            "Allowed departments",
-                            DEPARTMENT_OPTIONS,
-                            default=[
-                                department
-                                for department in selected_review_document["allowed_departments"]
-                                if department in DEPARTMENT_OPTIONS
-                            ],
-                            key=f"approve_departments_{selected_review_document['document_id']}",
-                        )
+                                if role in pm_role_options
+                            ] or [PROJECT_MANAGER_ROLE]
+                            edited_allowed_roles = st.multiselect(
+                                "Allowed roles",
+                                pm_role_options,
+                                default=pm_default_roles,
+                                key=f"approve_roles_{selected_review_document['document_id']}",
+                            )
+                            locked_department = st.selectbox(
+                                "Allowed department",
+                                [st.session_state["department"]],
+                                disabled=True,
+                                key=f"approve_departments_{selected_review_document['document_id']}",
+                            )
+                            edited_allowed_departments = [locked_department]
 
                         submitted_approval = st.form_submit_button("Approve for Indexing")
 
@@ -5170,6 +5220,10 @@ if selected_page in ["KB Management", "KB Status"]:
 
 
 if selected_page == "Chat":
+    if CHAT_QUESTION_WIDGET_VERSION_KEY not in st.session_state:
+        st.session_state[CHAT_QUESTION_WIDGET_VERSION_KEY] = 0
+        st.session_state.pop("chat_question", None)
+
     if "chat_messages" not in st.session_state:
         st.session_state["chat_messages"] = []
 
@@ -5528,7 +5582,7 @@ if selected_page == "Chat":
                 with question_columns[0]:
                     st.text_input(
                         "Message",
-                        key="chat_question",
+                        key=get_chat_question_widget_key(),
                         placeholder="Type or select an example question...",
                         label_visibility="collapsed",
                     )
